@@ -21,8 +21,8 @@ class DiscreteModel:
         self.Pz = Pz
 
         # Initial calculations
-        self.Nx = len(self.x_grid)
-        self.Nz = len(self.z_grid)
+        self.Nx, self.kx = self.x_grid.shape
+        self.Nz, self.kz = self.z_grid.shape
 
         self.bP = self.bet * self.Pz
         self.bP1 = np.kron(self.bP, np.ones((self.Nx, 1)))
@@ -66,14 +66,15 @@ class DiscreteModel:
             done = np.all(indices_old == indices)
             
         print('Converged in {} iterations'.format(it))
+        return None
 
     def sim(self, Nsim):
         """Simulate from solution"""
         z_ix_sim = tools.sim_discrete(self.Pz, Nsim)
-        z_sim = self.z_grid[z_ix_sim]
+        z_sim = self.z_grid[z_ix_sim, :]
 
-        state_ix_sim = tools.sim_policy(self.index_list, z_ix_sim)
-        x_sim = self.x_grid[state_ix_sim]
+        x_ix_sim = tools.sim_policy(self.index_list, z_ix_sim)
+        x_sim = self.x_grid[x_ix_sim, :]
         return (x_sim, z_sim)
 
 class LifeCycleModel:
@@ -89,8 +90,8 @@ class LifeCycleModel:
         self.Pz = Pz
 
         # Initial calculations
-        self.Nx = len(self.x_grid)
-        self.Nz = len(self.z_grid)
+        self.Nx, self.kx = self.x_grid.shape
+        self.Nz, self.kz = self.z_grid.shape
         self.Nt = len(self.flow_lists)
 
         self.bP = self.bet * self.Pz
@@ -103,46 +104,32 @@ class LifeCycleModel:
     def solve(self):
         """Solve model"""
 
-        R = np.vstack(self.flow_list)
-        indices = np.vstack(self.index_list)
-        v = np.vstack([vi.T for vi in self.terminal_list])
+        v_next = np.vstack([vi.T for vi in self.terminal_list])
 
         for tt in range(self.Nt-1, -1, -1):
 
-            W = np.dot(self.bP1, v)
+            R = np.vstack(self.flow_lists[tt])
+            W = np.dot(self.bP1, v_next)
             V = R + W
             indices, v = tools.update_value(V)
 
             self.v_lists[tt] = np.split(v, self.Nz)
             self.index_lists[tt] = np.split(indices, self.Nz)
-
-        while not done:
             
-            it += 1
-            
-            # Howard improvement step
-            # transition_list = [tools.get_transition(index) for index in self.index_list]
-            # bP_trans_list = [np.kron(self.bP[ii, :], transition_list[ii]) for ii in range(self.Nz)]
-            # bP_trans = np.vstack(bP_trans_list)
-            
-            # opt_flow_list = [self.flow_list[ii][np.arange(self.Nx), np.squeeze(self.index_list[ii])][:, np.newaxis] 
-                             # for ii in range(self.Nz)]
-            # opt_flow = np.vstack(opt_flow_list)
-            # v = np.linalg.solve((np.eye(self.Nx * self.Nz) - bP_trans), opt_flow)
-            # self.v_list = np.split(v, self.Nz)
-            
-            # Update step
-            W = np.dot(self.bP1, v_next)
-            V = R + W
-            indices, v = tools.update_value(V)
-            self.index_list = np.split(indices, self.Nz)
+            v_next = np.vstack([vi.T for vi in self.v_lists[tt]])
+        
+        return None
 
     def sim(self, Nsim):
-        raise Exception
-        # """Simulate from solution"""
-        # z_ix_sim = tools.sim_discrete(self.Pz, Nsim)
-        # z_sim = self.z_grid[z_ix_sim]
-
-        # state_ix_sim = tools.sim_policy(self.index_list, z_ix_sim)
-        # x_sim = self.x_grid[state_ix_sim]
-        # return (x_sim, z_sim)
+        """Simulate from solution"""
+        z_sim = np.zeros((self.kz, self.Nt, Nsim))
+        x_sim = np.zeros((self.kx, self.Nt, Nsim))
+        
+        for ii in range(Nsim):
+            z_ix_sim = tools.sim_discrete(self.Pz, self.Nt)
+            z_sim[:, :, ii] = self.z_grid[z_ix_sim, :].T  
+            
+            x_ix_sim = tools.sim_life_cycle(self.index_lists, z_ix_sim)
+            x_sim[:, :, ii] = self.x_grid[x_ix_sim, :].T
+            
+        return (x_sim, z_sim)

@@ -50,13 +50,33 @@ def sim_discrete(P, N, i0=0):
     
     return ix
     
-def sim_policy(index_list, z_sim, i0=0):
+def sim_policy(index_list, z_ix_sim, i0=0):
     
-    Nsim = len(z_sim)
+    Nsim = len(z_ix_sim)
     ix = np.zeros(Nsim).astype(int)
     ix[0] = i0
     
-    for ii in range(1, Nsim):
-        ix[ii] = index_list[z_sim[ii]][ix[ii-1]]
+    for ii in range(0, Nsim):
+        if ii > 0:
+            ix_old = ix[ii-1]
+        else:
+            ix_old = i0
+
+        ix[ii] = index_list[z_ix_sim[ii]][ix_old]
         
+    return ix
+
+def sim_life_cycle(index_lists, z_ix_sim, i0=0):
+
+    Nt = len(z_ix_sim)
+    ix = np.zeros(Nt).astype(int)
+
+    for tt in range(0, Nt):
+        if tt > 0:
+            ix_old = ix[tt-1]
+        else:
+            ix_old = i0
+
+        ix[tt] = index_lists[tt][z_ix_sim[tt]][ix_old]
+
     return ix
