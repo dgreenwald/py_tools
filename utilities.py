@@ -6,5 +6,9 @@ def split(x, lengths, axis=0):
         indices.append(indices[-1] + length)
     return np.split(x, indices, axis=axis)
 
+def splitstr(string, length):
+    string = str(string)
+    return (string[:length], string[length:])
+
 def any2(list_of_items, list_to_check):
     return any([var in list_to_check for var in list_of_items])

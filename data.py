@@ -4,6 +4,8 @@ import os
 import pandas as pd
 import pandas_datareader.data as web
 
+import py_tools.utilities as ut
+
 base_dir = '/home/dan/Dropbox/data/'
 pkl_dir = base_dir + 'pkl/'
 gll_dir = '/home/dan/Dropbox/gll/Dan/data/'
@@ -31,58 +33,6 @@ def deflate(df, var_list, index='cpi', log=False, diff=False, reimport=False):
 def date_index(df, startdate, freq='QS'):
     df.set_index(pd.date_range(startdate, periods=len(df), freq=freq), inplace=True)
     return df
-
-def splitstr(string, length):
-    string = str(string)
-    return (string[:length], string[length:])
-
-def transform(df, var_list, lag=0, diff=0, other=None, deflate=False, 
-              deflate_ix='cpi', deflate_log=False, deflate_diff=False,
-              deflate_reimport=False):
-
-    new_var_list = []
-    for var in var_list:
-        new_var = var
-
-        if deflate:
-            prefix = 'DEF' + deflate_ix.upper() + '_'
-            new_var = prefix + new_var
-
-        if other is not None:
-            prefix = other.upper()
-            new_var = prefix + new_var
-
-        if diff != 0:
-            if diff > 1:
-                prefix = 'D({})_'.format(diff)
-            else:
-                prefix = 'D_'
-            new_var = prefix + new_var
-
-        if lag != 0:
-            if lag > 1:
-                prefix = 'L({})_'.format(lag)
-            else:
-                prefix = 'L_'
-            new_var = prefix + new_var
-
-        new_var_list.append(new_var)
-
-        df[new_var] = df[var]
-
-        if deflate:
-            df[new_var] = deflate(df, [new_var], index=deflate_ix, log=deflate_log, 
-                                  diff=deflate_diff, reimport=deflate_reimport)
-        if other is not None:
-            df[new_var] = eval('np.{}(df[new_var])'.format(other))
-
-        if diff != 0:
-            df[new_var] = df[new_var].diff(diff)
-
-        if lag != 0:
-            df[new_var] = df[new_var].shift(lag)
-
-    return new_var_list
 
 # def add_var(var, var_set, dependencies):
 
@@ -144,7 +94,7 @@ def load_fof(reimport=False):
 
         unique_tables = sorted(list(set(tables)))
         for table in unique_tables:
-            prefix, suffix = splitstr(table, 1)
+            prefix, suffix = ut.splitstr(table, 1)
             infile = prefix + 'tab' + suffix + 'd.prn'
 
             these_codes = [this_code for this_table, this_code in zip(tables, codes) if this_table == table]
@@ -157,7 +107,7 @@ def load_fof(reimport=False):
             )
             df_new.rename(columns = {code : var for var, code in zip(full_list, codes)}, inplace=True)
 
-            yr, q = (int(string) for string in splitstr(df_new.ix[0, 'DATES'], 4))
+            yr, q = (int(string) for string in ut.splitstr(df_new.ix[0, 'DATES'], 4))
             mon = 3 * (q - 1) + 1
             date_index(df_new, '{0}/1/{1}'.format(mon, yr))
             del df_new['DATES']
@@ -249,7 +199,7 @@ def load_stockw(reimport=False):
     data_dir = gll_dir
     infile = 'stockw.csv'
     df = pd.read_table(data_dir + infile, sep=',', 
-                           names=['stockw_level'], usecols=['stockw_level'])
+                           names=['dates', 'stockw_level'], usecols=['stockw_level'])
     df['stockw'] = np.log(df['stockw_level'])
 
     # del df['dates']

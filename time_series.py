@@ -10,6 +10,54 @@ from py_tools.debug import disp
 import py_tools.data as dt
 import py_tools.utilities as ut
 
+def transform(df, var_list, lag=0, diff=0, other=None, deflate=False, 
+              deflate_ix='cpi', deflate_log=False, deflate_diff=False,
+              deflate_reimport=False):
+
+    new_var_list = []
+    for var in var_list:
+        new_var = var
+
+        if deflate:
+            prefix = 'DEF' + deflate_ix.upper() + '_'
+            new_var = prefix + new_var
+
+        if other is not None:
+            prefix = other.upper()
+            new_var = prefix + new_var
+
+        if diff != 0:
+            if diff != 1:
+                prefix = 'D({})_'.format(diff)
+            else:
+                prefix = 'D_'
+            new_var = prefix + new_var
+
+        if lag != 0:
+            if lag != 1:
+                prefix = 'L({})_'.format(lag)
+            else:
+                prefix = 'L_'
+            new_var = prefix + new_var
+
+        new_var_list.append(new_var)
+
+        df[new_var] = df[var]
+
+        if deflate:
+            df[new_var] = dt.deflate(df, [new_var], index=deflate_ix, log=deflate_log, 
+                                  diff=deflate_diff, reimport=deflate_reimport)
+        if other is not None:
+            df[new_var] = eval('np.{}(df[new_var])'.format(other))
+
+        if diff != 0:
+            df[new_var] = df[new_var].diff(diff)
+
+        if lag != 0:
+            df[new_var] = df[new_var].shift(lag)
+
+    return new_var_list
+
 def sm_regression(df, lhs, rhs, match='inner', ix=None, nw_lags=0):
     """Regression using statsmodels"""
 
@@ -28,27 +76,48 @@ def sm_regression(df, lhs, rhs, match='inner', ix=None, nw_lags=0):
     else:
         results = results.get_robustcov_results('HC0')
 
-    return results
+    return (results, ix, Xs, zs)
+
+class Regression:
+    """Regression object"""
+
+    def __init__(self, df, lhs, rhs, match='inner', ix=None, nw_lags=0):
+
+        if 'const' in rhs and 'const' not in df:
+            df['const'] = 1.0
+
+        X = df.ix[:, rhs].values
+        z = df.ix[:, lhs].values
+
+        self.match=match
+        self.ix, self.Xs, self.zs = match_sample(X, z, how=self.match, ix=ix)
+
+        self.nobs = X.shape[0]
+        self.params = least_sq(self.Xs, self.zs)
+        self.fittedvalues = np.dot(self.Xs, self.params)
+        self.resid = self.zs - self.fittedvalues
+        self.cov_HC0 = np.dot(self.resid.T, self.resid) / self.nobs
 
 def MA(df, lhs_var, rhs_vars, n_lags=16):
 
     lhs = [lhs_var]
-    # lhs += dt.transform(df, [lhs_var], 
+    # lhs += transform(df, [lhs_var], 
     # lhs.append(add_lag(df, lhs_var, lag=0, diff=0))
 
     rhs = ['const']
     for var in rhs_vars:
         for lag in range(n_lags):
-            rhs += dt.transform(df, [var], lag=lag)
+            rhs += transform(df, [var], lag=lag)
             # rhs.append(add_lag(df, var, lag=lag))
 
     # Get sample indices
     ix, _, _ = match_sample(df[rhs_vars].values, df[lhs_var].values)
 
     # Run regression
-    return sm_regression(df, lhs, rhs, match='custom', ix=ix)
+    results, ix, Xs, zs = sm_regression(df, lhs, rhs, match='custom', ix=ix)
+    return (results, ix, Xs, zs)
 
-def VAR(df, var_list, n_var_lags=1, vecm=True, n_dls_lags=8):
+def VAR(df, var_list, n_var_lags=1):
 
     n_var = len(var_list)
 
@@ -58,27 +127,39 @@ def VAR(df, var_list, n_var_lags=1, vecm=True, n_dls_lags=8):
     # RHS variables
     rhs = ['const']
 
-    if vecm:
-        # Estimate cointegrating relationship
-        dls_lhs = var_list[0]
-        dls_rhs = var_list[1:]
-        alp, dlt = run_dls(df, dls_lhs, dls_rhs, n_dls_lags)
+    for lag in range(1, n_var_lags + 1):
+        for var in var_list:
+            rhs += transform(df, [var], lag=lag)
 
-        # Get cointegration term
-        df['coint_resid'] = np.dot(df.ix[:, var_list], alp)
-        rhs += dt.transform(df, ['coint_resid'], lag=1)
-        # rhs.append(add_lag(df, var='coint_resid', lag=1))
-    else:
-        alp = np.zeros(n_var)
-        dlt = 0.0
+    # Regression
+    return Regression(df, lhs, rhs)
+
+def VECM(df, var_list, n_var_lags=1, n_dls_lags=8):
+
+    n_var = len(var_list)
+
+    # LHS variables
+    lhs = transform(df, var_list, diff=1)
+
+    # RHS variables
+    rhs = ['const']
+
+    # Estimate cointegrating relationship
+    dls_lhs = var_list[0]
+    dls_rhs = var_list[1:]
+    alp, dlt = run_dls(df, dls_lhs, dls_rhs, n_dls_lags)
+
+    # Get cointegration term
+    df['coint_resid'] = np.dot(df.ix[:, var_list], alp)
+    rhs += transform(df, ['coint_resid'], lag=1)
 
     for lag in range(1, n_var_lags + 1):
         for var in var_list:
-            rhs += dt.transform(df, [var], lag=lag)
+            rhs += transform(df, [var], diff=1, lag=lag)
             # rhs.append(add_lag(df, var, lag))
 
     # Regression
-    return sm_regression(df, lhs, rhs)
+    return Regression(df, lhs, rhs)
 
 class LongHorizonMA:
     """Long Horizon Moving Average Regression"""
@@ -199,11 +280,11 @@ def run_dls(df, lhs_var, rhs_vars, n_lags=8):
     
     for lag in range(-n_lags, n_lags + 1):
         for var in rhs_vars:
-            rhs += dt.transform(df, [var], lag=lag, diff=1)
+            rhs += transform(df, [var], lag=lag, diff=1)
             # rhs.append(add_lag(df, var, lag, diff=1))
             
     # Regression
-    results = sm_regression(df, lhs, rhs)
+    results, _, _, _ = sm_regression(df, lhs, rhs)
     
     coint_vec = np.hstack([np.ones(1), -results.params[1 : n_rhs + 1]])
     const = results.params[0]
