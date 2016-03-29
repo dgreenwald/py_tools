@@ -10,7 +10,6 @@ gll_dir = '/home/dan/Dropbox/gll/Dan/data/'
 
 def deflate(df, var_list, index='cpi', log=False, diff=False, reimport=False):
     
-    prefix = 'DEF' + index.upper() + '_'
     index_var = index + '_index'
 
     df_fred = load_fred(reimport=reimport)
@@ -22,12 +21,12 @@ def deflate(df, var_list, index='cpi', log=False, diff=False, reimport=False):
             scale = scale.diff()
 
         if log:
-            df[prefix + var] = df[var] - scale
+            series = df[var] - scale
         else:
             scale = np.exp(scale)
-            df[prefix + var] = df[var] / scale
+            series = df[var] / scale
 
-    return df
+    return series
 
 def date_index(df, startdate, freq='QS'):
     df.set_index(pd.date_range(startdate, periods=len(df), freq=freq), inplace=True)
@@ -37,41 +36,53 @@ def splitstr(string, length):
     string = str(string)
     return (string[:length], string[length:])
 
-# def transform(df, var, lag=0, diff=0, other=None, deflate=None):
+def transform(df, var_list, lag=0, diff=0, other=None, deflate=False, 
+              deflate_ix='cpi', deflate_log=False, deflate_diff=False,
+              deflate_reimport=False):
 
-    # new_var = var
+    new_var_list = []
+    for var in var_list:
+        new_var = var
 
-    # if deflate is not None:
-        # prefix = deflate.upper()
-        # new_var = prefix + new_var
+        if deflate:
+            prefix = 'DEF' + deflate_ix.upper() + '_'
+            new_var = prefix + new_var
 
-    # if other is not None:
-        # prefix = other.upper()
-        # new_var = prefix + new_var
+        if other is not None:
+            prefix = other.upper()
+            new_var = prefix + new_var
 
-    # if diff != 0:
-        # if diff > 1:
-            # prefix = 'D({})_'.format(diff)
-        # else:
-            # prefix = 'D_'
-        # new_var = prefix + new_var
+        if diff != 0:
+            if diff > 1:
+                prefix = 'D({})_'.format(diff)
+            else:
+                prefix = 'D_'
+            new_var = prefix + new_var
 
-    # if lag != 0:
-        # if lag > 1:
-            # prefix = 'L({})_'.format(lag)
-        # else:
-            # prefix = 'L_'
-        # new_var = prefix + new_var
+        if lag != 0:
+            if lag > 1:
+                prefix = 'L({})_'.format(lag)
+            else:
+                prefix = 'L_'
+            new_var = prefix + new_var
 
-    # df[new_var] = df[var]
+        new_var_list.append(new_var)
 
-    # if deflate is not None:
+        df[new_var] = df[var]
 
-    # if other is not None:
+        if deflate:
+            df[new_var] = deflate(df, [new_var], index=deflate_ix, log=deflate_log, 
+                                  diff=deflate_diff, reimport=deflate_reimport)
+        if other is not None:
+            df[new_var] = eval('np.{}(df[new_var])'.format(other))
 
-    # if diff != 0:
+        if diff != 0:
+            df[new_var] = df[new_var].diff(diff)
 
-    # if lag != 0:
+        if lag != 0:
+            df[new_var] = df[new_var].shift(lag)
+
+    return new_var_list
 
 # def add_var(var, var_set, dependencies):
 
@@ -93,8 +104,9 @@ def load_datasets(dataset_list, reimport=False):
     for dataset in dataset_list:
 
         df_new = eval('load_{}(reimport=reimport)'.format(dataset))
-        columns = {col : dataset.upper() + '_' + col for col in df_new.columns}
-        df_new.rename(columns=columns, inplace=True)
+        if len(df_new.columns) > 1:
+            columns = {col : dataset.upper() + '_' + col for col in df_new.columns}
+            df_new.rename(columns=columns, inplace=True)
 
         if df is None:
             df = df_new
@@ -237,10 +249,10 @@ def load_stockw(reimport=False):
     data_dir = gll_dir
     infile = 'stockw.csv'
     df = pd.read_table(data_dir + infile, sep=',', 
-                           names=['dates', 'stockw_level'], usecols=['stockw_level'])
+                           names=['stockw_level'], usecols=['stockw_level'])
     df['stockw'] = np.log(df['stockw_level'])
 
-    del df['dates']
+    # del df['dates']
     del df['stockw_level']
 
     df = date_index(df, '1/1/1952')
@@ -284,6 +296,7 @@ def load_cay(reimport=False):
     df = pd.read_table(data_dir + infile, delim_whitespace=True, 
                        names=['dates', 'c', 'a', 'y', 'cay'])
     df = date_index(df, '1/1/1952')
+    return df
 
 def load_bls_ls(reimport=False):
 
@@ -300,6 +313,7 @@ def load_bls_ls(reimport=False):
     # df = pd.merge(df, df_fred, left_index=True, right_index=True) 
     # df['bls_cap_inc'] = np.log((1.0 - df['bls_ls']) * df['GDPC1'])
     # df['log_bls_ls'] = np.log(df['bls_ls'])
+    return df
 
 def load_fernald(reimport=False):
 
@@ -310,6 +324,8 @@ def load_fernald(reimport=False):
                            header=0, usecols=['dtfp_util'])
     df = set_index(df, '1/1/1947')
     df['tfp_util'] = df['dtfp_util'].cumsum()
+
+    return df
 
 def load_fred(reimport=False):
 
