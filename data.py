@@ -1,9 +1,33 @@
+import datetime
 import numpy as np
 import os
 import pandas as pd
+import pandas_datareader.data as web
 
 base_dir = '/home/dan/Dropbox/data/'
+pkl_dir = base_dir + 'pkl/'
 gll_dir = '/home/dan/Dropbox/gll/Dan/data/'
+
+def deflate(df, var_list, index='cpi', log=False, diff=False, reimport=False):
+    
+    prefix = 'DEF' + index.upper() + '_'
+    index_var = index + '_index'
+
+    df_fred = load_fred(reimport=reimport)
+    for var in var_list:
+
+        scale = np.log(df_fred[index_var])
+
+        if diff:
+            scale = scale.diff()
+
+        if log:
+            df[prefix + var] = df[var] - scale
+        else:
+            scale = np.exp(scale)
+            df[prefix + var] = df[var] / scale
+
+    return df
 
 def date_index(df, startdate, freq='QS'):
     df.set_index(pd.date_range(startdate, periods=len(df), freq=freq), inplace=True)
@@ -12,6 +36,42 @@ def date_index(df, startdate, freq='QS'):
 def splitstr(string, length):
     string = str(string)
     return (string[:length], string[length:])
+
+# def transform(df, var, lag=0, diff=0, other=None, deflate=None):
+
+    # new_var = var
+
+    # if deflate is not None:
+        # prefix = deflate.upper()
+        # new_var = prefix + new_var
+
+    # if other is not None:
+        # prefix = other.upper()
+        # new_var = prefix + new_var
+
+    # if diff != 0:
+        # if diff > 1:
+            # prefix = 'D({})_'.format(diff)
+        # else:
+            # prefix = 'D_'
+        # new_var = prefix + new_var
+
+    # if lag != 0:
+        # if lag > 1:
+            # prefix = 'L({})_'.format(lag)
+        # else:
+            # prefix = 'L_'
+        # new_var = prefix + new_var
+
+    # df[new_var] = df[var]
+
+    # if deflate is not None:
+
+    # if other is not None:
+
+    # if diff != 0:
+
+    # if lag != 0:
 
 # def add_var(var, var_set, dependencies):
 
@@ -27,10 +87,26 @@ def splitstr(string, length):
 
     # return var_set
 
+def load_datasets(dataset_list, reimport=False):
+
+    df = None
+    for dataset in dataset_list:
+
+        df_new = eval('load_{}(reimport=reimport)'.format(dataset))
+        columns = {col : dataset.upper() + '_' + col for col in df_new.columns}
+        df_new.rename(columns=columns, inplace=True)
+
+        if df is None:
+            df = df_new
+        else:
+            df = pd.merge(df, df_new, left_index=True, right_index=True)
+
+    return df
+
 def load_fof(reimport=False):
 
     data_dir = base_dir + 'fof/'
-    pkl_file = data_dir + 'fof.pkl'
+    pkl_file = pkl_dir + 'fof.pkl'
 
     if not os.path.exists(pkl_file) or reimport:
 
@@ -111,7 +187,7 @@ def clean_nipa(df_t):
 def load_nipa(reimport=False):
 
     data_dir = base_dir + 'nipa/'
-    pkl_file = data_dir + 'nipa1.pkl'
+    pkl_file = pkl_dir + 'nipa1.pkl'
 
     if not os.path.exists(pkl_file) or reimport:
 
@@ -156,7 +232,7 @@ def load_nipa(reimport=False):
 
     return df
 
-def load_stockw():
+def load_stockw(reimport=False):
 
     data_dir = gll_dir
     infile = 'stockw.csv'
@@ -171,7 +247,7 @@ def load_stockw():
 
     return df
 
-def load_crsp():
+def load_crsp(reimport=False):
 
     data_dir = gll_dir
     infile = 'crsp.csv' 
@@ -200,7 +276,7 @@ def load_crsp():
 
     return df
 
-def load_cay():
+def load_cay(reimport=False):
 
     data_dir = gll_dir
     infile = 'caydata.txt'
@@ -209,7 +285,7 @@ def load_cay():
                        names=['dates', 'c', 'a', 'y', 'cay'])
     df = date_index(df, '1/1/1952')
 
-def load_bls_ls():
+def load_bls_ls(reimport=False):
 
     data_dir = gll_dir
     infile = 'bls_labor_share.csv'
@@ -225,7 +301,7 @@ def load_bls_ls():
     # df['bls_cap_inc'] = np.log((1.0 - df['bls_ls']) * df['GDPC1'])
     # df['log_bls_ls'] = np.log(df['bls_ls'])
 
-def load_fernald():
+def load_fernald(reimport=False):
 
     data_dir = gll_dir
     infile = 'quarterly_tfp.csv'
@@ -235,4 +311,26 @@ def load_fernald():
     df = set_index(df, '1/1/1947')
     df['tfp_util'] = df['dtfp_util'].cumsum()
 
+def load_fred(reimport=False):
 
+    data_dir = base_dir + 'fred/'
+    pkl_file = pkl_dir + 'fred.pkl'
+
+    var_index = {
+        'cpi_index' : 'CPIAUCSL',
+        'pce_index' : 'PCEPI',
+    }
+
+    var_list = sorted(list(var_index.keys()))
+    codes = [var_index[var] for var in var_list]
+
+    if not os.path.exists(pkl_file) or reimport:
+
+        start = datetime.datetime(1900, 1, 1)
+        end = datetime.datetime.today()
+        df = web.DataReader(codes, "fred", start, end)
+        df.rename(columns = {code : var for var, code in zip(var_list, codes)}, inplace=True)
+        df.to_pickle(pkl_file) 
+
+    df = pd.read_pickle(pkl_file)
+    return df
