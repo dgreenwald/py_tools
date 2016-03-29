@@ -1,5 +1,4 @@
 import ipdb
-import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import statsmodels.api as sm
@@ -58,7 +57,7 @@ def transform(df, var_list, lag=0, diff=0, other=None, deflate=False,
 
     return new_var_list
 
-def sm_regression(df, lhs, rhs, match='inner', ix=None, nw_lags=0):
+def sm_regression(df, lhs, rhs, match='inner', ix=None, nw_lags=0, display=False):
     """Regression using statsmodels"""
 
     if 'const' in rhs and 'const' not in df:
@@ -75,6 +74,9 @@ def sm_regression(df, lhs, rhs, match='inner', ix=None, nw_lags=0):
         results = results.get_robustcov_results('HAC', maxlags=nw_lags)
     else:
         results = results.get_robustcov_results('HC0')
+
+    if display:
+        print(results.summary())
 
     return (results, ix, Xs, zs)
 
@@ -98,7 +100,7 @@ class Regression:
         self.resid = self.zs - self.fittedvalues
         self.cov_HC0 = np.dot(self.resid.T, self.resid) / self.nobs
 
-def MA(df, lhs_var, rhs_vars, n_lags=16):
+def MA(df, lhs_var, rhs_vars, n_lags=16, display=False):
 
     lhs = [lhs_var]
     # lhs += transform(df, [lhs_var], 
@@ -114,7 +116,7 @@ def MA(df, lhs_var, rhs_vars, n_lags=16):
     ix, _, _ = match_sample(df[rhs_vars].values, df[lhs_var].values)
 
     # Run regression
-    results, ix, Xs, zs = sm_regression(df, lhs, rhs, match='custom', ix=ix)
+    results, ix, Xs, zs = sm_regression(df, lhs, rhs, match='custom', ix=ix, display=display)
     return (results, ix, Xs, zs)
 
 def VAR(df, var_list, n_var_lags=1):
@@ -271,7 +273,7 @@ def quad_form(A, X):
     return np.dot(A.T, np.dot(X, A))
 
 # Estimate cointegrating relationship using DLS
-def run_dls(df, lhs_var, rhs_vars, n_lags=8):
+def run_dls(df, lhs_var, rhs_vars, n_lags=8, display=False):
 
     n_rhs = len(rhs_vars)
     rhs = ['const'] + rhs_vars
@@ -284,7 +286,7 @@ def run_dls(df, lhs_var, rhs_vars, n_lags=8):
             # rhs.append(add_lag(df, var, lag, diff=1))
             
     # Regression
-    results, _, _, _ = sm_regression(df, lhs, rhs)
+    results, _, _, _ = sm_regression(df, lhs, rhs, display=display)
     
     coint_vec = np.hstack([np.ones(1), -results.params[1 : n_rhs + 1]])
     const = results.params[0]
