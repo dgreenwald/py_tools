@@ -153,8 +153,39 @@ def load_nipa(reimport=False):
 
     if not os.path.exists(pkl_file) or reimport:
 
+        # Corporate sector variables
         var_index = {
+            # Nonfinancial
+            'cons_fixed_cap' : 'B456RC1',
+            'net_value_added' : 'A457RC1',
+            'compensation' : 'A460RC1',
+            'wage_sal' : 'B461RC1',
+            'wage_sal_supp' : 'B462RC1',
+            'prod_taxes' : 'W325RC1',
+            'net_op_surplus' : 'W326RC1',
             'net_interest' : 'B471RC1',
+            'transfer_payments' : 'W327RC1',
+            'profits' : 'A463RC1',
+            'corp_taxes' : 'B465RC1',
+            'after_tax_profits' : 'W328RC1',
+            'net_dividends' : 'B467RC1',
+            'undistributed_profits' : 'W332RC1',
+            #
+            # Total
+            # 'cons_fixed_cap' : 'A438RC1',
+            # 'net_value_added' : 'A439RC1',
+            # 'compensation' : 'A442RC1',
+            # 'wage_sal' : 'A443RC1',
+            # 'wage_sal_supp' : 'A444RC1',
+            # 'taxes' : 'W321RC1',
+            # 'net_op_surplus' : 'W322RC1',
+            # 'net_interest' : 'A453RC1',
+            # 'transfer_payments' : 'W323RC1',
+            # 'profits' : 'A445RC1',
+            # 'taxes' : 'A054RC1',
+            # 'after_tax_profits' : 'W273RC1',
+            # 'net_dividends' : 'A449RC1',
+            # 'undistributed_profits' : 'W274RC1',
         } 
 
         full_list = sorted(list(var_index.keys()))
@@ -184,7 +215,7 @@ def load_nipa(reimport=False):
 
         codes = [var_index[var] for var in full_list]
         df = df.ix[:, codes]
-        df.rename(columns = {code : var for var, code in zip(var_list, codes)}, inplace=True)
+        df.rename(columns = {code : var for var, code in zip(full_list, codes)}, inplace=True)
 
         # Save to pickle format
         df.to_pickle(pkl_file)
