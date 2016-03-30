@@ -9,6 +9,14 @@ from py_tools.debug import disp
 import py_tools.data as dt
 import py_tools.utilities as ut
 
+class FullResults:
+    """Regression results with index and samples"""
+    def __init__(self, results, ix, Xs, zs):
+        self.results = results
+        self.ix = ix
+        self.Xs = Xs
+        self.zs = zs
+
 def transform(df, var_list, lag=0, diff=0, other=None, deflate=False, 
               deflate_ix='cpi', deflate_log=False, deflate_diff=False,
               deflate_reimport=False):
@@ -78,7 +86,7 @@ def sm_regression(df, lhs, rhs, match='inner', ix=None, nw_lags=0, display=False
     if display:
         print(results.summary())
 
-    return (results, ix, Xs, zs)
+    return FullResults(results, ix, Xs, zs)
 
 class Regression:
     """Regression object"""
@@ -116,8 +124,7 @@ def MA(df, lhs_var, rhs_vars, n_lags=16, display=False):
     ix, _, _ = match_sample(df[rhs_vars].values, df[lhs_var].values)
 
     # Run regression
-    results, ix, Xs, zs = sm_regression(df, lhs, rhs, match='custom', ix=ix, display=display)
-    return (results, ix, Xs, zs)
+    return sm_regression(df, lhs, rhs, match='custom', ix=ix, display=display)
 
 def VAR(df, var_list, n_var_lags=1):
 
@@ -169,10 +176,10 @@ class LongHorizonMA:
     def __init__(self, df, lhs_var, rhs_var, horizon, n_lags=16):
 
         # First stage: MA regression
-        results = MA(df, lhs_var, [rhs_var], n_lags)
+        fr = MA(df, lhs_var, [rhs_var], n_lags)
 
         # Second stage: compute LH coefficient
-        ma_coeffs = results.params[1:]
+        ma_coeffs = fr.results.params[1:]
 
         cov_term = 0.0
         for ii in range(horizon):
@@ -185,55 +192,64 @@ class LongHorizonMA:
 class LongHorizonVAR:
     """Long Horizon VAR Regression"""
 
-    def __init__(self, df, lhs_var, rhs_vars, horizon, n_var_lags=1, vecm=False, diff=0):
+    def __init__(self, df, lhs_var, rhs_vars, horizon, n_var_lags=1, predictive=False):
 
         var_list = [lhs_var] + rhs_vars
 
         n_rhs = len(rhs_vars)
         n_var = len(var_list)
 
-        results = VAR(df, var_list, n_var_lags, vecm=vecm, diff=diff)
+        fr = VAR(df, var_list, n_var_lags)
 
-        n_A = results.params.shape[0] - 1
+        n_A = fr.results.params.shape[0] - 1
         A = np.zeros((n_A, n_A))
-        A[:n_var, :] = results.params[1:, :].T
+        A[:n_var, :] = fr.results.params[1:, :].T
         if n_var_lags > 1:
             A[n_var:, :-n_var] = np.eye(n_A - n_var)
 
         Q = np.zeros(A.shape)
-        Q[:n_var, :n_var] = results.cov_HC0
+        Q[:n_var, :n_var] = fr.results.cov_HC0
 
         # C: unconditional covariances
         C = []
         C.append(solve_discrete_lyapunov(A, Q))
-        C_sum = np.zeros(C[0].shape)
+
+        if predictive:
+            C_sum = np.zeros(C[0].shape)
+
         for jj in range(1, horizon + 1):
             C.append(np.dot(A, C[jj-1]))
-            C_sum += C[jj]
+            if predictive:
+                C_sum += C[jj]
 
         Vk = horizon * C[0]
         for jj in range(1, horizon):
             Vk += (horizon - jj) * (C[jj] + C[jj].T)
 
         # Long-horizon regressions
+        # TODO: right now lhs var must be ordered first
         pick_lhs = np.zeros((n_A, 1))
         pick_lhs[0] = 1
 
         self.bet_lh = np.zeros(n_rhs)
         self.R2 = np.zeros(n_rhs)
 
-        for ii in range(n_rhs):
+        for ii in range(1, n_rhs):
 
             pick_rhs = np.zeros((n_A, 1))
             pick_rhs[ii] = 1
 
-            bet_lh_num = np.dot(pick_lhs.T, np.dot(C_sum, pick_rhs))
-            bet_lh_denom = quad_form(pick_rhs, C[0])
-            self.bet_lh[ii] = bet_lh_num / bet_lh_denom
+            if predictive:
+                lh_rh_cov = np.dot(pick_lhs.T, np.dot(C_sum, pick_rhs))
+                rh_var = quad_form(pick_rhs, C[0])
+            else:
+                lh_rh_cov = np.dot(pick_lhs.T, np.dot(Vk, pick_rhs))
+                rh_var = quad_form(pick_rhs, Vk)
 
-            R2_num = (self.bet_lh[ii] ** 2) * quad_form(pick_rhs, C[0])
-            R2_denom = quad_form(pick_lhs, Vk)
-            self.R2[ii] = R2_num / R2_denom
+            self.bet_lh[ii] = lh_rh_cov / rh_var
+
+            lh_var = quad_form(pick_lhs, Vk)
+            self.R2[ii] = (self.bet_lh[ii] ** 2) * rh_var / lh_var
 
 def orthogonalize_errors(u):
     """Cholesky decomposition"""
@@ -286,9 +302,9 @@ def run_dls(df, lhs_var, rhs_vars, n_lags=8, display=False):
             # rhs.append(add_lag(df, var, lag, diff=1))
             
     # Regression
-    results, _, _, _ = sm_regression(df, lhs, rhs, display=display)
+    fr = sm_regression(df, lhs, rhs, display=display)
     
-    coint_vec = np.hstack([np.ones(1), -results.params[1 : n_rhs + 1]])
-    const = results.params[0]
+    coint_vec = np.hstack([np.ones(1), -fr.results.params[1 : n_rhs + 1]])
+    const = fr.results.params[0]
 
     return (coint_vec, const)

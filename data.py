@@ -331,3 +331,14 @@ def load_fred(reimport=False):
 
     df = pd.read_pickle(pkl_file)
     return df
+
+def load_payouts(reimport=False):
+
+    df_fof = load_fof(reimport)
+    df_nipa = load_nipa(reimport)
+    
+    df = pd.merge(df_fof, df_nipa, left_index=True, right_index=True)
+    df['net_payouts'] = (df['FOF_net_dividends'] + df['NIPA_net_interest'] 
+                         - df['FOF_net_new_equity'] - df['FOF_net_new_paper'] - df['FOF_net_new_bonds'])
+
+    return df
