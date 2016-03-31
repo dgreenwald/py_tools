@@ -1,4 +1,5 @@
 import datetime
+import ipdb
 import numpy as np
 import os
 import pandas as pd
@@ -73,8 +74,8 @@ def load_fof(reimport=False):
     if not os.path.exists(pkl_file) or reimport:
 
         var_index = {
-            # 'liabilities_book' : ('b103', 'FL104190005'),
-            # 'net_worth_book' : ('b103', 'FL102090005'),
+            'liabilities_book' : ('b103', 'FL104190005'),
+            'net_worth_book' : ('b103', 'FL102090005'),
             # 'net_dividends' : ('u103', 'FU106121075'),
             # 'net_new_equity' : ('u103', 'FU103164103'),
             # 'net_new_paper' : ('u103', 'FU103169100'),
@@ -334,10 +335,7 @@ def load_fred(reimport=False):
 
 def load_payouts(reimport=False):
 
-    df_fof = load_fof(reimport)
-    df_nipa = load_nipa(reimport)
-    
-    df = pd.merge(df_fof, df_nipa, left_index=True, right_index=True)
+    df = load_datasets(['nipa', 'fof'], reimport)
     df['net_payouts'] = (df['FOF_net_dividends'] + df['NIPA_net_interest'] 
                          - df['FOF_net_new_equity'] - df['FOF_net_new_paper'] - df['FOF_net_new_bonds'])
 
