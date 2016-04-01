@@ -50,19 +50,20 @@ def transform(df, var_list, lag=0, diff=0, other=None, deflate=False,
 
         new_var_list.append(new_var)
 
-        df[new_var] = df[var]
+        if new_var not in df:
+            df[new_var] = df[var]
 
-        if deflate:
-            df[new_var] = dt.deflate(df, [new_var], index=deflate_ix, log=deflate_log, 
-                                  diff=deflate_diff, reimport=deflate_reimport)
-        if other is not None:
-            df[new_var] = eval('np.{}(df[new_var])'.format(other))
+            if deflate:
+                df[new_var] = dt.deflate(df, [new_var], index=deflate_ix, log=deflate_log, 
+                                      diff=deflate_diff, reimport=deflate_reimport)
+            if other is not None:
+                df[new_var] = eval('np.{}(df[new_var])'.format(other))
 
-        if diff != 0:
-            df[new_var] = df[new_var].diff(diff)
+            if diff != 0:
+                df[new_var] = df[new_var].diff(diff)
 
-        if lag != 0:
-            df[new_var] = df[new_var].shift(lag)
+            if lag != 0:
+                df[new_var] = df[new_var].shift(lag)
 
     return new_var_list
 
