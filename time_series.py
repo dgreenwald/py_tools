@@ -2,6 +2,7 @@ import ipdb
 import numpy as np
 import pandas as pd
 import statsmodels.api as sm
+import statsmodels.formula.api as smf
 from scipy.linalg import solve_discrete_lyapunov
 
 import data
@@ -30,19 +31,19 @@ def transform(df, var_list, lag=0, diff=0, other=None, deflate=False,
             new_var = prefix + new_var
 
         if other is not None:
-            prefix = other.upper()
+            prefix = other.upper() + '_'
             new_var = prefix + new_var
 
         if diff != 0:
             if diff != 1:
-                prefix = 'D({})_'.format(diff)
+                prefix = 'D{}_'.format(diff)
             else:
                 prefix = 'D_'
             new_var = prefix + new_var
 
         if lag != 0:
             if lag != 1:
-                prefix = 'L({})_'.format(lag)
+                prefix = 'L{}_'.format(lag)
             else:
                 prefix = 'L_'
             new_var = prefix + new_var
@@ -65,6 +66,28 @@ def transform(df, var_list, lag=0, diff=0, other=None, deflate=False,
 
     return new_var_list
 
+def formula_regression(df, formula, var_list=None, match='inner', ix=None, nw_lags=0, display=False):
+
+    if var_list is not None:
+        ix, _ = match_sample(df[var_list].values, how=match, ix=ix)
+
+    if ix is None:
+        model = smf.ols(formula=formula, data=df)
+    else:
+        model = smf.ols(formula=formula, data=df.ix[ix, :])
+
+    results = model.fit()
+
+    if nw_lags > 0:
+        results = results.get_robustcov_results('HAC', maxlags=nw_lags)
+    else:
+        results = results.get_robustcov_results('HC0')
+
+    if display:
+        print(results.summary())
+
+    return FullResults(results, ix, Xs=None, zs=None)
+
 def sm_regression(df, lhs, rhs, match='inner', ix=None, nw_lags=0, display=False):
     """Regression using statsmodels"""
 
@@ -74,7 +97,7 @@ def sm_regression(df, lhs, rhs, match='inner', ix=None, nw_lags=0, display=False
     X = df.ix[:, rhs].values
     z = df.ix[:, lhs].values
 
-    ix, Xs, zs = match_sample(X, z, how=match, ix=ix)
+    ix, Xs, zs = match_xy(X, z, how=match, ix=ix)
 
     model = sm.OLS(zs, Xs)
     results = model.fit()
@@ -100,7 +123,7 @@ class Regression:
         z = df.ix[:, lhs].values
 
         self.match=match
-        self.ix, self.Xs, self.zs = match_sample(X, z, how=self.match, ix=ix)
+        self.ix, self.Xs, self.zs = match_xy(X, z, how=self.match, ix=ix)
 
         self.nobs = X.shape[0]
         self.params = least_sq(self.Xs, self.zs)
@@ -121,7 +144,7 @@ def MA(df, lhs_var, rhs_vars, n_lags=16, display=False):
             # rhs.append(add_lag(df, var, lag=lag))
 
     # Get sample indices
-    ix, _, _ = match_sample(df[rhs_vars].values, df[lhs_var].values)
+    ix, _, _ = match_xy(df[rhs_vars].values, df[lhs_var].values)
 
     # Run regression
     return sm_regression(df, lhs, rhs, match='custom', ix=ix, display=display)
@@ -258,7 +281,21 @@ def orthogonalize_errors(u):
     e = (np.linalg.solve(H, u.T)).T
     return (e, H)
 
-def match_sample(X, z, how='inner', ix=None):
+def match_sample(X, how='inner', ix=None):
+
+    if how == 'inner':
+        ix = np.all(pd.notnull(X), axis=1)
+    elif how == 'outer':
+        ix = np.any(pd.notnull(X), axis=1)
+    elif how != 'custom':
+        raise Exception
+        
+    Xs = X[ix, :]
+    Xs[pd.isnull(Xs)] = 0.0
+    
+    return (ix, Xs)
+
+def match_xy(X, z, how='inner', ix=None):
 
     # TODO: should change so that originals not modified
     if len(z.shape) == 1:
@@ -266,19 +303,28 @@ def match_sample(X, z, how='inner', ix=None):
         
     if len(X.shape) == 1:
         X = X[:, np.newaxis]
+
+    Xall = np.hstack((X, z))
+    ix, Xall_s = match_sample(Xall, how=how, ix=ix)
+
+    Nx = X.shape[1]
+    Nz = z.shape[1]
+
+    Xs = Xall_s[:Nx]
+    zs = Xall_s[Nx:]
     
-    if how == 'inner':
-        ix = np.all(pd.notnull(np.hstack((X, z))), axis=1)
-    elif how == 'outer':
-        ix = np.any(pd.notnull(np.hstack((X, z))), axis=1)
-    elif how != 'custom':
-        raise Exception
+    # if how == 'inner':
+        # ix = np.all(pd.notnull(np.hstack((X, z))), axis=1)
+    # elif how == 'outer':
+        # ix = np.any(pd.notnull(np.hstack((X, z))), axis=1)
+    # elif how != 'custom':
+        # raise Exception
         
-    Xs = X[ix, :]
-    zs = z[ix, :]
+    # Xs = X[ix, :]
+    # zs = z[ix, :]
     
-    Xs[pd.isnull(Xs)] = 0.0
-    zs[pd.isnull(zs)] = 0.0
+    # Xs[pd.isnull(Xs)] = 0.0
+    # zs[pd.isnull(zs)] = 0.0
     
     return (ix, Xs, zs)
 
