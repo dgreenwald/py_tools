@@ -338,5 +338,6 @@ def load_payouts(reimport=False):
     df = load_datasets(['nipa', 'fof'], reimport)
     df['net_payouts'] = (df['FOF_net_dividends'] + df['NIPA_net_interest'] 
                          - df['FOF_net_new_equity'] - df['FOF_net_new_paper'] - df['FOF_net_new_bonds'])
+    df = df['net_payouts'].to_frame() 
 
     return df
