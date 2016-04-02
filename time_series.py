@@ -112,25 +112,53 @@ def sm_regression(df, lhs, rhs, match='inner', ix=None, nw_lags=0, display=False
 
     return FullResults(results, ix, Xs, zs)
 
-class Regression:
+class MVOLSResults:
     """Regression object"""
 
-    def __init__(self, df, lhs, rhs, match='inner', ix=None, nw_lags=0):
+    def __init__(self, nobs, params, fittedvalues, resid, cov_HC0):
 
-        if 'const' in rhs and 'const' not in df:
-            df['const'] = 1.0
+        self.nobs = nobs
+        self.params = params
+        self.fittedvalues = fittedvalues
+        self.resid = resid
+        self.cov_HC0 = cov_HC0
 
-        X = df.ix[:, rhs].values
-        z = df.ix[:, lhs].values
+    # def __init__(self, df, lhs, rhs, match='inner', ix=None, nw_lags=0):
 
-        self.match=match
-        self.ix, self.Xs, self.zs = match_xy(X, z, how=self.match, ix=ix)
+        # if 'const' in rhs and 'const' not in df:
+            # df['const'] = 1.0
 
-        self.nobs = X.shape[0]
-        self.params = least_sq(self.Xs, self.zs)
-        self.fittedvalues = np.dot(self.Xs, self.params)
-        self.resid = self.zs - self.fittedvalues
-        self.cov_HC0 = np.dot(self.resid.T, self.resid) / self.nobs
+        # X = df.ix[:, rhs].values
+        # z = df.ix[:, lhs].values
+
+        # self.match=match
+        # self.ix, self.Xs, self.zs = match_xy(X, z, how=self.match, ix=ix)
+
+        # self.nobs = X.shape[0]
+        # self.params = least_sq(self.Xs, self.zs)
+        # self.fittedvalues = np.dot(self.Xs, self.params)
+        # self.resid = self.zs - self.fittedvalues
+        # self.cov_HC0 = np.dot(self.resid.T, self.resid) / self.nobs
+
+def mv_ols(df, lhs, rhs, match='inner', ix=None, nw_lags=0):
+
+    if 'const' in rhs and 'const' not in df:
+        df['const'] = 1.0
+
+    X = df.ix[:, rhs].values
+    z = df.ix[:, lhs].values
+
+    match=match
+    ix, Xs, zs = match_xy(X, z, how=match, ix=ix)
+
+    nobs = X.shape[0]
+    params = least_sq(Xs, zs)
+    fittedvalues = np.dot(Xs, params)
+    resid = zs - fittedvalues
+    cov_HC0 = np.dot(resid.T, resid) / nobs
+
+    results = MVOLSResults(nobs, params, fittedvalues, resid, cov_HC0)
+    return FullResults(results, ix, Xs, zs)
 
 def MA(df, lhs_var, rhs_vars, n_lags=16, display=False):
 
@@ -165,7 +193,7 @@ def VAR(df, var_list, n_var_lags=1):
             rhs += transform(df, [var], lag=lag)
 
     # Regression
-    return Regression(df, lhs, rhs)
+    return mv_ols(df, lhs, rhs)
 
 def VECM(df, var_list, n_var_lags=1, n_dls_lags=8):
 
@@ -192,7 +220,7 @@ def VECM(df, var_list, n_var_lags=1, n_dls_lags=8):
             # rhs.append(add_lag(df, var, lag))
 
     # Regression
-    return Regression(df, lhs, rhs)
+    return mv_ols(df, lhs, rhs)
 
 class LongHorizonMA:
     """Long Horizon Moving Average Regression"""
@@ -216,64 +244,120 @@ class LongHorizonMA:
 class LongHorizonVAR:
     """Long Horizon VAR Regression"""
 
-    def __init__(self, df, lhs_var, rhs_vars, horizon, n_var_lags=1, predictive=False):
+    def __init__(self, df, lhs_var, rhs_vars, horizon, n_var_lags=1):
 
         var_list = [lhs_var] + rhs_vars
 
-        n_rhs = len(rhs_vars)
+        self.n_rhs = len(rhs_vars)
         n_var = len(var_list)
 
-        fr = VAR(df, var_list, n_var_lags)
+        self.fr = VAR(df, var_list, n_var_lags)
 
-        n_A = fr.results.params.shape[0] - 1
-        A = np.zeros((n_A, n_A))
-        A[:n_var, :] = fr.results.params[1:, :].T
+        n_A = self.fr.results.params.shape[0] - 1
+        self.A = np.zeros((n_A, n_A))
+        self.A[:n_var, :] = self.fr.results.params[1:, :].T
         if n_var_lags > 1:
-            A[n_var:, :-n_var] = np.eye(n_A - n_var)
+            self.A[n_var:, :-n_var] = np.eye(n_A - n_var)
 
-        Q = np.zeros(A.shape)
-        Q[:n_var, :n_var] = fr.results.cov_HC0
+        self.Q = np.zeros(self.A.shape)
+        self.Q[:n_var, :n_var] = self.fr.results.cov_HC0
 
         # C: unconditional covariances
-        C = []
-        C.append(solve_discrete_lyapunov(A, Q))
+        self.C = []
+        self.C.append(solve_discrete_lyapunov(self.A, self.Q))
 
-        if predictive:
-            C_sum = np.zeros(C[0].shape)
+        # if predictive:
+            # C_sum = np.zeros(self.C[0].shape)
 
         for jj in range(1, horizon + 1):
-            C.append(np.dot(A, C[jj-1]))
-            if predictive:
-                C_sum += C[jj]
+            self.C.append(np.dot(self.A, self.C[jj-1]))
+            # if predictive:
+                # C_sum += self.C[jj]
 
-        Vk = horizon * C[0]
+        self.Vk = horizon * self.C[0]
         for jj in range(1, horizon):
-            Vk += (horizon - jj) * (C[jj] + C[jj].T)
+            self.Vk += (horizon - jj) * (self.C[jj] + self.C[jj].T)
 
         # Long-horizon regressions
         # TODO: right now lhs var must be ordered first
-        pick_lhs = np.zeros((n_A, 1))
-        pick_lhs[0] = 1
+        self.lhs_ix = 0
 
-        self.bet_lh = np.zeros(n_rhs)
-        self.R2 = np.zeros(n_rhs)
+    def predictive_reg(self):
+        
+        # Compute covariance of current with future sum
+        C_sum = np.zeros(self.C[0].shape)
 
-        for ii in range(1, n_rhs):
+        for jj in range(1, horizon + 1):
+            C_sum += self.C[jj]
 
-            pick_rhs = np.zeros((n_A, 1))
-            pick_rhs[ii] = 1
+        bet_lh = np.zeros(self.n_rhs)
+        R2 = np.zeros(self.n_rhs)
 
-            if predictive:
-                lh_rh_cov = np.dot(pick_lhs.T, np.dot(C_sum, pick_rhs))
-                rh_var = quad_form(pick_rhs, C[0])
-            else:
-                lh_rh_cov = np.dot(pick_lhs.T, np.dot(Vk, pick_rhs))
-                rh_var = quad_form(pick_rhs, Vk)
+        for ii in range(0, self.n_rhs):
 
-            self.bet_lh[ii] = lh_rh_cov / rh_var
+            rhs_ix = ii + 1
 
-            lh_var = quad_form(pick_lhs, Vk)
-            self.R2[ii] = (self.bet_lh[ii] ** 2) * rh_var / lh_var
+            lh_rh_cov = C_sum[self.lhs_ix, rhs_ix]
+            rh_var = self.C[0][rhs_ix, rhs_ix]
+
+            bet_lh[ii] = lh_rh_cov / rh_var
+
+            lh_var = self.Vk[self.lhs_ix, self.lhs_ix]
+            R2[ii] = (lh_rh_cov ** 2) / (lh_var * rh_var)
+
+        bet_lh = np.zeros(self.n_rhs)
+        R2 = np.zeros(self.n_rhs)
+
+        return (bet_lh, R2)
+
+    def contemp_reg(self):
+
+        bet_lh = np.zeros(self.n_rhs)
+        R2 = np.zeros(self.n_rhs)
+
+        for ii in range(0, self.n_rhs):
+
+            rhs_ix = ii + 1
+
+            lh_rh_cov = self.Vk[self.lhs_ix, rhs_ix]
+            rh_var = self.Vk[rhs_ix, rhs_ix]
+
+            bet_lh[ii] = lh_rh_cov / rh_var
+
+            lh_var = self.Vk[self.lhs_ix, self.lhs_ix]
+            R2[ii] = (lh_rh_cov ** 2) / (lh_var * rh_var)
+
+        return (bet_lh, R2)
+
+    def orthogonal_contemp_reg(self):
+
+        bet_lh = np.zeros(self.n_rhs)
+        R2 = np.zeros(self.n_rhs)
+
+        # covariance terms
+        var_y = self.Vk[0, 0]
+        cov_xy = self.Vk[0, 1:]
+        cov_xx = self.Vk[1:, 1:]
+
+        # pre-allocate
+        bet_xu = np.zeros((self.n_rhs, self.n_rhs))
+
+        # initialize at un-orthogonalized values
+        cov_yu = cov_xy.copy()
+        cov_xu = cov_xx.copy()
+        var_u = np.diagonal(cov_xx).copy()
+
+        for jj in range(1, self.n_rhs):
+            for kk in range(jj):
+                bet_xu = cov_xu[jj, kk] / var_u[kk]
+                cov_xu[:, jj] -= bet_xu * cov_xu[:, kk]
+                cov_yu[jj] -= bet_xu * cov_yu[kk]
+                var_u[jj] -= bet_xu * cov_xu[jj, kk]
+
+        bet_lh = cov_yu / var_u
+        R2 = ((bet_lh ** 2) * var_u) / var_y
+
+        return bet_lh, R2
 
 def orthogonalize_errors(u):
     """Cholesky decomposition"""
@@ -311,8 +395,8 @@ def match_xy(X, z, how='inner', ix=None):
     Nx = X.shape[1]
     Nz = z.shape[1]
 
-    Xs = Xall_s[:Nx]
-    zs = Xall_s[Nx:]
+    Xs = Xall_s[:, :Nx]
+    zs = Xall_s[:, Nx:]
     
     # if how == 'inner':
         # ix = np.all(pd.notnull(np.hstack((X, z))), axis=1)
