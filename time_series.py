@@ -312,20 +312,29 @@ class LongHorizonVAR:
 
     def contemp_reg(self):
 
-        bet_lh = np.zeros(self.n_rhs)
-        R2 = np.zeros(self.n_rhs)
+        # bet_lh = np.zeros(self.n_rhs)
+        # R2 = np.zeros(self.n_rhs)
 
-        for ii in range(0, self.n_rhs):
+        # for ii in range(0, self.n_rhs):
 
-            rhs_ix = ii + 1
+            # rhs_ix = ii + 1
 
-            lh_rh_cov = self.Vk[self.lhs_ix, rhs_ix]
-            rh_var = self.Vk[rhs_ix, rhs_ix]
+            # lh_rh_cov = self.Vk[self.lhs_ix, rhs_ix]
+            # rh_var = self.Vk[rhs_ix, rhs_ix]
 
-            bet_lh[ii] = lh_rh_cov / rh_var
+            # bet_lh[ii] = lh_rh_cov / rh_var
 
-            lh_var = self.Vk[self.lhs_ix, self.lhs_ix]
-            R2[ii] = (lh_rh_cov ** 2) / (lh_var * rh_var)
+            # lh_var = self.Vk[self.lhs_ix, self.lhs_ix]
+            # R2[ii] = (lh_rh_cov ** 2) / (lh_var * rh_var)
+
+        # return (bet_lh, R2)
+
+        var_y = self.Vk[0, 0]
+        cov_xy = self.Vk[0, 1:]
+        cov_xx = self.Vk[1:, 1:]
+
+        bet_lh = np.linalg.solve(cov_xx, cov_xy)
+        R2 = quad_form(bet_lh, cov_xx) / var_y
 
         return (bet_lh, R2)
 
@@ -357,7 +366,7 @@ class LongHorizonVAR:
         bet_lh = cov_yu / var_u
         R2 = ((bet_lh ** 2) * var_u) / var_y
 
-        return bet_lh, R2
+        return (bet_lh, R2)
 
 def orthogonalize_errors(u):
     """Cholesky decomposition"""
