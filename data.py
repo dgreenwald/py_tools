@@ -150,13 +150,14 @@ def clean_nipa(df_t):
 def load_nipa(reimport=False):
 
     data_dir = base_dir + 'nipa/'
-    pkl_file = pkl_dir + 'nipa1.pkl'
+    pkl_file = pkl_dir + 'nipa_14.pkl'
 
     if not os.path.exists(pkl_file) or reimport:
 
         # Corporate sector variables
         var_index = {
             # Nonfinancial
+            # 'gross_value_added' : 'A455RC1',
             'cons_fixed_cap' : 'B456RC1',
             'net_value_added' : 'A457RC1',
             'compensation' : 'A460RC1',
@@ -171,6 +172,8 @@ def load_nipa(reimport=False):
             'after_tax_profits' : 'W328RC1',
             'net_dividends' : 'B467RC1',
             'undistributed_profits' : 'W332RC1',
+            # 'gross_value_added_chained' : 'B455RX1',
+            'net_value_added_chained' : 'A457RX1',
             #
             # Total
             # 'cons_fixed_cap' : 'A438RC1',
@@ -231,11 +234,11 @@ def load_stockw(reimport=False):
     data_dir = gll_dir
     infile = 'stockw.csv'
     df = pd.read_table(data_dir + infile, sep=',', 
-                           names=['dates', 'stockw_level'], usecols=['stockw_level'])
-    df['stockw'] = np.log(df['stockw_level'])
+                           names=['dates', 'stockw'], usecols=['stockw'])
+    # df['stockw'] = np.log(df['stockw_level'])
 
     # del df['dates']
-    del df['stockw_level']
+    # del df['stockw_level']
 
     df = date_index(df, '1/1/1952')
 
@@ -310,6 +313,8 @@ def load_fernald(reimport=False):
     return df
 
 def load_fred(reimport=False):
+
+    reimport=True
 
     data_dir = base_dir + 'fred/'
     pkl_file = pkl_dir + 'fred.pkl'

@@ -4,8 +4,8 @@ import pandas as pd
 import statsmodels.api as sm
 import statsmodels.formula.api as smf
 from scipy.linalg import solve_discrete_lyapunov
+from tabulate import tabulate
 
-import data
 from py_tools.debug import disp 
 import py_tools.data as dt
 import py_tools.utilities as ut
@@ -246,21 +246,26 @@ class LongHorizonVAR:
 
     def __init__(self, df, lhs_var, rhs_vars, horizon, n_var_lags=1):
 
-        var_list = [lhs_var] + rhs_vars
+        self.lhs_var = lhs_var
+        self.rhs_vars = rhs_vars
+        self.n_var_lags = n_var_lags
+        self.horizon=horizon
 
-        self.n_rhs = len(rhs_vars)
-        n_var = len(var_list)
+        var_list = [self.lhs_var] + self.rhs_vars
 
-        self.fr = VAR(df, var_list, n_var_lags)
+        self.n_rhs = len(self.rhs_vars)
+        self.n_var = len(var_list)
+
+        self.fr = VAR(df, var_list, self.n_var_lags)
 
         n_A = self.fr.results.params.shape[0] - 1
         self.A = np.zeros((n_A, n_A))
-        self.A[:n_var, :] = self.fr.results.params[1:, :].T
-        if n_var_lags > 1:
-            self.A[n_var:, :-n_var] = np.eye(n_A - n_var)
+        self.A[:self.n_var, :] = self.fr.results.params[1:, :].T
+        if self.n_var_lags > 1:
+            self.A[self.n_var:, :-self.n_var] = np.eye(n_A - self.n_var)
 
         self.Q = np.zeros(self.A.shape)
-        self.Q[:n_var, :n_var] = self.fr.results.cov_HC0
+        self.Q[:self.n_var, :self.n_var] = self.fr.results.cov_HC0
 
         # C: unconditional covariances
         self.C = []
@@ -269,14 +274,14 @@ class LongHorizonVAR:
         # if predictive:
             # C_sum = np.zeros(self.C[0].shape)
 
-        for jj in range(1, horizon + 1):
+        for jj in range(1, self.horizon + 1):
             self.C.append(np.dot(self.A, self.C[jj-1]))
             # if predictive:
                 # C_sum += self.C[jj]
 
-        self.Vk = horizon * self.C[0]
-        for jj in range(1, horizon):
-            self.Vk += (horizon - jj) * (self.C[jj] + self.C[jj].T)
+        self.Vk = self.horizon * self.C[0]
+        for jj in range(1, self.horizon):
+            self.Vk += (self.horizon - jj) * (self.C[jj] + self.C[jj].T)
 
         # Long-horizon regressions
         # TODO: right now lhs var must be ordered first
@@ -284,6 +289,7 @@ class LongHorizonVAR:
 
     def predictive_reg(self):
         
+        print("Need to check for lags > 1!")
         # Compute covariance of current with future sum
         C_sum = np.zeros(self.C[0].shape)
 
@@ -310,43 +316,50 @@ class LongHorizonVAR:
 
         return (bet_lh, R2)
 
-    def contemp_reg(self):
+    def contemp_reg(self, display=False):
 
-        # bet_lh = np.zeros(self.n_rhs)
-        # R2 = np.zeros(self.n_rhs)
-
-        # for ii in range(0, self.n_rhs):
-
-            # rhs_ix = ii + 1
-
-            # lh_rh_cov = self.Vk[self.lhs_ix, rhs_ix]
-            # rh_var = self.Vk[rhs_ix, rhs_ix]
-
-            # bet_lh[ii] = lh_rh_cov / rh_var
-
-            # lh_var = self.Vk[self.lhs_ix, self.lhs_ix]
-            # R2[ii] = (lh_rh_cov ** 2) / (lh_var * rh_var)
-
-        # return (bet_lh, R2)
-
+        # covariance terms
         var_y = self.Vk[0, 0]
-        cov_xy = self.Vk[0, 1:]
-        cov_xx = self.Vk[1:, 1:]
+        cov_xy = self.Vk[0, 1:self.n_var]
+        cov_xx = self.Vk[1:self.n_var, 1:self.n_var]
 
+        # OLS
         bet_lh = np.linalg.solve(cov_xx, cov_xy)
         R2 = quad_form(bet_lh, cov_xx) / var_y
 
+        if display:
+            # Print first table
+            headers = ['LH VAR Regression', '']
+            table = [
+                ['Dep. Variable:', self.lhs_var],
+                ['Lags:', self.n_var_lags],
+                ['Horizon:', self.horizon],
+                ['R2:', '{:4.3f}'.format(R2)],
+            ]
+
+            print('\n\n\n')
+            print(tabulate(table, headers, tablefmt='rst', floatfmt='4.3f'))
+
+            headers = ['', 'coef']
+            table = []
+            for ii in range(self.n_rhs):
+                table.append([self.rhs_vars[ii], bet_lh[ii]])
+
+            print('\n')
+            print(tabulate(table, headers, tablefmt='rst', floatfmt='4.3f'))
+            print('\n\n\n')
+
         return (bet_lh, R2)
 
-    def orthogonal_contemp_reg(self):
+    def orthogonal_contemp_reg(self, display=False):
 
         bet_lh = np.zeros(self.n_rhs)
         R2 = np.zeros(self.n_rhs)
 
         # covariance terms
         var_y = self.Vk[0, 0]
-        cov_xy = self.Vk[0, 1:]
-        cov_xx = self.Vk[1:, 1:]
+        cov_xy = self.Vk[0, 1:self.n_var]
+        cov_xx = self.Vk[1:self.n_var, 1:self.n_var]
 
         # pre-allocate
         bet_xu = np.zeros((self.n_rhs, self.n_rhs))
@@ -365,6 +378,27 @@ class LongHorizonVAR:
 
         bet_lh = cov_yu / var_u
         R2 = ((bet_lh ** 2) * var_u) / var_y
+
+        if display:
+            # Print first table
+            headers = ['LH VAR Orth. Regression', '']
+            table = [
+                ['Dep. Variable:', self.lhs_var],
+                ['Lags:', self.n_var_lags],
+                ['Horizon:', self.horizon],
+            ]
+
+            print('\n\n\n')
+            print(tabulate(table, headers, tablefmt='rst', floatfmt='4.3f'))
+
+            headers = ['', 'coef', 'R2']
+            table = []
+            for ii in range(self.n_rhs):
+                table.append([self.rhs_vars[ii], bet_lh[ii], R2[ii]])
+
+            print('\n')
+            print(tabulate(table, headers, tablefmt='rst', floatfmt='4.3f'))
+            print('\n\n\n')
 
         return (bet_lh, R2)
 
