@@ -122,6 +122,9 @@ def load_fof(reimport=False):
 
         # Drop missing observations
         df = df.ix['1951-10-01':, :]
+
+        # Convert to billions
+        df /= 1000.0
         
         # Save to pickle format
         df.to_pickle(pkl_file)
@@ -341,8 +344,13 @@ def load_fred(reimport=False):
 def load_payouts(reimport=False):
 
     df = load_datasets(['nipa', 'fof'], reimport)
-    df['net_payouts'] = (df['FOF_net_dividends'] + df['NIPA_net_interest'] 
+    df['net_payouts'] = (df['FOF_net_dividends'] + df['NIPA_net_interest']
                          - df['FOF_net_new_equity'] - df['FOF_net_new_paper'] - df['FOF_net_new_bonds'])
+    neg_ix = df['net_payouts'].values < 0.0
+    if np.any(neg_ix):
+        max_negative_ix = int(np.amax(np.arange(len(df))[neg_ix]))
+        df = df.ix[max_negative_ix + 1:, :]
+
     df = df['net_payouts'].to_frame() 
 
     return df

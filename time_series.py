@@ -386,6 +386,7 @@ class LongHorizonVAR:
                 ['Dep. Variable:', self.lhs_var],
                 ['Lags:', self.n_var_lags],
                 ['Horizon:', self.horizon],
+                ['Total R2', '{:4.3f}'.format(np.sum(R2))],
             ]
 
             print('\n\n\n')
