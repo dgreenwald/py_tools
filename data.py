@@ -11,43 +11,9 @@ base_dir = '/home/dan/Dropbox/data/'
 pkl_dir = base_dir + 'pkl/'
 gll_dir = '/home/dan/Dropbox/gll/Dan/data/'
 
-def deflate(df, var_list, index='cpi', log=False, diff=False, reimport=False):
-    
-    index_var = index + '_index'
-
-    df_fred = load_fred(reimport=reimport)
-    for var in var_list:
-
-        scale = np.log(df_fred[index_var])
-
-        if diff:
-            scale = scale.diff()
-
-        if log:
-            series = df[var] - scale
-        else:
-            scale = np.exp(scale)
-            series = df[var] / scale
-
-    return series
-
 def date_index(df, startdate, freq='QS'):
     df.set_index(pd.date_range(startdate, periods=len(df), freq=freq), inplace=True)
     return df
-
-# def add_var(var, var_set, dependencies):
-
-    # # new_vars = set(dependencies.get(var, []))
-    # # var_set |= new_vars
-    # # for new_var in new_vars:
-        # # var_set = add_var(new_var, var_set, dependencies)
-
-    # if var in dependencies:
-        # var_set |= set(dependencies[var])
-    # else:
-        # var_set.add(var)
-
-    # return var_set
 
 def load_datasets(dataset_list, reimport=False):
 
@@ -316,8 +282,6 @@ def load_fernald(reimport=False):
     return df
 
 def load_fred(reimport=False):
-
-    reimport=True
 
     data_dir = base_dir + 'fred/'
     pkl_file = pkl_dir + 'fred.pkl'

@@ -18,17 +18,72 @@ class FullResults:
         self.Xs = Xs
         self.zs = zs
 
-def transform(df, var_list, lag=0, diff=0, other=None, deflate=False, 
-              deflate_ix='cpi', deflate_log=False, deflate_diff=False,
-              deflate_reimport=False):
+def deflate(df, var_list, index='cpi', log=False, diff=False, reimport=False):
+    
+    index_var = index + '_index'
+    assert index_var not in df
+
+    for var in var_list:
+
+        new_var = 'DEF' + index.upper() + '_' + var
+        assert new_var not in df
+        new_var_list.append(new_var)
+
+        df_fred = load_fred(reimport=reimport)
+        df = pd.merge(df, df_fred[index_var].to_frame(), left_index=True, right_index=True)
+
+        scale = np.log(df[index_var])
+        if diff:
+            scale = scale.diff()
+
+        if log:
+            df[new_var] = df[var] - scale
+        else:
+            df[new_var] = df[var] / scale
+
+    return [new_var_list]
+
+    # if diff:
+        # df[index_var] /= df[index_var].shift()
+
+    # if log:
+        # df = 
+        # df[index_var] = np.log(df[index_var])
+
+    # if log:
+        # df[index_var] = np.log(df[index_var])
+
+    # # df_merge = pd.merge(df, df_fred[index_var].to_frame(), left_index=True, right_index=True)
+
+    # # for var in var_list:
+
+    # if new_var is None:
+        # new_var = 'DEF' + index.upper() + '_' + var
+
+    # df_merge['scale'] = np.log(df_fred[index_var])
+
+    # if diff:
+        # df_merge['scale'] = df_merge['scale'].diff()
+
+    # if log:
+        # df_merge[new_var] = df_merge[var] - df_merge['scale']
+    # else:
+        # df_merge['scale'] = np.exp(df_merge['scale'])
+        # df_merge[new_var] = df_merge[var] / df_merge['scale']
+
+    # df = pd.merge(df, df_merge[new_var].to_frame(), left_index=True, right_index=True)
+
+    # return new_var
+
+def transform(df, var_list, lag=0, diff=0, other=None,
+              # , deflate=False, 
+              # deflate_ix='cpi', deflate_log=False, deflate_diff=False,
+              # deflate_reimport=False
+              ):
 
     new_var_list = []
     for var in var_list:
         new_var = var
-
-        if deflate:
-            prefix = 'DEF' + deflate_ix.upper() + '_'
-            new_var = prefix + new_var
 
         if other is not None:
             prefix = other.upper() + '_'
@@ -53,9 +108,11 @@ def transform(df, var_list, lag=0, diff=0, other=None, deflate=False,
         if new_var not in df:
             df[new_var] = df[var]
 
-            if deflate:
-                df[new_var] = dt.deflate(df, [new_var], index=deflate_ix, log=deflate_log, 
-                                      diff=deflate_diff, reimport=deflate_reimport)
+            # if deflate:
+                # _ = dt.deflate(df, new_var, index=deflate_ix, log=deflate_log, 
+                               # diff=deflate_diff, reimport=deflate_reimport,
+                               # new_var=new_var)
+
             if other is not None:
                 df[new_var] = eval('np.{}(df[new_var])'.format(other))
 
