@@ -1,4 +1,4 @@
-import ipdb
+# import ipdb
 import numpy as np
 import pandas as pd
 import statsmodels.api as sm
@@ -6,9 +6,9 @@ import statsmodels.formula.api as smf
 from scipy.linalg import solve_discrete_lyapunov
 from tabulate import tabulate
 
-from py_tools.debug import disp 
+# from py_tools.debug import disp 
 import py_tools.data as dt
-import py_tools.utilities as ut
+# import py_tools.utilities as ut
 
 class FullResults:
     """Regression results with index and samples"""
@@ -21,27 +21,28 @@ class FullResults:
 def deflate(df, var_list, index='cpi', log=False, diff=False, reimport=False):
     
     index_var = index + '_index'
-    assert index_var not in df
+    new_var_list = []
 
     for var in var_list:
 
         new_var = 'DEF' + index.upper() + '_' + var
-        assert new_var not in df
         new_var_list.append(new_var)
+        if new_var not in df:
 
-        df_fred = load_fred(reimport=reimport)
-        df = pd.merge(df, df_fred[index_var].to_frame(), left_index=True, right_index=True)
+            if index_var not in df:
+                df_fred = dt.load_fred(reimport=reimport)
+                df = pd.merge(df, df_fred[index_var].to_frame(), left_index=True, right_index=True)
 
-        scale = np.log(df[index_var])
-        if diff:
-            scale = scale.diff()
+            scale = np.log(df[index_var])
+            if diff:
+                scale = scale.diff()
 
-        if log:
-            df[new_var] = df[var] - scale
-        else:
-            df[new_var] = df[var] / scale
+            if log:
+                df[new_var] = df[var] - scale
+            else:
+                df[new_var] = df[var] / scale
 
-    return [new_var_list]
+    return (df, new_var_list)
 
     # if diff:
         # df[index_var] /= df[index_var].shift()
@@ -236,8 +237,7 @@ def MA(df, lhs_var, rhs_vars, n_lags=16, display=False):
     return sm_regression(df, lhs, rhs, match='custom', ix=ix, display=display)
 
 def VAR(df, var_list, n_var_lags=1):
-
-    n_var = len(var_list)
+    """Estimate VAR using OLS"""
 
     # LHS variables
     lhs = var_list
@@ -253,8 +253,7 @@ def VAR(df, var_list, n_var_lags=1):
     return mv_ols(df, lhs, rhs)
 
 def VECM(df, var_list, n_var_lags=1, n_dls_lags=8):
-
-    n_var = len(var_list)
+    """Estimate VECM using DLS"""
 
     # LHS variables
     lhs = transform(df, var_list, diff=1)
@@ -284,19 +283,21 @@ class LongHorizonMA:
 
     def __init__(self, df, lhs_var, rhs_var, horizon, n_lags=16):
 
-        # First stage: MA regression
-        fr = MA(df, lhs_var, [rhs_var], n_lags)
+        print("Need to fix!")
+        raise Exception
+        # # First stage: MA regression
+        # fr = MA(df, lhs_var, [rhs_var], n_lags)
 
-        # Second stage: compute LH coefficient
-        ma_coeffs = fr.results.params[1:]
+        # # Second stage: compute LH coefficient
+        # ma_coeffs = fr.results.params[1:]
 
-        cov_term = 0.0
-        for ii in range(horizon):
-            start = max(0, ii - horizon + 1)
-            end = ii + 1
-            cov_term += np.sum(ma_coeffs[start : end])
+        # cov_term = 0.0
+        # for ii in range(horizon):
+            # start = max(0, ii - horizon + 1)
+            # end = ii + 1
+            # cov_term += np.sum(ma_coeffs[start : end])
 
-        bet = cov_term / horizon
+        # bet = cov_term / horizon
 
 class LongHorizonVAR:
     """Long Horizon VAR Regression"""
@@ -350,7 +351,7 @@ class LongHorizonVAR:
         # Compute covariance of current with future sum
         C_sum = np.zeros(self.C[0].shape)
 
-        for jj in range(1, horizon + 1):
+        for jj in range(1, self.horizon + 1):
             C_sum += self.C[jj]
 
         bet_lh = np.zeros(self.n_rhs)
@@ -494,23 +495,9 @@ def match_xy(X, z, how='inner', ix=None):
     ix, Xall_s = match_sample(Xall, how=how, ix=ix)
 
     Nx = X.shape[1]
-    Nz = z.shape[1]
 
     Xs = Xall_s[:, :Nx]
     zs = Xall_s[:, Nx:]
-    
-    # if how == 'inner':
-        # ix = np.all(pd.notnull(np.hstack((X, z))), axis=1)
-    # elif how == 'outer':
-        # ix = np.any(pd.notnull(np.hstack((X, z))), axis=1)
-    # elif how != 'custom':
-        # raise Exception
-        
-    # Xs = X[ix, :]
-    # zs = z[ix, :]
-    
-    # Xs[pd.isnull(Xs)] = 0.0
-    # zs[pd.isnull(zs)] = 0.0
     
     return (ix, Xs, zs)
 
