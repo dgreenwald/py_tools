@@ -20,7 +20,7 @@ class FullResults:
 
 def deflate(df, var_list, index='cpi', log=False, diff=False, reimport=False):
     
-    index_var = index + '_index'
+    index_var = 'FRED_' + index + '_index'
     new_var_list = []
 
     for var in var_list:
@@ -30,7 +30,7 @@ def deflate(df, var_list, index='cpi', log=False, diff=False, reimport=False):
         if new_var not in df:
 
             if index_var not in df:
-                df_fred = dt.load_fred(reimport=reimport)
+                df_fred = dt.load_datasets(['fred'], reimport=reimport)
                 df = pd.merge(df, df_fred[index_var].to_frame(), left_index=True, right_index=True)
 
             scale = np.log(df[index_var])
@@ -40,7 +40,7 @@ def deflate(df, var_list, index='cpi', log=False, diff=False, reimport=False):
             if log:
                 df[new_var] = df[var] - scale
             else:
-                df[new_var] = df[var] / scale
+                df[new_var] = df[var] / np.exp(scale)
 
     return (df, new_var_list)
 

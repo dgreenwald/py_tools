@@ -1,3 +1,6 @@
+# TODO: data about type of series (log, real, units, etc)
+# TODO: default index for deflation
+
 import datetime
 import ipdb
 import numpy as np
@@ -20,10 +23,20 @@ def load_datasets(dataset_list, reimport=False):
     df = None
     for dataset in dataset_list:
 
-        df_new = eval('load_{}(reimport=reimport)'.format(dataset))
-        if len(df_new.columns) > 1:
-            columns = {col : dataset.upper() + '_' + col for col in df_new.columns}
-            df_new.rename(columns=columns, inplace=True)
+        pkl_file = pkl_dir + dataset + '.pkl'
+        
+        if not os.path.exists(pkl_file) or reimport:
+
+            df_new = eval('load_{}()'.format(dataset))
+            if len(df_new.columns) > 1:
+                columns = {col : dataset.upper() + '_' + col for col in df_new.columns}
+                df_new.rename(columns=columns, inplace=True)
+
+            df_new.to_pickle(pkl_file)
+
+        else:
+
+            df_new = pd.read_pickle(pkl_file)
 
         if df is None:
             df = df_new
@@ -32,71 +45,63 @@ def load_datasets(dataset_list, reimport=False):
 
     return df
 
-def load_fof(reimport=False):
+def load_fof():
 
     data_dir = base_dir + 'fof/'
-    pkl_file = pkl_dir + 'fof.pkl'
 
-    if not os.path.exists(pkl_file) or reimport:
+    var_index = {
+        'liabilities_book' : ('b103', 'FL104190005'),
+        'net_worth_book' : ('b103', 'FL102090005'),
+        # 'net_dividends' : ('u103', 'FU106121075'),
+        # 'net_new_equity' : ('u103', 'FU103164103'),
+        # 'net_new_paper' : ('u103', 'FU103169100'),
+        # 'net_new_bonds' : ('u103', 'FU103163003')
+        'net_dividends' : ('a103', 'FA106121075'),
+        'net_new_equity' : ('a103', 'FA103164103'),
+        'net_new_paper' : ('a103', 'FA103169100'),
+        'net_new_bonds' : ('a103', 'FA103163003')
+    }
 
-        var_index = {
-            'liabilities_book' : ('b103', 'FL104190005'),
-            'net_worth_book' : ('b103', 'FL102090005'),
-            # 'net_dividends' : ('u103', 'FU106121075'),
-            # 'net_new_equity' : ('u103', 'FU103164103'),
-            # 'net_new_paper' : ('u103', 'FU103169100'),
-            # 'net_new_bonds' : ('u103', 'FU103163003')
-            'net_dividends' : ('a103', 'FA106121075'),
-            'net_new_equity' : ('a103', 'FA103164103'),
-            'net_new_paper' : ('a103', 'FA103169100'),
-            'net_new_bonds' : ('a103', 'FA103163003')
-        }
+    full_list = sorted(list(var_index.keys()))
 
-        full_list = sorted(list(var_index.keys()))
+    tables, codes = zip(*[var_index[var] for var in full_list])
+    codes = [code + '.Q' for code in codes]
 
-        tables, codes = zip(*[var_index[var] for var in full_list])
-        codes = [code + '.Q' for code in codes]
+    df = None
 
-        df = None
+    unique_tables = sorted(list(set(tables)))
+    for table in unique_tables:
+        prefix, suffix = ut.splitstr(table, 1)
+        infile = prefix + 'tab' + suffix + 'd.prn'
 
-        unique_tables = sorted(list(set(tables)))
-        for table in unique_tables:
-            prefix, suffix = ut.splitstr(table, 1)
-            infile = prefix + 'tab' + suffix + 'd.prn'
+        these_codes = [this_code for this_table, this_code in zip(tables, codes) if this_table == table]
+        usecols = ['DATES'] + these_codes
 
-            these_codes = [this_code for this_table, this_code in zip(tables, codes) if this_table == table]
-            usecols = ['DATES'] + these_codes
+        df_new = pd.read_table(
+            data_dir + infile,
+            delimiter=' ',
+            usecols=usecols,
+        )
+        df_new.rename(columns = {code : var for var, code in zip(full_list, codes)}, inplace=True)
 
-            df_new = pd.read_table(
-                data_dir + infile,
-                delimiter=' ',
-                usecols=usecols,
-            )
-            df_new.rename(columns = {code : var for var, code in zip(full_list, codes)}, inplace=True)
+        yr, q = (int(string) for string in ut.splitstr(df_new.ix[0, 'DATES'], 4))
+        mon = 3 * (q - 1) + 1
+        date_index(df_new, '{0}/1/{1}'.format(mon, yr))
+        del df_new['DATES']
 
-            yr, q = (int(string) for string in ut.splitstr(df_new.ix[0, 'DATES'], 4))
-            mon = 3 * (q - 1) + 1
-            date_index(df_new, '{0}/1/{1}'.format(mon, yr))
-            del df_new['DATES']
+        df_new = df_new.convert_objects(convert_dates=False, convert_numeric=True)
 
-            df_new = df_new.convert_objects(convert_dates=False, convert_numeric=True)
+        if df is not None:
+            df = pd.merge(df, df_new, left_index=True, right_index=True)
+        else:
+            df = df_new
 
-            if df is not None:
-                df = pd.merge(df, df_new, left_index=True, right_index=True)
-            else:
-                df = df_new
+    # Drop missing observations
+    df = df.ix['1951-10-01':, :]
 
-        # Drop missing observations
-        df = df.ix['1951-10-01':, :]
-
-        # Convert to billions
-        df /= 1000.0
-        
-        # Save to pickle format
-        df.to_pickle(pkl_file)
-
-    df = pd.read_pickle(pkl_file)
-
+    # Convert to billions
+    df /= 1000.0
+    
     return df
 
 def clean_nipa(df_t):
@@ -116,89 +121,81 @@ def clean_nipa(df_t):
 
     return df
 
-def load_nipa(reimport=False):
+def load_nipa():
 
     data_dir = base_dir + 'nipa/'
     pkl_file = pkl_dir + 'nipa_14.pkl'
 
-    if not os.path.exists(pkl_file) or reimport:
+    # Corporate sector variables
+    var_index = {
+        # Nonfinancial
+        # 'gross_value_added' : 'A455RC1',
+        'cons_fixed_cap' : 'B456RC1',
+        'net_value_added' : 'A457RC1',
+        'compensation' : 'A460RC1',
+        'wage_sal' : 'B461RC1',
+        'wage_sal_supp' : 'B462RC1',
+        'prod_taxes' : 'W325RC1',
+        'net_op_surplus' : 'W326RC1',
+        'net_interest' : 'B471RC1',
+        'transfer_payments' : 'W327RC1',
+        'profits' : 'A463RC1',
+        'corp_taxes' : 'B465RC1',
+        'after_tax_profits' : 'W328RC1',
+        'net_dividends' : 'B467RC1',
+        'undistributed_profits' : 'W332RC1',
+        # 'gross_value_added_chained' : 'B455RX1',
+        'net_value_added_chained' : 'A457RX1',
+        #
+        # Total
+        # 'cons_fixed_cap' : 'A438RC1',
+        # 'net_value_added' : 'A439RC1',
+        # 'compensation' : 'A442RC1',
+        # 'wage_sal' : 'A443RC1',
+        # 'wage_sal_supp' : 'A444RC1',
+        # 'taxes' : 'W321RC1',
+        # 'net_op_surplus' : 'W322RC1',
+        # 'net_interest' : 'A453RC1',
+        # 'transfer_payments' : 'W323RC1',
+        # 'profits' : 'A445RC1',
+        # 'taxes' : 'A054RC1',
+        # 'after_tax_profits' : 'W273RC1',
+        # 'net_dividends' : 'A449RC1',
+        # 'undistributed_profits' : 'W274RC1',
+    } 
 
-        # Corporate sector variables
-        var_index = {
-            # Nonfinancial
-            # 'gross_value_added' : 'A455RC1',
-            'cons_fixed_cap' : 'B456RC1',
-            'net_value_added' : 'A457RC1',
-            'compensation' : 'A460RC1',
-            'wage_sal' : 'B461RC1',
-            'wage_sal_supp' : 'B462RC1',
-            'prod_taxes' : 'W325RC1',
-            'net_op_surplus' : 'W326RC1',
-            'net_interest' : 'B471RC1',
-            'transfer_payments' : 'W327RC1',
-            'profits' : 'A463RC1',
-            'corp_taxes' : 'B465RC1',
-            'after_tax_profits' : 'W328RC1',
-            'net_dividends' : 'B467RC1',
-            'undistributed_profits' : 'W332RC1',
-            # 'gross_value_added_chained' : 'B455RX1',
-            'net_value_added_chained' : 'A457RX1',
-            #
-            # Total
-            # 'cons_fixed_cap' : 'A438RC1',
-            # 'net_value_added' : 'A439RC1',
-            # 'compensation' : 'A442RC1',
-            # 'wage_sal' : 'A443RC1',
-            # 'wage_sal_supp' : 'A444RC1',
-            # 'taxes' : 'W321RC1',
-            # 'net_op_surplus' : 'W322RC1',
-            # 'net_interest' : 'A453RC1',
-            # 'transfer_payments' : 'W323RC1',
-            # 'profits' : 'A445RC1',
-            # 'taxes' : 'A054RC1',
-            # 'after_tax_profits' : 'W273RC1',
-            # 'net_dividends' : 'A449RC1',
-            # 'undistributed_profits' : 'W274RC1',
-        } 
+    full_list = sorted(list(var_index.keys()))
 
-        full_list = sorted(list(var_index.keys()))
+    # Current file
+    df_t = pd.read_excel(
+        data_dir + 'Section1All_xls.xls',
+        sheetname='11400 Qtr',
+        skiprows=7,
+        # header=[0, 1],
+        index_col=2,
+    )
+    df_curr = clean_nipa(df_t)
 
-        # Current file
-        df_t = pd.read_excel(
-            data_dir + 'Section1All_xls.xls',
-            sheetname='11400 Qtr',
-            skiprows=7,
-            # header=[0, 1],
-            index_col=2,
-        )
-        df_curr = clean_nipa(df_t)
+    # Current file
+    df_t = pd.read_excel(
+        data_dir + 'Section1All_Hist.xls',
+        sheetname='11400 Qtr',
+        skiprows=7,
+        # header=[0, 1],
+        index_col=2,
+    )
+    df_hist = clean_nipa(df_t)
 
-        # Current file
-        df_t = pd.read_excel(
-            data_dir + 'Section1All_Hist.xls',
-            sheetname='11400 Qtr',
-            skiprows=7,
-            # header=[0, 1],
-            index_col=2,
-        )
-        df_hist = clean_nipa(df_t)
+    start_date = df_curr.index[0]
+    df = df_hist.ix[:start_date, :].append(df_curr)
 
-        start_date = df_curr.index[0]
-        df = df_hist.ix[:start_date, :].append(df_curr)
-
-        codes = [var_index[var] for var in full_list]
-        df = df.ix[:, codes]
-        df.rename(columns = {code : var for var, code in zip(full_list, codes)}, inplace=True)
-
-        # Save to pickle format
-        df.to_pickle(pkl_file)
-
-    df = pd.read_pickle(pkl_file)
-    # df = df.ix[:, var_list]
+    codes = [var_index[var] for var in full_list]
+    df = df.ix[:, codes]
+    df.rename(columns = {code : var for var, code in zip(full_list, codes)}, inplace=True)
 
     return df
 
-def load_stockw(reimport=False):
+def load_stockw():
 
     data_dir = gll_dir
     infile = 'stockw.csv'
@@ -213,7 +210,7 @@ def load_stockw(reimport=False):
 
     return df
 
-def load_crsp(reimport=False):
+def load_crsp():
 
     data_dir = gll_dir
     infile = 'crsp.csv' 
@@ -242,7 +239,7 @@ def load_crsp(reimport=False):
 
     return df
 
-def load_cay(reimport=False):
+def load_cay():
 
     data_dir = gll_dir
     infile = 'caydata.txt'
@@ -252,7 +249,7 @@ def load_cay(reimport=False):
     df = date_index(df, '1/1/1952')
     return df
 
-def load_bls_ls(reimport=False):
+def load_bls_ls():
 
     data_dir = gll_dir
     infile = 'bls_labor_share.csv'
@@ -269,19 +266,19 @@ def load_bls_ls(reimport=False):
     # df['log_bls_ls'] = np.log(df['bls_ls'])
     return df
 
-def load_fernald(reimport=False):
+# def load_fernald():
 
-    data_dir = gll_dir
-    infile = 'quarterly_tfp.csv'
+    # data_dir = gll_dir
+    # infile = 'quarterly_tfp.csv'
 
-    df = pd.read_table(data_dir + infile, sep=',',
-                           header=0, usecols=['dtfp_util'])
-    df = set_index(df, '1/1/1947')
-    df['tfp_util'] = df['dtfp_util'].cumsum()
+    # df = pd.read_table(data_dir + infile, sep=',',
+                           # header=0, usecols=['dtfp_util'])
+    # df = set_index(df, '1/1/1947')
+    # df['tfp_util'] = df['dtfp_util'].cumsum()
 
-    return df
+    # return df
 
-def load_fred(reimport=False):
+def load_fred():
 
     data_dir = base_dir + 'fred/'
     pkl_file = pkl_dir + 'fred.pkl'
@@ -289,25 +286,22 @@ def load_fred(reimport=False):
     var_index = {
         'cpi_index' : 'CPIAUCSL',
         'pce_index' : 'PCEPI',
+        'real_gdp' : 'GDPC1',
     }
 
     var_list = sorted(list(var_index.keys()))
     codes = [var_index[var] for var in var_list]
 
-    if not os.path.exists(pkl_file) or reimport:
+    start = datetime.datetime(1900, 1, 1)
+    end = datetime.datetime.today()
+    df = web.DataReader(codes, "fred", start, end)
+    df.rename(columns = {code : var for var, code in zip(var_list, codes)}, inplace=True)
 
-        start = datetime.datetime(1900, 1, 1)
-        end = datetime.datetime.today()
-        df = web.DataReader(codes, "fred", start, end)
-        df.rename(columns = {code : var for var, code in zip(var_list, codes)}, inplace=True)
-        df.to_pickle(pkl_file) 
-
-    df = pd.read_pickle(pkl_file)
     return df
 
-def load_payouts(reimport=False):
+def load_payouts():
 
-    df = load_datasets(['nipa', 'fof'], reimport)
+    df = load_datasets(['nipa', 'fof'], reimport=True)
     df['net_payouts'] = (df['FOF_net_dividends'] + df['NIPA_net_interest']
                          - df['FOF_net_new_equity'] - df['FOF_net_new_paper'] - df['FOF_net_new_bonds'])
     neg_ix = df['net_payouts'].values < 0.0
@@ -316,5 +310,20 @@ def load_payouts(reimport=False):
         df = df.ix[max_negative_ix + 1:, :]
 
     df = df['net_payouts'].to_frame() 
+
+    return df
+
+def load_fernald():
+
+    df = pd.read_excel(
+        gll_dir + 'quarterly_tfp.xls',
+        sheetname='quarterly',
+        skiprows=1,
+    )
+
+    df['tfp_util'] = np.cumsum(df['dtfp_util'] / 400.0)
+    df['tfp'] = np.cumsum(df['dtfp'] / 400.0)
+
+    df = date_index(df, '01/01/1947')
 
     return df
