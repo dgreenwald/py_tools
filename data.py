@@ -71,7 +71,7 @@ def load_fof():
 
     unique_tables = sorted(list(set(tables)))
     for table in unique_tables:
-        prefix, suffix = ut.splitstr(table, 1)
+        prefix, suffix = ut.split_str(table, 1)
         infile = prefix + 'tab' + suffix + 'd.prn'
 
         these_codes = [this_code for this_table, this_code in zip(tables, codes) if this_table == table]
@@ -84,7 +84,7 @@ def load_fof():
         )
         df_new.rename(columns = {code : var for var, code in zip(full_list, codes)}, inplace=True)
 
-        yr, q = (int(string) for string in ut.splitstr(df_new.ix[0, 'DATES'], 4))
+        yr, q = (int(string) for string in ut.split_str(df_new.ix[0, 'DATES'], 4))
         mon = 3 * (q - 1) + 1
         date_index(df_new, '{0}/1/{1}'.format(mon, yr))
         del df_new['DATES']
