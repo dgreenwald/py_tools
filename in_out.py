@@ -2,7 +2,6 @@ import numpy as np
 import os
 import pickle
 import struct
-from tabulate import tabulate
 
 def load_eigen(filename, dtype='float64'):
 
@@ -51,22 +50,3 @@ def make_dir(path):
     if not os.path.exists(path):
         os.makedirs(path)
     return None
-
-def print_table(table, headers, outfile=None):
-    tabulated = tabulate(table, headers, floatfmt='4.3f')
-
-    if outfile is None:
-        print(tabulated)
-    else:
-        with open(outfile, 'w') as fid:
-            fid.write(tabulated)
-
-    return None
-
-def write_tabular(fid, table, headers=None, alignment=None, booktabs=True):
-    """Write table to latex""" 
-    fid.write('\\begin{tabular}')
-    if alignment is None:
-        alignment = 'l' + len(table[0]) * 'c'
-
-    fid.write('\\toprule\n')
