@@ -18,13 +18,68 @@ def write_tabulated(table, headers, fid=None, floatfmt='4.3f', tablefmt='plain')
 
     return None
 
+def open_latex(fid):
+    fid.write(r"""
+\documentclass[a4paper,12pt]{article}
+
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{amsthm}
+\usepackage{amsfonts}
+\usepackage{changepage}
+\usepackage{booktabs}
+\usepackage{caption}
+\usepackage{setspace}
+
+\allowdisplaybreaks[1]
+
+\linespread{1.6}
+%\linespread{1.3}
+
+\begin{document}
+
+\small
+
+\setlength\voffset{-0.75 in}
+
+\changepage{1.5 in}{1 in}{0 in}{-0.5 in}{0 in}{0 in}{0 in}{0 in}{0 in}
+""")
+
+    return None
+
+def close_latex(fid):
+
+    fid.write('\n' + r'\end{document}')
+    return None
+
+def write_table(fid, table, caption=None, notes=None, 
+                headers=None, alignment=None, booktabs=True, floatfmt='4.3f'):
+
+    fid.write(r"""
+\begin{table}[h!]
+\begin{center}
+\small
+""")
+
+    if caption is not None:
+        fid.write(r'\caption{' + caption + '}\n')
+
+    write_tabular(fid, table, headers=headers, alignment=alignment, booktabs=booktabs, 
+                  floatfmt=floatfmt)
+
+    fid.write(r'\end{center}' + '\n')
+
+    if notes is not None:
+        fid.write(r'\footnotesize{' + notes + '}\n')
+
+    fid.write(r'\end{table}' + '\n\n')
+    
+    return None
+
 def write_tabular(fid, table, headers=None, alignment=None, booktabs=True,
                   floatfmt='4.3f'):
 
     """Write table to latex""" 
-
-    fid.write(r'\begin{tabular}')
-
     # Set alignment
     n_cols = len(table[0])
     if alignment is None:
@@ -32,24 +87,22 @@ def write_tabular(fid, table, headers=None, alignment=None, booktabs=True,
     elif len(alignment) == 1:
         alignment = n_cols * alignment
         
-    fid.write('{' + alignment + '}\n')
+    fid.write(r'\begin{tabular}{' + alignment + '}\n')
 
     # Top rule
     if booktabs:
-        fid.write(r'\toprule')
+        fid.write(r'\toprule' + '\n')
     else:
-        fid.write(r'\hline')
-    fid.write('\n')
+        fid.write(r'\hline' + '\n')
 
     # Headers
     if headers is not None:
 
-        fid.write(' & '.join(headers) + r'\\')
-        fid.write('\n')
+        fid.write(' & '.join(headers) + r'\\' + '\n')
         if booktabs:
-            fid.write(r'\midrule')
+            fid.write(r'\midrule' + '\n')
         else:
-            fid.write(r'\hline')
+            fid.write(r'\hline' + '\n')
 
     # Body of table
     for row in table:
@@ -66,10 +119,10 @@ def write_tabular(fid, table, headers=None, alignment=None, booktabs=True,
         fid.write('\t ' + r'\\' + ' \n')
 
     if booktabs:
-        fid.write(r'\bottomrule')
+        fid.write(r'\bottomrule' + '\n')
     else:
-        fid.write(r'\hline')
+        fid.write(r'\hline' + '\n')
 
-    fid.write(r'\end{tabular}')
+    fid.write(r'\end{tabular}' + '\n')
 
     return None
