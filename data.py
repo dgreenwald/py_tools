@@ -2,7 +2,7 @@
 # TODO: default index for deflation
 
 import datetime
-import ipdb
+# import ipdb
 import numpy as np
 import os
 import pandas as pd
@@ -104,97 +104,6 @@ def load_fof():
     
     return df
 
-def clean_nipa(df_t):
-
-    df_t = df_t.ix[df_t.index != ' ', :]
-    df_t = df_t.ix[pd.notnull(df_t.index), :]
-    del df_t['Line']
-    del df_t['Unnamed: 1']
-
-    df = df_t.transpose()
-    start_date = df.index[0]
-    yr = int(np.floor(start_date))
-    q = int(10 * (start_date - yr) + 1)
-    mon = int(3 * (q - 1) + 1)
-
-    date_index(df, '{0}/1/{1}'.format(mon, yr))
-
-    return df
-
-def load_nipa():
-
-    data_dir = base_dir + 'nipa/'
-    pkl_file = pkl_dir + 'nipa_14.pkl'
-
-    # Corporate sector variables
-    var_index = {
-        # Nonfinancial
-        # 'gross_value_added' : 'A455RC1',
-        'cons_fixed_cap' : 'B456RC1',
-        'net_value_added' : 'A457RC1',
-        'compensation' : 'A460RC1',
-        'wage_sal' : 'B461RC1',
-        'wage_sal_supp' : 'B462RC1',
-        'prod_taxes' : 'W325RC1',
-        'net_op_surplus' : 'W326RC1',
-        'net_interest' : 'B471RC1',
-        'transfer_payments' : 'W327RC1',
-        'profits' : 'A463RC1',
-        'corp_taxes' : 'B465RC1',
-        'after_tax_profits' : 'W328RC1',
-        'net_dividends' : 'B467RC1',
-        'undistributed_profits' : 'W332RC1',
-        # 'gross_value_added_chained' : 'B455RX1',
-        'net_value_added_chained' : 'A457RX1',
-        #
-        # Total
-        # 'cons_fixed_cap' : 'A438RC1',
-        # 'net_value_added' : 'A439RC1',
-        # 'compensation' : 'A442RC1',
-        # 'wage_sal' : 'A443RC1',
-        # 'wage_sal_supp' : 'A444RC1',
-        # 'taxes' : 'W321RC1',
-        # 'net_op_surplus' : 'W322RC1',
-        # 'net_interest' : 'A453RC1',
-        # 'transfer_payments' : 'W323RC1',
-        # 'profits' : 'A445RC1',
-        # 'taxes' : 'A054RC1',
-        # 'after_tax_profits' : 'W273RC1',
-        # 'net_dividends' : 'A449RC1',
-        # 'undistributed_profits' : 'W274RC1',
-    } 
-
-    full_list = sorted(list(var_index.keys()))
-
-    # Current file
-    df_t = pd.read_excel(
-        data_dir + 'Section1All_xls.xls',
-        sheetname='11400 Qtr',
-        skiprows=7,
-        # header=[0, 1],
-        index_col=2,
-    )
-    df_curr = clean_nipa(df_t)
-
-    # Current file
-    df_t = pd.read_excel(
-        data_dir + 'Section1All_Hist.xls',
-        sheetname='11400 Qtr',
-        skiprows=7,
-        # header=[0, 1],
-        index_col=2,
-    )
-    df_hist = clean_nipa(df_t)
-
-    start_date = df_curr.index[0]
-    df = df_hist.ix[:start_date, :].append(df_curr)
-
-    codes = [var_index[var] for var in full_list]
-    df = df.ix[:, codes]
-    df.rename(columns = {code : var for var, code in zip(full_list, codes)}, inplace=True)
-
-    return df
-
 def load_stockw():
 
     data_dir = gll_dir
@@ -280,9 +189,6 @@ def load_bls_ls():
 
 def load_fred():
 
-    data_dir = base_dir + 'fred/'
-    pkl_file = pkl_dir + 'fred.pkl'
-
     var_index = {
         'cpi_index' : 'CPIAUCSL',
         'pce_index' : 'PCEPI',
@@ -325,5 +231,140 @@ def load_fernald():
     df['tfp'] = np.cumsum(df['dtfp'] / 400.0)
 
     df = date_index(df, '01/01/1947')
+
+    return df
+
+def load_nipa(table=(1, 14, 0), freq='Q', prefix=True, **kwargs):
+
+    data_dir = base_dir + 'nipa/'
+
+    # File names
+    i_file = table[0]
+    curr_file_path = data_dir + 'Section{}All_xls.xls'.format(i_file)
+    hist_file_path = data_dir + 'Section{}All_Hist.xls'.format(i_file)
+
+    # Table name
+    table_name = '{0:d}{1:0.2d}{2:0.2d}'.format(*table)
+    if freq == 'Q':
+        table_name += ' Qtr'
+    elif freq == 'A':
+        table_name += ' Ann'
+    else:
+        print("Bad frequency")
+        raise Exception
+
+    # Load current file
+    df_t = pd.read_excel(
+        curr_file_path,
+        sheetname=table_name,
+        skiprows=7,
+        # header=[0, 1],
+        index_col=2,
+    )
+    df_curr = clean_nipa(df_t)
+
+    # Load historical file
+    df_t = pd.read_excel(
+        hist_file_path,
+        sheetname=table_name,
+        skiprows=7,
+        # header=[0, 1],
+        index_col=2,
+    )
+    df_hist = clean_nipa(df_t)
+
+    table_str = table_name
+    if table == (1, 14, 0):
+        if kwargs['cnf']:
+            table_str += '_CNF'
+            # Corporate sector variables
+            var_index = {
+                # Nonfinancial
+                # 'gross_value_added' : 'A455RC1',
+                'cons_fixed_cap' : 'B456RC1',
+                'net_value_added' : 'A457RC1',
+                'compensation' : 'A460RC1',
+                'wage_sal' : 'B461RC1',
+                'wage_sal_supp' : 'B462RC1',
+                'prod_taxes' : 'W325RC1',
+                'net_op_surplus' : 'W326RC1',
+                'net_interest' : 'B471RC1',
+                'transfer_payments' : 'W327RC1',
+                'profits' : 'A463RC1',
+                'corp_taxes' : 'B465RC1',
+                'after_tax_profits' : 'W328RC1',
+                'net_dividends' : 'B467RC1',
+                'undistributed_profits' : 'W332RC1',
+                # 'gross_value_added_chained' : 'B455RX1',
+                'net_value_added_chained' : 'A457RX1',
+            }
+        else:
+            table_str += '_CORP'
+            # Total
+            var_index = {
+                'cons_fixed_cap' : 'A438RC1',
+                'net_value_added' : 'A439RC1',
+                'compensation' : 'A442RC1',
+                'wage_sal' : 'A443RC1',
+                'wage_sal_supp' : 'A444RC1',
+                'taxes' : 'W321RC1',
+                'net_op_surplus' : 'W322RC1',
+                'net_interest' : 'A453RC1',
+                'transfer_payments' : 'W323RC1',
+                'profits' : 'A445RC1',
+                'taxes' : 'A054RC1',
+                'after_tax_profits' : 'W273RC1',
+                'net_dividends' : 'A449RC1',
+                'undistributed_profits' : 'W274RC1',
+            }
+     
+    full_list = sorted(list(var_index.keys()))
+
+    if prefix:
+        var_index = {table_str + '_' + key : val for key, val in var_index.items()}
+
+    # # Current file
+    # df_t = pd.read_excel(
+        # data_dir + 'Section{}All_xls.xls'.format(i_file),
+        # sheetname='11400 Qtr',
+        # skiprows=7,
+        # # header=[0, 1],
+        # index_col=2,
+    # )
+    # df_curr = clean_nipa(df_t)
+
+    # # Current file
+    # df_t = pd.read_excel(
+        # data_dir + 'Section1All_Hist.xls',
+        # sheetname='11400 Qtr',
+        # skiprows=7,
+        # # header=[0, 1],
+        # index_col=2,
+    # )
+    # df_hist = clean_nipa(df_t)
+
+    start_date = df_curr.index[0]
+    df = df_hist.ix[:start_date, :].append(df_curr)
+
+    codes = [var_index[var] for var in full_list]
+    df = df.ix[:, codes]
+    df.rename(columns = {code : var for var, code in zip(full_list, codes)}, inplace=True)
+
+    return df
+
+def clean_nipa(df_t):
+
+    df_t = df_t.ix[df_t.index != ' ', :]
+    df_t = df_t.ix[pd.notnull(df_t.index), :]
+    del df_t['Line']
+    del df_t['Unnamed: 1']
+
+    df = df_t.transpose()
+    start_date = df.index[0]
+    yr = int(np.floor(start_date))
+    q = int(10 * (start_date - yr) + 1)
+    mon = int(3 * (q - 1) + 1)
+
+    date_index(df, '{0}/1/{1}'.format(mon, yr))
 
     return df
