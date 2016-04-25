@@ -52,11 +52,13 @@ def close_latex(fid):
     fid.write('\n' + r'\end{document}')
     return None
 
-def write_table(fid, table, caption=None, notes=None, 
+def write_table(fid, table, caption=None, notes=None, position='h!',
                 headers=None, alignment=None, booktabs=True, floatfmt='4.3f'):
 
     fid.write(r"""
-\begin{table}[h!]
+\begin{table}""")
+    fid.write('[{}]'.format(position))
+    fid.write(r"""
 \begin{center}
 \small
 """)
