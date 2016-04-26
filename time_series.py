@@ -18,22 +18,61 @@ class FullResults:
         self.Xs = Xs
         self.zs = zs
 
-def deflate(df, var_list, index='cpi', log=False, diff=False, reimport=False):
+def deflate(df, var_list, index='cpi', log=False, diff=False, per_capita=False, reimport=False):
     
-    index_var = 'FRED_' + index + '_index'
+    # index_var = 'FRED_' + index + '_index'
     new_var_list = []
+
+    if per_capita:
+        assert index != 'pop'
+        df, var_list = deflate(df, var_list, index='pop', log=log, diff=diff, per_capita=False, reimport=reimport)
 
     for var in var_list:
 
-        new_var = 'DEF' + index.upper() + '_' + var
+        if index == 'pop':
+            new_var = 'PC_' + var
+        else:
+            new_var = 'DEF' + index.upper() + '_' + var
+        # if per_capita:
+            # new_var += 'PC_'
+        # new_var += var
+
         new_var_list.append(new_var)
+
         if new_var not in df:
 
-            if index_var not in df:
-                df_fred = dt.load_datasets(['fred'], reimport=reimport)
-                df = pd.merge(df, df_fred[index_var].to_frame(), left_index=True, right_index=True)
+            if index == 'cpi':
+                dataset = 'fred'
+                index_name = 'cpi_deflator'
+            elif index == 'pce':
+                dataset = 'nipa_10109'
+                index_name = 'pce_deflator'
+            elif index == 'pop':
+                dataset = 'nipa_20100'
 
+            if index == 'pop':
+                index_var = 'pop'
+            else:
+                index_var = dataset.upper() + '_' + index_name 
+
+            if index_var not in df:
+
+                df_new = dt.load([dataset], reimport=reimport)
+
+                if index == 'pop':
+                    df_new[index_var] = df_new['NIPA_20100_real_disp_inc'] / df_new['NIPA_20100_real_pc_disp_inc']
+
+                df = pd.merge(df, df_new[index_var].to_frame(), left_index=True, right_index=True)
+
+            # if per_capita and 'pop' not in df:
+                # df_new = dt.load(['nipa_20100'], reimport=reimport)
+                # df_new['pop'] = df_new['NIPA_20100_real_disp_inc'] / df_new['NIPA_20100_real_pc_disp_inc']
+                # df = pd.merge(df, df_new['pop'].to_frame(), left_index=True, right_index=True)
+                
             scale = np.log(df[index_var])
+            # if per_capita:
+                # scale += np.log(df['pop'])
+
             if diff:
                 scale = scale.diff()
 
@@ -43,38 +82,6 @@ def deflate(df, var_list, index='cpi', log=False, diff=False, reimport=False):
                 df[new_var] = df[var] / np.exp(scale)
 
     return (df, new_var_list)
-
-    # if diff:
-        # df[index_var] /= df[index_var].shift()
-
-    # if log:
-        # df = 
-        # df[index_var] = np.log(df[index_var])
-
-    # if log:
-        # df[index_var] = np.log(df[index_var])
-
-    # # df_merge = pd.merge(df, df_fred[index_var].to_frame(), left_index=True, right_index=True)
-
-    # # for var in var_list:
-
-    # if new_var is None:
-        # new_var = 'DEF' + index.upper() + '_' + var
-
-    # df_merge['scale'] = np.log(df_fred[index_var])
-
-    # if diff:
-        # df_merge['scale'] = df_merge['scale'].diff()
-
-    # if log:
-        # df_merge[new_var] = df_merge[var] - df_merge['scale']
-    # else:
-        # df_merge['scale'] = np.exp(df_merge['scale'])
-        # df_merge[new_var] = df_merge[var] / df_merge['scale']
-
-    # df = pd.merge(df, df_merge[new_var].to_frame(), left_index=True, right_index=True)
-
-    # return new_var
 
 def transform(df, var_list, lag=0, diff=0, other=None,
               # , deflate=False, 

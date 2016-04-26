@@ -18,7 +18,7 @@ def date_index(df, startdate, freq='QS'):
     df.set_index(pd.date_range(startdate, periods=len(df), freq=freq), inplace=True)
     return df
 
-def load_datasets(dataset_list, reimport=False):
+def load(dataset_list, reimport=False):
 
     df = None
     for dataset in dataset_list:
@@ -28,7 +28,9 @@ def load_datasets(dataset_list, reimport=False):
         if not os.path.exists(pkl_file) or reimport:
 
             df_new = load_dataset(dataset)
-            if len(df_new.columns) > 1:
+
+            # Add prefix unless single series
+            if dataset not in ['payouts', 'stockw']:
                 columns = {col : dataset.upper() + '_' + col for col in df_new.columns}
                 df_new.rename(columns=columns, inplace=True)
 
@@ -177,8 +179,8 @@ def load_dataset(dataset):
     elif dataset == 'fred':
 
         var_index = {
-            'cpi_index' : 'CPIAUCSL',
-            'pce_index' : 'PCEPI',
+            'cpi_deflator' : 'CPIAUCSL',
+            'pce_deflator' : 'PCEPI',
             'real_gdp' : 'GDPC1',
         }
 
@@ -192,7 +194,7 @@ def load_dataset(dataset):
 
     elif dataset == 'payouts':
 
-        df = load_datasets(['nipa_11400', 'fof'], reimport=True)
+        df = load(['nipa_11400', 'fof'], reimport=True)
         df['net_payouts'] = (df['FOF_net_dividends'] + df['NIPA_11400_net_interest_corp_nonfin']
                              - df['FOF_net_new_equity'] - df['FOF_net_new_paper'] - df['FOF_net_new_bonds'])
         neg_ix = df['net_payouts'].values < 0.0
@@ -217,6 +219,7 @@ def load_dataset(dataset):
 
     elif dataset[:4] == 'nipa':
 
+        # TODO: allow annual?
         table = dataset[5:]
         sheetname = table + ' Qtr'
 
@@ -262,7 +265,13 @@ def load_dataset(dataset):
         # df_hist = df_hist.apply(lambda x: pd.to_numeric(x, errors='coerce'))
         df_hist = df_hist.convert_objects(convert_dates=False, convert_numeric=True)
 
-        if table == '11400':
+        if table == '10109':
+
+            var_index = {
+                'pce_deflator' : 'DPCERD3',
+            }
+
+        elif table == '11400':
 
             # Corporate nonfinancial
             cnf_index = {
@@ -322,6 +331,8 @@ def load_dataset(dataset):
                 'transfers' : 'A577RC1',
                 'employee_contributions' : 'A061RC1',
                 'personal_taxes' : 'W055RC1',
+                'real_disp_inc' : 'A067RX1',
+                'real_pc_disp_inc' : 'A229RX0',
             }
          
         # prefix = table_name.replace(' ', '_')
