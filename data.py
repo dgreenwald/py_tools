@@ -18,7 +18,7 @@ def date_index(df, startdate, freq='QS'):
     df.set_index(pd.date_range(startdate, periods=len(df), freq=freq), inplace=True)
     return df
 
-def load(dataset_list, reimport=False):
+def load(dataset_list, reimport=False, **kwargs):
 
     df = None
     for dataset in dataset_list:
@@ -27,7 +27,7 @@ def load(dataset_list, reimport=False):
         
         if not os.path.exists(pkl_file) or reimport:
 
-            df_new = load_dataset(dataset)
+            df_new = load_dataset(dataset, **kwargs)
 
             # Add prefix unless single series
             if dataset not in ['payouts', 'stockw']:
@@ -51,7 +51,7 @@ def load(dataset_list, reimport=False):
 
     return df
 
-def load_dataset(dataset):
+def load_dataset(dataset, **kwargs):
 
     if dataset == 'fof':
 
@@ -219,11 +219,12 @@ def load_dataset(dataset):
 
     elif dataset[:4] == 'nipa':
 
+        nipa_vintage = kwargs.get('nipa_vintage', '1604')
+        data_dir = base_dir + 'nipa/' + nipa_vintage + '/'
+
         # TODO: allow annual?
         table = dataset[5:]
         sheetname = table + ' Qtr'
-
-        data_dir = base_dir + 'nipa/'
 
         i_file = table[0]
 
@@ -324,17 +325,63 @@ def load_dataset(dataset):
 
         elif table == '20100':
 
+            # var_index = {
+                # 'wage_sal' : 'A576RC1',
+                # 'transfer_payments' : 'A577RC1',
+                # 'proprieters_income' : 'A041RC1',
+                # 'personal_contribs'
+
+
+                # 'disposable_income' : 'A067RC1',
+                # 'personal_income' : 'A065RC1',
+                # 'transfers' : 'A577RC1',
+                # 'employee_contributions' : 'A061RC1',
+                # 'personal_taxes' : 'W055RC1',
+                # 'real_disp_inc' : 'A067RX1',
+                # 'real_pc_disp_inc' : 'A229RX0',
+            # }
+
+            # if nipa_vintage == '1604':
             var_index = {
-                'disposable_income' : 'A067RC1',
+                # 'wage_sal' : 'A576RC1',
                 'personal_income' : 'A065RC1',
-                'compensation' : 'A033RC1',
-                'transfers' : 'A577RC1',
-                'employee_contributions' : 'A061RC1',
-                'personal_taxes' : 'W055RC1',
+                'transfer_payments' : 'A577RC1',
+                'employer_pension_ins' : 'B040RC1',
+                'personal_social' : 'A061RC1',
+                'employer_social' : 'B039RC1',
+                'proprietors_income' : 'A041RC1',
+                'rental_income' : 'A048RC1',
+                'dividends' : 'B703RC1',
+                'interest' : 'A064RC1',
+                'personal_current_taxes' : 'W055RC1',
                 'real_disp_inc' : 'A067RX1',
                 'real_pc_disp_inc' : 'A229RX0',
             }
-         
+            # elif nipa_vintage == '1302':
+                # var_index = {
+                    # 'wage_sal' : 'A576RC1',
+                    # 'transfer_payments' : 'A577RC1',
+                    # 'employer_pension_ins' : 'B040RC1',
+                    # 'personal_social' : 'A061RC1',
+                    # 'employer_social' : 'B039RC1',
+                    # 'proprietors_income' : 'A041RC1',
+                    # 'rental_income' : 'A048RC1',
+                    # 'personal_dividends' : 'B703RC1',
+                    # 'personal_interest_income' : 'A064RC1',
+                    # 'personal_current_taxes' : 'W055RC1',
+                # } 
+            # else:
+                # raise Exception
+
+            if nipa_vintage == '1604':
+                var_index.update({
+                    'wage_sal' : 'A034RC1',
+                })
+            elif nipa_vintage == '1302':
+                var_index.update({
+                    'wage_sal' : 'A576RC1',
+                })
+
         # prefix = table_name.replace(' ', '_')
         # var_index = {table_str + '_' + key : val for key, val in var_index.items()}
 
@@ -346,6 +393,19 @@ def load_dataset(dataset):
         codes = [var_index[var] for var in full_list]
         df = df.ix[:, codes]
         df.rename(columns = {code : var for var, code in zip(full_list, codes)}, inplace=True)
+
+        if table == '11400':
+            df['earnings_corp'] = df['after_tax_profits_corp'] + df['net_interest_corp']
+            df['earnings_corp_nonfin'] = df['after_tax_profits_corp_nonfin'] + df['net_interest_corp_nonfin']
+        elif table == '20100':
+            df['employee_net_social'] = df['personal_social'] - df['employer_social']
+            df['total_other'] = df['proprietors_income'] + df['rental_income'] + df['dividends'] + df['interest']
+            df['tax_share'] = df['wage_sal'] / (df['wage_sal'] + df['total_other'])
+            df['tax'] = df['tax_share'] * df['personal_current_taxes']
+            df['nyd'] = (df['wage_sal'] + df['transfer_payments'] + df['employer_pension_ins']
+                         - df['employee_net_social'] - df['tax'])
+            df['comp_no_transfers'] = df['wage_sal'] + df['employer_pension_ins'] + df['employer_social']
+            df['total_comp'] = df['comp_no_transfers'] + df['transfer_payments']
 
     return df
 
