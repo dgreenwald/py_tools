@@ -18,6 +18,24 @@ def date_index(df, startdate, freq='QS'):
     df.set_index(pd.date_range(startdate, periods=len(df), freq=freq), inplace=True)
     return df
 
+def resample(df, methods_vars, freq='QS'):
+    df_resamp = None
+
+    for method, var_list in methods_vars.items():
+
+        if var_list is not None:
+
+            df_new = getattr(df[var_list].resample(freq), method)()
+
+            # if len(var_list) == 1:
+                # df_new = df_new.to_frame()
+            if df_resamp is None:
+                df_resamp = df_new
+            else:
+                df_resamp = pd.merge(df_resamp, df_new, left_index=True, right_index=True)
+
+    return df
+
 def load(dataset_list, reimport=False, **kwargs):
 
     df = None
@@ -136,9 +154,16 @@ def load_dataset(dataset, **kwargs):
         df_m['P'] = (df_m['vwretx'] + 1.0).cumprod()
         df_m['D'] = np.hstack((np.nan, df_m['P'][:-1])) * (df_m['vwretd'] - df_m['vwretx'])
 
-        df = df_m['P'].resample('QS').last().to_frame()
-        df = pd.merge(df, df_m['D'].resample('QS').sum().to_frame(),
-                        left_index=True, right_index=True)
+        # df = df_m['P'].resample('QS').last().to_frame()
+        # df = pd.merge(df, df_m['D'].resample('QS').sum().to_frame(),
+                        # left_index=True, right_index=True)
+
+        methods_vars = {
+            'last' : ['P'],
+            'sum' : ['D'],
+        }
+        df = resample(df, methods_vars)
+
         df['D4'] = df['D']
         for jj in range(1, 4):
             df['D4'] += df['D'].shift(jj)
@@ -406,6 +431,30 @@ def load_dataset(dataset, **kwargs):
                          - df['employee_net_social'] - df['tax'])
             df['comp_no_transfers'] = df['wage_sal'] + df['employer_pension_ins'] + df['employer_social']
             df['total_comp'] = df['comp_no_transfers'] + df['transfer_payments']
+
+    elif dataset == 'shiller':
+
+        colnames = [
+            'Date', 'P', 'D', 'E', 'CPI', 'Date Frac', 'GS10', 
+            'Real P', 'Real D', 'Real E', 'CAPE'
+        ]
+
+        df_m = pd.read_excel(
+            base_dir + 'shiller/ie_data.xls',
+            sheetname='Data',
+            skiprows=8,
+            colnames=colnames,
+            usecols=usecols,
+        )
+
+        df_m = date_index(df_m, '01/01/1881', freq='MS')
+
+        methods_vars = {
+            'sum' : ['Real D', 'Real E'],
+            'last' : ['Real P'],
+        }
+
+        df = resample(df_m, methods_vars)
 
     return df
 
