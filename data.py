@@ -10,15 +10,16 @@ import pandas_datareader.data as web
 
 import py_tools.utilities as ut
 
-base_dir = '/home/dan/Dropbox/data/'
+drop_dir = '/home/dan/Dropbox/'
+base_dir = drop_dir + 'data/'
 pkl_dir = base_dir + 'pkl/'
-gll_dir = '/home/dan/Dropbox/gll/Dan/data/'
+gll_dir = drop_dir + 'gll/Dan/data/'
 
 def date_index(df, startdate, freq='QS'):
     df.set_index(pd.date_range(startdate, periods=len(df), freq=freq), inplace=True)
     return df
 
-def load_datasets(dataset_list, reimport=False):
+def load_datasets(dataset_list, reimport=False, **kwargs):
 
     df = None
     for dataset in dataset_list:
@@ -27,7 +28,7 @@ def load_datasets(dataset_list, reimport=False):
         
         if not os.path.exists(pkl_file) or reimport:
 
-            df_new = load_dataset(dataset)
+            df_new = load_dataset(dataset, **kwargs)
             if len(df_new.columns) > 1:
                 columns = {col : dataset.upper() + '_' + col for col in df_new.columns}
                 df_new.rename(columns=columns, inplace=True)
@@ -49,7 +50,7 @@ def load_datasets(dataset_list, reimport=False):
 
     return df
 
-def load_dataset(dataset):
+def load_dataset(dataset, **kwargs):
 
     if dataset == 'fof':
 
@@ -157,6 +158,16 @@ def load_dataset(dataset):
         df = pd.read_table(data_dir + infile, delim_whitespace=True, 
                            names=['dates', 'c', 'a', 'y', 'cay'])
         df = date_index(df, '1/1/1952')
+
+    elif dataset == 'cay_source':
+
+        cay_source_vintage = kwargs.get('cay_source_vintage', '1302'),
+        data_dir = drop_dir + 'Dan Greenwald Files/CreateCAY/data_{}/'.format(cay_source_vintage)
+
+        df = pd.read_excel(
+            data_dir + 'source_{0}_{1}_rats.xlsx'.format(cay_source_vintage[:2], cay_source_vintage[2:]),
+            sheetname='Sheet 1',
+        )
 
     elif dataset == 'bls_ls':
 
