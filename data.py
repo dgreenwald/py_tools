@@ -19,7 +19,25 @@ def date_index(df, startdate, freq='QS'):
     df.set_index(pd.date_range(startdate, periods=len(df), freq=freq), inplace=True)
     return df
 
-def load_datasets(dataset_list, reimport=False, **kwargs):
+def resample(df, methods_vars, freq='QS'):
+    df_resamp = None
+
+    for method, var_list in methods_vars.items():
+
+        if var_list is not None:
+
+            df_new = getattr(df[var_list].resample(freq), method)()
+
+            # if len(var_list) == 1:
+                # df_new = df_new.to_frame()
+            if df_resamp is None:
+                df_resamp = df_new
+            else:
+                df_resamp = pd.merge(df_resamp, df_new, left_index=True, right_index=True)
+
+    return df
+
+def load(dataset_list, reimport=False, **kwargs):
 
     df = None
     for dataset in dataset_list:
@@ -135,9 +153,16 @@ def load_dataset(dataset, **kwargs):
         df_m['P'] = (df_m['vwretx'] + 1.0).cumprod()
         df_m['D'] = np.hstack((np.nan, df_m['P'][:-1])) * (df_m['vwretd'] - df_m['vwretx'])
 
-        df = df_m['P'].resample('QS').last().to_frame()
-        df = pd.merge(df, df_m['D'].resample('QS').sum().to_frame(),
-                        left_index=True, right_index=True)
+        # df = df_m['P'].resample('QS').last().to_frame()
+        # df = pd.merge(df, df_m['D'].resample('QS').sum().to_frame(),
+                        # left_index=True, right_index=True)
+
+        methods_vars = {
+            'last' : ['P'],
+            'sum' : ['D'],
+        }
+        df = resample(df, methods_vars)
+
         df['D4'] = df['D']
         for jj in range(1, 4):
             df['D4'] += df['D'].shift(jj)
@@ -161,13 +186,15 @@ def load_dataset(dataset, **kwargs):
 
     elif dataset == 'cay_source':
 
-        cay_source_vintage = kwargs.get('cay_source_vintage', '1302'),
+        cay_source_vintage = kwargs.get('cay_source_vintage', '1302')
         data_dir = drop_dir + 'Dan Greenwald Files/CreateCAY/data_{}/'.format(cay_source_vintage)
 
         df = pd.read_excel(
             data_dir + 'source_{0}_{1}_rats.xlsx'.format(cay_source_vintage[:2], cay_source_vintage[2:]),
-            sheetname='Sheet 1',
+            sheetname='Sheet1',
         )
+
+        df = date_index(df, '1/1/1947')
 
     elif dataset == 'bls_ls':
 
@@ -188,8 +215,8 @@ def load_dataset(dataset, **kwargs):
     elif dataset == 'fred':
 
         var_index = {
-            'cpi_index' : 'CPIAUCSL',
-            'pce_index' : 'PCEPI',
+            'cpi_deflator' : 'CPIAUCSL',
+            'pce_deflator' : 'PCEPI',
             'real_gdp' : 'GDPC1',
         }
 
@@ -203,7 +230,7 @@ def load_dataset(dataset, **kwargs):
 
     elif dataset == 'payouts':
 
-        df = load_datasets(['nipa_11400', 'fof'], reimport=True)
+        df = load(['nipa_11400', 'fof'], reimport=True)
         df['net_payouts'] = (df['FOF_net_dividends'] + df['NIPA_11400_net_interest_corp_nonfin']
                              - df['FOF_net_new_equity'] - df['FOF_net_new_paper'] - df['FOF_net_new_bonds'])
         neg_ix = df['net_payouts'].values < 0.0
@@ -228,10 +255,12 @@ def load_dataset(dataset, **kwargs):
 
     elif dataset[:4] == 'nipa':
 
+        nipa_vintage = kwargs.get('nipa_vintage', '1604')
+        data_dir = base_dir + 'nipa/' + nipa_vintage + '/'
+
+        # TODO: allow annual?
         table = dataset[5:]
         sheetname = table + ' Qtr'
-
-        data_dir = base_dir + 'nipa/'
 
         i_file = table[0]
 
@@ -273,7 +302,13 @@ def load_dataset(dataset, **kwargs):
         # df_hist = df_hist.apply(lambda x: pd.to_numeric(x, errors='coerce'))
         df_hist = df_hist.convert_objects(convert_dates=False, convert_numeric=True)
 
-        if table == '11400':
+        if table == '10109':
+
+            var_index = {
+                'pce_deflator' : 'DPCERD3',
+            }
+
+        elif table == '11400':
 
             # Corporate nonfinancial
             cnf_index = {
@@ -326,15 +361,63 @@ def load_dataset(dataset, **kwargs):
 
         elif table == '20100':
 
+            # var_index = {
+                # 'wage_sal' : 'A576RC1',
+                # 'transfer_payments' : 'A577RC1',
+                # 'proprieters_income' : 'A041RC1',
+                # 'personal_contribs'
+
+
+                # 'disposable_income' : 'A067RC1',
+                # 'personal_income' : 'A065RC1',
+                # 'transfers' : 'A577RC1',
+                # 'employee_contributions' : 'A061RC1',
+                # 'personal_taxes' : 'W055RC1',
+                # 'real_disp_inc' : 'A067RX1',
+                # 'real_pc_disp_inc' : 'A229RX0',
+            # }
+
+            # if nipa_vintage == '1604':
             var_index = {
-                'disposable_income' : 'A067RC1',
+                # 'wage_sal' : 'A576RC1',
                 'personal_income' : 'A065RC1',
-                'compensation' : 'A033RC1',
-                'transfers' : 'A577RC1',
-                'employee_contributions' : 'A061RC1',
-                'personal_taxes' : 'W055RC1',
+                'transfer_payments' : 'A577RC1',
+                'employer_pension_ins' : 'B040RC1',
+                'personal_social' : 'A061RC1',
+                'employer_social' : 'B039RC1',
+                'proprietors_income' : 'A041RC1',
+                'rental_income' : 'A048RC1',
+                'dividends' : 'B703RC1',
+                'interest' : 'A064RC1',
+                'personal_current_taxes' : 'W055RC1',
+                'real_disp_inc' : 'A067RX1',
+                'real_pc_disp_inc' : 'A229RX0',
             }
-         
+            # elif nipa_vintage == '1302':
+                # var_index = {
+                    # 'wage_sal' : 'A576RC1',
+                    # 'transfer_payments' : 'A577RC1',
+                    # 'employer_pension_ins' : 'B040RC1',
+                    # 'personal_social' : 'A061RC1',
+                    # 'employer_social' : 'B039RC1',
+                    # 'proprietors_income' : 'A041RC1',
+                    # 'rental_income' : 'A048RC1',
+                    # 'personal_dividends' : 'B703RC1',
+                    # 'personal_interest_income' : 'A064RC1',
+                    # 'personal_current_taxes' : 'W055RC1',
+                # } 
+            # else:
+                # raise Exception
+
+            if nipa_vintage == '1604':
+                var_index.update({
+                    'wage_sal' : 'A034RC1',
+                })
+            elif nipa_vintage == '1302':
+                var_index.update({
+                    'wage_sal' : 'A576RC1',
+                })
+
         # prefix = table_name.replace(' ', '_')
         # var_index = {table_str + '_' + key : val for key, val in var_index.items()}
 
@@ -346,6 +429,43 @@ def load_dataset(dataset, **kwargs):
         codes = [var_index[var] for var in full_list]
         df = df.ix[:, codes]
         df.rename(columns = {code : var for var, code in zip(full_list, codes)}, inplace=True)
+
+        if table == '11400':
+            df['earnings_corp'] = df['after_tax_profits_corp'] + df['net_interest_corp']
+            df['earnings_corp_nonfin'] = df['after_tax_profits_corp_nonfin'] + df['net_interest_corp_nonfin']
+        elif table == '20100':
+            df['employee_net_social'] = df['personal_social'] - df['employer_social']
+            df['total_other'] = df['proprietors_income'] + df['rental_income'] + df['dividends'] + df['interest']
+            df['tax_share'] = df['wage_sal'] / (df['wage_sal'] + df['total_other'])
+            df['tax'] = df['tax_share'] * df['personal_current_taxes']
+            df['nyd'] = (df['wage_sal'] + df['transfer_payments'] + df['employer_pension_ins']
+                         - df['employee_net_social'] - df['tax'])
+            df['comp_no_transfers'] = df['wage_sal'] + df['employer_pension_ins'] + df['employer_social']
+            df['total_comp'] = df['comp_no_transfers'] + df['transfer_payments']
+
+    elif dataset == 'shiller':
+
+        colnames = [
+            'Date', 'P', 'D', 'E', 'CPI', 'Date Frac', 'GS10', 
+            'Real P', 'Real D', 'Real E', 'CAPE'
+        ]
+
+        df_m = pd.read_excel(
+            base_dir + 'shiller/ie_data.xls',
+            sheetname='Data',
+            skiprows=8,
+            colnames=colnames,
+            usecols=usecols,
+        )
+
+        df_m = date_index(df_m, '01/01/1881', freq='MS')
+
+        methods_vars = {
+            'sum' : ['Real D', 'Real E'],
+            'last' : ['Real P'],
+        }
+
+        df = resample(df_m, methods_vars)
 
     return df
 
