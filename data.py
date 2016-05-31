@@ -2,7 +2,7 @@
 # TODO: default index for deflation
 
 import datetime
-# import ipdb
+import ipdb
 import numpy as np
 import os
 import pandas as pd
@@ -37,17 +37,34 @@ def resample(df, methods_vars, freq='QS'):
 
     return df
 
-def load(dataset_list, reimport=False, **kwargs):
+def get_suffix(dataset, **kwargs):
+
+    if dataset[:4] == 'nipa':
+
+        nipa_vintage = kwargs.get('nipa_vintage', '1604')
+        suffix = nipa_vintage
+
+    else:
+        
+        suffix = ''
+
+    if suffix != '':
+        suffix = '_' + suffix
+
+    return suffix
+
+def load(dataset_list, reimport=False, no_prefix=True, **kwargs):
 
     df = None
     for dataset in dataset_list:
 
-        pkl_file = pkl_dir + dataset + '.pkl'
+        suffix = get_suffix(dataset, **kwargs)
+        pkl_file = pkl_dir + dataset + suffix + '.pkl'
         
         if not os.path.exists(pkl_file) or reimport:
 
             df_new = load_dataset(dataset, **kwargs)
-            if len(df_new.columns) > 1:
+            if len(df_new.columns) > 1 or not no_prefix:
                 columns = {col : dataset.upper() + '_' + col for col in df_new.columns}
                 df_new.rename(columns=columns, inplace=True)
 
@@ -161,7 +178,7 @@ def load_dataset(dataset, **kwargs):
             'last' : ['P'],
             'sum' : ['D'],
         }
-        df = resample(df, methods_vars)
+        df = resample(df_m, methods_vars)
 
         df['D4'] = df['D']
         for jj in range(1, 4):
@@ -302,7 +319,17 @@ def load_dataset(dataset, **kwargs):
         # df_hist = df_hist.apply(lambda x: pd.to_numeric(x, errors='coerce'))
         df_hist = df_hist.convert_objects(convert_dates=False, convert_numeric=True)
 
-        if table == '10109':
+        if table == '10106':
+       
+            var_index = {
+                'real_gdp' : 'A191RX1',
+                'real_pce' : 'DPCERX1',
+                'real_private_inv' : 'A006RX1',
+                'real_net_exports' : 'A019RX1',
+                'real_govt_expend' : 'A822RX1',
+            }
+
+        elif table == '10109':
 
             var_index = {
                 'pce_deflator' : 'DPCERD3',
@@ -445,24 +472,40 @@ def load_dataset(dataset, **kwargs):
 
     elif dataset == 'shiller':
 
+        # colnames = [
+            # 'Date', 'P', 'D', 'E', 'CPI', 'Date Frac', 'GS10', 
+            # 'Real P', 'Real D', 'Real E', 'CAPE',
+        # ]
+
         colnames = [
-            'Date', 'P', 'D', 'E', 'CPI', 'Date Frac', 'GS10', 
-            'Real P', 'Real D', 'Real E', 'CAPE'
+            'Date', 'P', 'D', 'E', 'CPI', 'date_frac', 'GS10', 
+            'real_P', 'real_D', 'real_E', 'CAPE',
         ]
 
         df_m = pd.read_excel(
             base_dir + 'shiller/ie_data.xls',
             sheetname='Data',
-            skiprows=8,
-            colnames=colnames,
-            usecols=usecols,
+            skiprows=7,
+            # colnames=colnames,
+            # usecols=usecols,
         )
 
-        df_m = date_index(df_m, '01/01/1881', freq='MS')
+        df_m = df_m.rename(columns={
+            'Rate GS10' : 'GS10',
+            'Fraction' : 'date_frac',
+            'Price' : 'real_P',
+            'Dividend' : 'real_D',
+            'Earnings' : 'real_E',
+        })
+
+        df_m = df_m[colnames]
+        df_m = date_index(df_m, '01/01/1871', freq='MS')
 
         methods_vars = {
-            'sum' : ['Real D', 'Real E'],
-            'last' : ['Real P'],
+            # 'sum' : ['Dividend', 'Earnings'],
+            # 'last' : ['Price', 'CAPE'],
+            'sum' : ['real_D', 'real_E'],
+            'last' : ['real_P', 'CAPE'],
         }
 
         df = resample(df_m, methods_vars)

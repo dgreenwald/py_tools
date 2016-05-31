@@ -18,14 +18,16 @@ class FullResults:
         self.Xs = Xs
         self.zs = zs
 
-def deflate(df, var_list, index='cpi', log=False, diff=False, per_capita=False, reimport=False):
+def deflate(df, var_list, index='cpi', log=False, diff=False, per_capita=False, 
+            reimport=False, **kwargs):
     
     # index_var = 'FRED_' + index + '_index'
     new_var_list = []
 
     if per_capita:
         assert index != 'pop'
-        df, var_list = deflate(df, var_list, index='pop', log=log, diff=diff, per_capita=False, reimport=reimport)
+        df, var_list = deflate(df, var_list, index='pop', log=log, diff=diff, per_capita=False, 
+                               reimport=reimport, **kwargs)
 
     for var in var_list:
 
@@ -52,12 +54,14 @@ def deflate(df, var_list, index='cpi', log=False, diff=False, per_capita=False, 
 
             if index == 'pop':
                 index_var = 'pop'
+            elif index == 'pce':
+                index_var = index_name
             else:
                 index_var = dataset.upper() + '_' + index_name 
 
             if index_var not in df:
 
-                df_new = dt.load([dataset], reimport=reimport)
+                df_new = dt.load([dataset], reimport=reimport, **kwargs)
 
                 if index == 'pop':
                     df_new[index_var] = df_new['NIPA_20100_real_disp_inc'] / df_new['NIPA_20100_real_pc_disp_inc']
