@@ -1,4 +1,5 @@
 from collections import Mapping
+import itertools
 import numpy as np
 
 def split(x, lengths, axis=0):
@@ -20,6 +21,9 @@ def split_list(x, n):
 def any2(list_of_items, list_to_check):
     """Check of any on left are in list on right"""
     return any([var in list_to_check for var in list_of_items])
+
+def join_lists(list_of_lists):
+    return list(itertools.chain.from_iterable(list_of_lists))
 
 class PresetDict(dict):
     """dict that does not update if there is already a key present"""
