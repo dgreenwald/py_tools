@@ -5,9 +5,9 @@ import py_tools.utilities as ut
 class Table:
     """Latex table class"""
 
-    def __init__(self, contents, n_cols=None, header=False, alignment=None, clines=None, hlines=None):
+    def __init__(self, contents=None, n_cols=None, header=False, alignment=None, clines=None, hlines=None):
 
-        self.contents = contents 
+        self.contents = contents if contents is not None else []
         self.n_cols = n_cols
         self.header = header
         self.alignment = alignment
@@ -78,7 +78,7 @@ class Table:
         else:
             table_text += r'\hline \hline' + '\n'
 
-        table_text += tstrut + '\n'
+        include_tstrut = True
 
         # Headers
         # if self.headers is not None:
@@ -108,6 +108,10 @@ class Table:
             # Bottom strut
             # if i_row + 1 == self.n_rows() or i_row < self.n_headers:
                 # table_text += bstrut
+            if include_tstrut:
+                table_text += tstrut
+                include_tstrut = False
+
             if i_row in self.clines or i_row in self.hlines or i_row + 1 == self.n_rows():
                 table_text += bstrut
 
@@ -122,13 +126,15 @@ class Table:
                 for (start, end) in self.clines[i_row]:
                     table_text += '\\cline{{{0}-{1}}}'.format(start, end)
                 table_text += '\n'
-                table_text += tstrut + '%\n'
+                include_tstrut = True
+                # table_text += tstrut + '%\n'
             elif i_row in self.hlines:
                 if booktabs:
                     table_text += r'\midrule' + '\n'
                 else:
                     table_text += r'\hline' + '\n'
-                table_text += tstrut  + '%\n'
+                # table_text += tstrut  + '%\n'
+                include_tstrut = True
 
         if booktabs:
             table_text += r'\bottomrule' + '\n'
@@ -155,8 +161,16 @@ class Table:
 
         return None
 
+    def multicolumn(self, text):
+
+        return multicolumn(self.n_cols, text)
+
     # def add_vspace(self, space, row=0):
         # self.vspace[row] = space
+
+def multicolumn(n_cols, text):
+    """Generate multicolumn string"""
+    return '\\multicolumn{{{0}}}{{c}}{{{1}}}'.format(n_cols, text)
 
 def hstack(table_list):
     """Stack tables horizontally"""
@@ -231,7 +245,8 @@ def join_subtables(table_list, header_list):
         add_header = header is not None and table.n_cols > 1
 
         if add_header:
-            new_header = '\\multicolumn{{{0}}}{{c}}{{{1}}}'.format(new_table.n_cols, header)
+            # new_header = '\\multicolumn{{{0}}}{{c}}{{{1}}}'.format(new_table.n_cols, header)
+            new_header = multicolumn(new_table.n_cols, header)
         else:
             new_header = ' '
 
@@ -268,8 +283,40 @@ def join_subtables(table_list, header_list):
     return super_table
 
 # Append vertically
-# def append_subtables(table_list, header_list):
-    # """Join two tables with text between"""
+def append_subtables(table_list, header_list):
+    """Append two tables with text between"""
+
+    assert all([table.n_cols == table_list[0].n_cols for table in table_list])
+    assert all([table.alignment == table_list[0].alignment for table in table_list])
+
+    n_cols = table_list[0].n_cols
+    alignment = table_list[0].alignment
+
+    full_contents = []
+    full_clines = {}
+    full_hlines = []
+
+    offset = 0
+    for (table, header) in zip(table_list, header_list):
+
+        # Add header
+        if offset > 0: full_hlines.append(offset - 1)
+        full_contents.append([table.multicolumn(header)])
+        full_hlines.append(offset)
+        offset += 1
+
+        # Add content
+        full_contents += table.contents
+
+        full_clines.update({
+            key + offset : [(start, end) for start, end in vals]
+            for key, vals in table.clines.items()
+        })
+
+        full_hlines += [val + offset for val in table.hlines]
+        offset += table.n_rows()
+
+    return Table(full_contents, n_cols, alignment=alignment, clines=full_clines, hlines=full_hlines)
 
 def output_tabulated(table, headers, filename, floatfmt='4.3f', tablefmt='plain'):
     """Write table to file path"""
