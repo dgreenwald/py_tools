@@ -35,7 +35,8 @@ class Table:
     def n_rows(self):
         return len(self.contents)
 
-    def table(self, caption=None, notes=None, position='h!', fontsize='small', **kwargs):
+    def table(self, caption=None, notes=None, position='h!', fontsize='small', 
+              caption_above=True, **kwargs):
 
         table_text = r"""
 \begin{table}"""
@@ -46,7 +47,7 @@ class Table:
 """
         table_text += '\\' + fontsize + '\n'
 
-        if caption is not None:
+        if caption is not None and caption_above:
             table_text += r'\caption{' + caption + '}\n'
 
         # write_tabular(fid, table, headers=headers, alignment=alignment, booktabs=booktabs, 
@@ -54,6 +55,9 @@ class Table:
         table_text += self.tabular(**kwargs)
 
         table_text += r'\end{center}' + '\n'
+
+        if caption is not None and not caption_above:
+            table_text += r'\caption{' + caption + '}\n'
 
         if notes is not None:
             table_text += r'\footnotesize{' + notes + '}\n'
