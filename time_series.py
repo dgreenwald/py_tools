@@ -191,6 +191,8 @@ def sm_regression(df, lhs, rhs, match='inner', ix=None, nw_lags=0, display=False
 
 def long_horizon_contemp(df, lhs, rhs, horizon, **kwargs):
 
+    raise Exception
+
     long_list = transform(df, [lhs] + rhs, diff=horizon, other='cumsum') 
     lhs_long = long_list[0]
     rhs_long = long_list[1:]
@@ -199,9 +201,14 @@ def long_horizon_contemp(df, lhs, rhs, horizon, **kwargs):
 
 def long_horizon_predictive(df, lhs, rhs, horizon, **kwargs):
 
-    lhs_long = transform(df, [lhs], lag=-1, diff=horizon, other='cumsum')[0]
+    # lhs_long = transform(df, [lhs], lag=-1, diff=horizon, other='cumsum')[0]
 
-    return regression(df, lhs_long, rhs, **kwargs)
+    df['lhs_long'] = 0
+    for jj in range(1, horizon + 1):
+        lhs_diff = transform(df, [lhs], lag=-jj)[0]
+        df['lhs_long'] += df[lhs_diff]
+
+    return regression(df, 'lhs_long', rhs, **kwargs)
 
 class MVOLSResults:
     """Regression object"""
