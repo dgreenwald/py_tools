@@ -81,7 +81,7 @@ def load(dataset_list, reimport=False, no_prefix=True, **kwargs):
         if df is None:
             df = df_new
         else:
-            df = pd.merge(df, df_new, left_index=True, right_index=True)
+            df = pd.merge(df, df_new, left_index=True, right_index=True, how='outer')
 
     return df
 
@@ -186,7 +186,31 @@ def load_dataset(dataset, **kwargs):
         df['D4'] *= 0.25
 
         df['p'] = np.log(df['P'])
-        df['d'] = np.log(df['D4'])
+        df['d4'] = np.log(df['D4'])
+        # df['dd'] = df['d'].diff()
+        df['Re'] = np.hstack((np.nan, (df['P'][1:] + df['D'][1:]).values / df['P'][:-1].values))
+        df['re'] = np.log(df['Re'])
+        df['pd'] = df['p'] - df['d4']
+
+    elif dataset == 'crsp_q':
+
+        data_dir = gll_pred_dir
+        infile = 'crsp.csv'
+
+        df = pd.read_table(
+            data_dir + infile,
+            sep=',',
+            # names=['date', 'vwretd', 'vwretx'],
+            usecols=['vwretd', 'vwretx'],
+        )
+
+        df = date_index(df, '10/1/1925')
+
+        df['P'] = (df['vwretx'] + 1.0).cumprod()
+        df['D'] = np.hstack((np.nan, df['P'][:-1])) * (df['vwretd'] - df['vwretx'])
+
+        df['p'] = np.log(df['P'])
+        df['d'] = np.log(df['D'])
         # df['dd'] = df['d'].diff()
         df['Re'] = np.hstack((np.nan, (df['P'][1:] + df['D'][1:]).values / df['P'][:-1].values))
         df['re'] = np.log(df['Re'])
