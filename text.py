@@ -105,7 +105,7 @@ class Table:
                     table_text += '\t& '
 
                 if isinstance(entry, float):
-                    table_text += '{:{floatfmt}}'.format(entry)
+                    table_text += '{0:{1}}'.format(entry, floatfmt)
                 else:
                     table_text += '{}'.format(entry)
             
@@ -374,41 +374,54 @@ def close_latex(fid):
     fid.write('\n' + r'\end{document}')
     return None
 
-def write_table(fid, table, caption=None, notes=None, position='h!',
-                headers=None, alignment=None, booktabs=True, floatfmt='4.3f'):
-
-    fid.write(r"""
-\begin{table}""")
-    fid.write('[{}]'.format(position))
-    fid.write(r"""
-\begin{center}
-\small
-""")
-
-    if caption is not None:
-        fid.write(r'\caption{' + caption + '}\n')
-
-    write_tabular(fid, table, headers=headers, alignment=alignment, booktabs=booktabs, 
-                  floatfmt=floatfmt)
-
-    fid.write(r'\end{center}' + '\n')
-
-    if notes is not None:
-        fid.write(r'\footnotesize{' + notes + '}\n')
-
-    fid.write(r'\end{table}' + '\n\n')
+def regression_table(results, var_names=None, cov_type='HC0_se', floatfmt='4.3f'):
     
-    return None
+     contents = []
 
-def write_tabular(fid, contents, headers=None, alignment=None, booktabs=True,
-                  floatfmt='4.3f'):
+     coeffs = results.params
+     se = getattr(results, cov_type)
 
-    all_contents = [headers] + contents
-    # table = Table(contents, headers=headers, alignment=alignment)
-    table = Table(all_contents, header=True, alignment=alignment)
-    fid.write(table.text(booktabs, floatfmt))
-    # table.write(fid, booktabs, floatfmt)
-    return None
+     for ii in range(len(coeffs)):
+         contents.append([coeffs[ii]])
+         contents.append(['({0:{1}})'.format(se[ii], floatfmt)])
+
+     return Table(contents)
+
+# def write_table(fid, table, caption=None, notes=None, position='h!',
+                # headers=None, alignment=None, booktabs=True, floatfmt='4.3f'):
+
+    # fid.write(r"""
+# \begin{table}""")
+    # fid.write('[{}]'.format(position))
+    # fid.write(r"""
+# \begin{center}
+# \small
+# """)
+
+    # if caption is not None:
+        # fid.write(r'\caption{' + caption + '}\n')
+
+    # write_tabular(fid, table, headers=headers, alignment=alignment, booktabs=booktabs, 
+                  # floatfmt=floatfmt)
+
+    # fid.write(r'\end{center}' + '\n')
+
+    # if notes is not None:
+        # fid.write(r'\footnotesize{' + notes + '}\n')
+
+    # fid.write(r'\end{table}' + '\n\n')
+    
+    # return None
+
+# def write_tabular(fid, contents, headers=None, alignment=None, booktabs=True,
+                  # floatfmt='4.3f'):
+
+    # all_contents = [headers] + contents
+    # # table = Table(contents, headers=headers, alignment=alignment)
+    # table = Table(all_contents, header=True, alignment=alignment)
+    # fid.write(table.text(booktabs, floatfmt))
+    # # table.write(fid, booktabs, floatfmt)
+    # return None
 
     # """Write table to latex""" 
     # # Set alignment

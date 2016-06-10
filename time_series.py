@@ -1,6 +1,7 @@
 # import ipdb
 import numpy as np
 import pandas as pd
+import re
 import statsmodels.api as sm
 import statsmodels.formula.api as smf
 from scipy.linalg import solve_discrete_lyapunov
@@ -115,6 +116,8 @@ def transform(df, var_list, lag=0, diff=0, other=None,
                 prefix = 'L_'
             new_var = prefix + new_var
 
+        new_var = re.sub('-', '_MINUS_', new_var)
+
         new_var_list.append(new_var)
 
         if new_var not in df:
@@ -135,6 +138,11 @@ def transform(df, var_list, lag=0, diff=0, other=None,
                 df[new_var] = df[new_var].shift(lag)
 
     return new_var_list
+
+def regression(df, lhs, rhs, **kwargs):
+
+    formula = '{0} ~ {1}'.format(lhs, ' + '.join(rhs))
+    return formula_regression(df, formula, **kwargs)
 
 def formula_regression(df, formula, var_list=None, match='inner', ix=None, nw_lags=0, display=False):
 
@@ -180,6 +188,20 @@ def sm_regression(df, lhs, rhs, match='inner', ix=None, nw_lags=0, display=False
         print(results.summary())
 
     return FullResults(results, ix, Xs, zs)
+
+def long_horizon_contemp(df, lhs, rhs, horizon, **kwargs):
+
+    long_list = transform(df, [lhs] + rhs, diff=horizon, other='cumsum') 
+    lhs_long = long_list[0]
+    rhs_long = long_list[1:]
+
+    return regression(df, lhs_long, rhs_long, **kwargs)
+
+def long_horizon_predictive(df, lhs, rhs, horizon, **kwargs):
+
+    lhs_long = transform(df, [lhs], lag=-1, diff=horizon, other='cumsum')[0]
+
+    return regression(df, lhs_long, rhs, **kwargs)
 
 class MVOLSResults:
     """Regression object"""

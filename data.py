@@ -2,7 +2,6 @@
 # TODO: default index for deflation
 
 import datetime
-import ipdb
 import numpy as np
 import os
 import pandas as pd
@@ -14,6 +13,7 @@ drop_dir = '/home/dan/Dropbox/'
 base_dir = drop_dir + 'data/'
 pkl_dir = base_dir + 'pkl/'
 gll_dir = drop_dir + 'gll/Dan/data/'
+gll_pred_dir = drop_dir + 'gll/Dan/Predictability/data/'
 
 def date_index(df, startdate, freq='QS'):
     df.set_index(pd.date_range(startdate, periods=len(df), freq=freq), inplace=True)
@@ -35,7 +35,7 @@ def resample(df, methods_vars, freq='QS'):
             else:
                 df_resamp = pd.merge(df_resamp, df_new, left_index=True, right_index=True)
 
-    return df
+    return df_resamp
 
 def get_suffix(dataset, **kwargs):
 
@@ -506,6 +506,40 @@ def load_dataset(dataset, **kwargs):
             # 'last' : ['Price', 'CAPE'],
             'sum' : ['real_D', 'real_E'],
             'last' : ['real_P', 'CAPE'],
+        }
+
+        df = resample(df_m, methods_vars)
+
+    elif dataset == 'tb3ms':
+
+        df_m = pd.read_csv(
+            gll_dir + 'TB3MS.csv',
+            names=['date', 'tb3ms'],
+            skiprows=1,
+            usecols=['tb3ms'],
+        ) 
+
+        df_m['rf'] = 0.25 * np.log(1.0 + 0.01 * df_m['tb3ms'])
+        df_m = df_m['rf'].to_frame()
+
+        df_m = date_index(df_m, '01/01/1934', freq='MS')
+
+        df = resample(df_m, {'first' : 'rf'}).to_frame()
+
+    elif dataset == 'uncertainty':
+
+        usecols = ['u{:02d}'.format(ii + 1) for ii in range(12)]
+
+        df_m = pd.read_excel(
+            gll_pred_dir + 'macro_uncertainty.xlsx',
+            sheetname='data',
+            usecols=usecols,
+        )
+
+        df_m = date_index(df_m, '07/01/1960', freq='MS')
+
+        methods_vars = {
+            'last' : usecols,
         }
 
         df = resample(df_m, methods_vars)
