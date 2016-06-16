@@ -5,20 +5,20 @@ import py_tools.utilities as ut
 class Table:
     """Latex table class"""
 
-    def __init__(self, contents=None, n_cols=None, header=False, 
+    def __init__(self, contents=None, n_cols=None, has_header=False, 
                  alignment=None, clines=None, hlines=None,
                  floatfmt='4.3f'):
 
         self.contents = contents if contents is not None else []
         self.n_cols = n_cols
-        self.header = header
+        self.has_header = has_header
         self.alignment = alignment
         self.clines = clines if clines is not None else {}
         self.hlines = hlines
         self.floatfmt = floatfmt
 
         if self.hlines is None:
-            if header:
+            if has_header:
                 self.hlines = [0]
             else:
                 self.hlines = []
@@ -328,29 +328,53 @@ def close_latex(fid):
     return None
 
 # TODO: define wrappers for table so that you can change floatfmt on the fly
-def regression_table(results, var_names=None, vertical=False, 
+def regression_table(results, var_names=None, vertical=False, tstat=False,
                      cov_type='HC0_se', floatfmt='4.3f', 
-                     stats=['rsquared'], **kwargs):
+                     print_vars=None,
+                     stats=['rsquared_adj'], **kwargs):
 
     tex_stats = {
-        'rsquared' : '\\bar{R}^2',
+        'rsquared' : 'R^2',
+        'rsquared_adj' : '\\bar{R}^2'
     }
 
     contents = []
 
     coeffs = results.params
-    se = getattr(results, cov_type)
+
+    if tstat:
+        se_like = results.tvalues
+    else:
+        se_like = getattr(results, cov_type)
+
+    has_header = False
+
+    n_vars = len(coeffs)
+    if print_vars is not None:
+        print_ix = [ii for ii in range(n_vars) if var_names[ii] in print_vars]
+    else:
+        print_vars = var_names
+        print_ix = range(n_vars)
 
     if vertical:
-        raise Exception
-        for ii in range(len(coeffs)):
+        for ii in range(n_vars):
             contents.append([coeffs[ii]])
-            contents.append(['({0:{1}})'.format(se[ii], floatfmt)])
+            contents.append(['({0:{1}})'.format(se_like[ii], floatfmt)])
+        for stat in stats:
+            this_stat = getattr(results, stat)
+            contents.append(['{0:{1}}'.format(this_stat, floatfmt)])
     else:
         if var_names is not None:
-            header_list = var_names + [tex_stats[stat] for stat in stats]
+            header_list = print_vars + [tex_stats[stat] for stat in stats]
             contents.append(header_list)
             has_header = True
+
+        contents.append(
+            [coeffs[ii] for ii in print_ix]
+            + [getattr(results, stat) for stat in stats])
+
+        contents.append(['({0:{1}})'.format(se_like[ii], floatfmt) for ii in print_ix]
+                        + [' ' for stat in stats])
 
     return Table(contents, has_header=has_header, floatfmt=floatfmt, **kwargs)
 

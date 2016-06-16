@@ -209,12 +209,17 @@ def load_dataset(dataset, **kwargs):
         df['P'] = (df['vwretx'] + 1.0).cumprod()
         df['D'] = np.hstack((np.nan, df['P'][:-1])) * (df['vwretd'] - df['vwretx'])
 
+        df['D4'] = df['D']
+        for jj in range(1, 4):
+            df['D4'] += df['D'].shift(jj)
+        df['D4'] *= 0.25
+
         df['p'] = np.log(df['P'])
-        df['d'] = np.log(df['D'])
+        df['d4'] = np.log(df['D4'])
         # df['dd'] = df['d'].diff()
         df['Re'] = np.hstack((np.nan, (df['P'][1:] + df['D'][1:]).values / df['P'][:-1].values))
         df['re'] = np.log(df['Re'])
-        df['pd'] = df['p'] - df['d']
+        df['pd'] = df['p'] - df['d4']
 
     elif dataset == 'cay':
 
@@ -550,20 +555,33 @@ def load_dataset(dataset, **kwargs):
 
         df = resample(df_m, {'first' : 'rf'}).to_frame()
 
-    elif dataset == 'uncertainty':
+    elif dataset == 'uc':
 
-        usecols = ['u{:02d}'.format(ii + 1) for ii in range(12)]
+        # usecols = ['u{:02d}'.format(ii + 1) for ii in range(12)]
+
+        # df_m = pd.read_excel(
+            # gll_pred_dir + 'macro_uncertainty.xlsx',
+            # sheetname='data',
+            # usecols=usecols,
+        # )
+
+        # df_m = date_index(df_m, '7/01/1960', freq='MS')
+
+        usecols = ['{:d}'.format(ii + 1) for ii in range(12)]
 
         df_m = pd.read_excel(
-            gll_pred_dir + 'macro_uncertainty.xlsx',
-            sheetname='data',
-            usecols=usecols,
+            gll_pred_dir + 'ut_cons.xls',
+            sheetname='All',
+            # skiprows=1,
+            names=(['Dates'] + usecols),
+            # usecols=usecols,
         )
 
+        df_m = df_m[usecols]
         df_m = date_index(df_m, '07/01/1960', freq='MS')
 
         methods_vars = {
-            'last' : usecols,
+            'first' : usecols,
         }
 
         df = resample(df_m, methods_vars)
