@@ -94,6 +94,8 @@ def load_dataset(dataset, **kwargs):
         var_index = {
             'liabilities_book' : ('b103', 'FL104190005'),
             'net_worth_book' : ('b103', 'FL102090005'),
+            'net_worth_market' : ('b103', 'FL102090005'),
+            'equities_outstanding_market' : ('b103', 'LM103164103'),
             # 'net_dividends' : ('u103', 'FU106121075'),
             # 'net_new_equity' : ('u103', 'FU103164103'),
             # 'net_new_paper' : ('u103', 'FU103169100'),
