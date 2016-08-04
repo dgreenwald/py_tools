@@ -3,10 +3,21 @@ from tabulate import tabulate
 import py_tools.utilities as ut
 
 class Table:
-    """Latex table class"""
+    """Latex table class.
+    
+    contents: list of lists, each sublist is one row
+    n_cols: number of columns of the table
+    has_header: flag for whether the top row is a header row
+    alignment: alignment of columns (e.g., 'lcc') 
+    clines: additional partial underlines
+    hlines: additional full underlines
+    super_header: text above top line
+    floatfmt: format for floating point entries
+    """
 
     def __init__(self, contents=None, n_cols=None, has_header=False, 
                  alignment=None, clines=None, hlines=None,
+                 super_header=None,
                  floatfmt='4.3f'):
 
         self.contents = contents if contents is not None else []
@@ -33,10 +44,12 @@ class Table:
             self.alignment *= self.n_cols
 
     def n_rows(self):
+        """Return number of rows"""
         return len(self.contents)
 
     def table(self, caption=None, notes=None, position='h!', fontsize='small', 
               caption_above=True, **kwargs):
+        """Format contents as latex table"""
 
         table_text = r"""
 \begin{table}"""
@@ -67,13 +80,16 @@ class Table:
         return table_text
 
     def tabular(self, booktabs=True):
-        """Write table to latex"""
+        """Format contents as latex tabular"""
 
         table_text = ''
         table_text += r'\begin{tabular}{' + self.alignment + '}\n'
 
         tstrut = '\\rule{0pt}{2.6ex}'
         bstrut = '\\rule[-0.9ex]{0pt}{0pt}'
+
+        if self.super_header is not None:
+            table_text += '\t&'.join(self.super_header) + '\\\\\n'
 
         # Top rule
         if booktabs:
@@ -130,6 +146,7 @@ class Table:
         return table_text
 
     def row(self, i_row):
+        """Accessor for single row"""
         
         if i_row < self.n_rows():
             return self.contents[i_row]
@@ -137,6 +154,7 @@ class Table:
             return self.n_cols * []
 
     def add_cline(self, start, end, row=0):
+        """Add a partial horizontal line"""
         
         if row in self.clines:
             self.clines[row] += [(start, end)]
@@ -145,9 +163,24 @@ class Table:
 
         return None
 
-    def multicolumn(self, text):
+    def multicolumn_row(self, text):
+        """Create a multicolumn row spanning the table"""
 
-        return multicolumn(self.n_cols, text)
+        return [multicolumn(self.n_cols, text)]
+
+    def add_super_header(self, text):
+
+        self.super_header = self.multicolumn_row(text)
+
+    # def append_multicolumn_row(self, text, before=False, is_header=False):
+        # """Add a multicolumn entry spanning the table. 
+        # Placed at the end, unless before=True."""
+
+        # new_row = self.multicolumn_row(text)
+        # if before:
+            # self = shift_down(self, new_row, is_header)
+        # else:
+            # self.contents.append(new_row)
 
 def multicolumn(n_cols, text):
     """Generate multicolumn string"""
@@ -197,7 +230,7 @@ def shift_down(table, new_row, is_header=True):
     return new_table
 
 # Join horizontally
-def join_subtables(table_list, header_list):
+def join_horizontal(table_list, header_list):
     """Join two tables so that each has a separate header"""
 
     tables_with_headers = []
@@ -213,11 +246,12 @@ def join_subtables(table_list, header_list):
         add_header = header is not None and table.n_cols > 1
 
         if add_header:
-            new_header = multicolumn(new_table.n_cols, header)
+            # new_header = multicolumn(new_table.n_cols, header)
+            new_header = new_table.multicolumn_row(header)
         else:
-            new_header = ' '
+            new_header = [' ']
 
-        new_table = shift_down(new_table, [new_header])
+        new_table = shift_down(new_table, new_header)
 
         if add_header:
             new_table.add_cline(1, new_table.n_cols)
@@ -240,7 +274,7 @@ def join_subtables(table_list, header_list):
     return super_table
 
 # Append vertically
-def append_subtables(table_list, header_list):
+def join_vertical(table_list, header_list):
     """Append two tables with text between"""
 
     assert all([table.n_cols == table_list[0].n_cols for table in table_list])
@@ -258,7 +292,7 @@ def append_subtables(table_list, header_list):
 
         # Add header
         if offset > 0: full_hlines.append(offset - 1)
-        full_contents.append([table.multicolumn(header)])
+        full_contents.append(table.multicolumn_row(header))
         full_hlines.append(offset)
         offset += 1
 
