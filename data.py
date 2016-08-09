@@ -9,11 +9,15 @@ import pandas_datareader.data as web
 
 import py_tools.utilities as ut
 
-drop_dir = '/home/dan/Dropbox/'
+home_dir = os.environ['HOME']
+drop_dir = home_dir + '/Dropbox/'
 base_dir = drop_dir + 'data/'
 pkl_dir = base_dir + 'pkl/'
 gll_dir = drop_dir + 'gll/Dan/data/'
 gll_pred_dir = drop_dir + 'gll/Dan/Predictability/data/'
+
+# def get_drop_dir():
+    # return drop_dir
 
 def date_index(df, startdate, freq='QS'):
     df.set_index(pd.date_range(startdate, periods=len(df), freq=freq), inplace=True)

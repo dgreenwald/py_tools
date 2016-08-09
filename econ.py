@@ -80,3 +80,29 @@ def sim_life_cycle(index_lists, z_ix_sim, i0=0):
         ix[tt] = index_lists[tt][z_ix_sim[tt]][ix_old]
 
     return ix
+
+# Rouwenhorst approximation
+def discrete_approx(rho, sig_e, N, cons=0.0):
+
+    q = 0.5 * (1.0 + rho)
+    sig_z = np.sqrt((sig_e ** 2)/(1 - rho ** 2))
+    psi = np.sqrt(N - 1.0) * sig_z
+
+    y = np.linspace(-psi, psi, N) + cons
+
+    P = np.array([[q, 1.0 - q], [1.0 - q, q]])
+
+    for ii in range(2, N):
+        P_old = P
+        P = np.zeros((ii+1, ii+1))
+
+        P[:-1, :-1] += q * P_old
+        P[:-1, 1:] += (1.0 - q) * P_old
+        P[1:, :-1] += (1.0 - q) * P_old
+        P[1:, 1:] += q * P_old
+
+        P[1:-1, :] *= 0.5
+
+    P /= np.sum(P, axis=1)
+
+    return (P, y)
