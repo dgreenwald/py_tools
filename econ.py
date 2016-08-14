@@ -6,7 +6,8 @@ Created on Sat Mar  5 07:46:14 2016
 """
 
 import numpy as np
-from walker import WalkerRandomSampling
+from . import walker
+# from walker import WalkerRandomSampling
 
 def get_unit_vecs(P, tol=1e-8, normalize=False):
     
@@ -18,6 +19,10 @@ def get_unit_vecs(P, tol=1e-8, normalize=False):
         unit_vecs /= np.sum(unit_vecs, axis=0)
         
     return unit_vecs
+
+def ergodic_dist(P):
+
+    return get_unit_vecs(P.T, normalize=True) 
 
 def check_ergodic(invariant, tol=1e-8):
     
@@ -40,7 +45,7 @@ def get_transition(indices):
     
 def sim_discrete(P, N, i0=0):
     
-    samplers = [WalkerRandomSampling(P[ii, :]) for ii in range(P.shape[0])]
+    samplers = [walker.WalkerRandomSampling(P[ii, :]) for ii in range(P.shape[0])]
     
     ix = np.zeros(N).astype(int)
     ix[0] = i0
@@ -49,6 +54,18 @@ def sim_discrete(P, N, i0=0):
         ix[ii] = samplers[ix[ii-1]].random(1)
     
     return ix
+
+def sim_iid(p, N):
+
+    sampler = walker.WalkerRandomSampling(p)
+    return sampler.random(N)
+
+def sim_discrete_from_ergodic(P, N):
+
+    pi_star = ergodic_dist(P)
+    i0 = np.random.choice(len(pi_star), p=pi_star.ravel())
+
+    return sim_discrete(P, N, i0)
     
 def sim_policy(index_list, z_ix_sim, i0=0):
     
@@ -105,4 +122,4 @@ def discrete_approx(rho, sig_e, N, cons=0.0):
 
     P /= np.sum(P, axis=1)
 
-    return (P, y)
+    return (y, P)
