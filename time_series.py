@@ -213,13 +213,18 @@ def long_horizon_predictive(df, lhs, rhs, horizon, **kwargs):
 class MVOLSResults:
     """Regression object"""
 
-    def __init__(self, nobs, params, fittedvalues, resid, cov_HC0):
+    def __init__(self, nobs, params, fittedvalues, resid, cov_HC0,
+                 llf, aic, bic, hqc):
 
         self.nobs = nobs
         self.params = params
         self.fittedvalues = fittedvalues
         self.resid = resid
         self.cov_HC0 = cov_HC0
+        self.llf = llf
+        self.aic = aic
+        self.bic = bic
+        self.hqc = hqc
 
     # def __init__(self, df, lhs, rhs, match='inner', ix=None, nw_lags=0):
 
@@ -243,6 +248,10 @@ def mv_ols(df, lhs, rhs, match='inner', ix=None, nw_lags=0):
     if 'const' in rhs and 'const' not in df:
         df['const'] = 1.0
 
+    if nw_lags > 0:
+        print("Need to code")
+        raise Exception
+
     X = df.ix[:, rhs].values
     z = df.ix[:, lhs].values
 
@@ -255,7 +264,20 @@ def mv_ols(df, lhs, rhs, match='inner', ix=None, nw_lags=0):
     resid = zs - fittedvalues
     cov_HC0 = np.dot(resid.T, resid) / nobs
 
-    results = MVOLSResults(nobs, params, fittedvalues, resid, cov_HC0)
+    # Compute likelihood
+    T, k = Xs.shape
+    _, n = z.shape
+    n_free = np.prod(params.shape)
+
+    log_det_Om = np.log(np.linalg.det(cov_HC0))
+    llf = -0.5 * (T * log_det_Om + T * n * (1.0 + np.log(2.0 * np.pi)))
+    aic = log_det_Om + (2.0 / T) * n_free
+    bic = log_det_Om + (np.log(T) / T) * n_free
+    hqc = log_det_Om + (2.0 * np.log(np.log(T)) / T) * n_free
+
+    results = MVOLSResults(nobs, params, fittedvalues, resid, cov_HC0,
+                           llf, aic, bic, hqc)
+
     return FullResults(results, ix, Xs, zs)
 
 def MA(df, lhs_var, rhs_vars, n_lags=16, display=False):
@@ -276,14 +298,17 @@ def MA(df, lhs_var, rhs_vars, n_lags=16, display=False):
     # Run regression
     return sm_regression(df, lhs, rhs, match='custom', ix=ix, display=display)
 
-def VAR(df, var_list, n_var_lags=1):
+def VAR(df, var_list, n_var_lags=1, use_const=True):
     """Estimate VAR using OLS"""
 
     # LHS variables
     lhs = var_list
 
     # RHS variables
-    rhs = ['const']
+    if use_const:
+        rhs = ['const']
+    else:
+        rhs = []
 
     for lag in range(1, n_var_lags + 1):
         for var in var_list:
