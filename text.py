@@ -55,7 +55,7 @@ class Table:
 
         if swp:
             table_text += r"""
-%TCIMACRO{\TeXButton{B}{\begin{table}[h!] \centering}}
+%TCIMACRO{\TeXButton{B}{\begin{table}[h!] \centering}}%
 %BeginExpansion
 """
 
@@ -68,7 +68,8 @@ class Table:
         else:
             table_text += '\n' + r'\begin{center}' + '\n'
 
-        table_text += '\\' + fontsize + '\n'
+        if not swp:
+            table_text += '\\' + fontsize + '\n'
 
         if caption is not None and caption_above:
             table_text += r'\caption{' + caption + '}\n'
