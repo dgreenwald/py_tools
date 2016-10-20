@@ -280,6 +280,20 @@ def load_dataset(dataset, **kwargs):
         df = web.DataReader(codes, "fred", start, end)
         df.rename(columns = {code : var for var, code in zip(var_list, codes)}, inplace=True)
 
+    elif dataset == 'fred_m':
+
+        var_index = {
+            'tbill' : 'TB3MS',
+        }
+
+        var_list = sorted(list(var_index.keys()))
+        codes = [var_index[var] for var in var_list]
+
+        start = datetime.datetime(1900, 1, 1)
+        end = datetime.datetime.today()
+        df = web.DataReader(codes, "fred", start, end)
+        df.rename(columns = {code : var for var, code in zip(var_list, codes)}, inplace=True)
+
     elif dataset == 'payouts':
 
         df = load(['nipa_11400', 'fof'], reimport=True)
@@ -401,12 +415,12 @@ def load_dataset(dataset, **kwargs):
                 'compensation' : 'A442RC1',
                 'wage_sal' : 'A443RC1',
                 'wage_sal_supp' : 'A444RC1',
-                'taxes' : 'W321RC1',
+                'prod_taxes' : 'W321RC1',
                 'net_op_surplus' : 'W322RC1',
                 'net_interest' : 'A453RC1',
                 'transfer_payments' : 'W323RC1',
                 'profits' : 'A445RC1',
-                'taxes' : 'A054RC1',
+                'corp_taxes' : 'A054RC1',
                 'after_tax_profits' : 'W273RC1',
                 'net_dividends' : 'A449RC1',
                 'undistributed_profits' : 'W274RC1',
