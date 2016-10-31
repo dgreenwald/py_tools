@@ -71,12 +71,7 @@ class AimObj:
 
     def numeric_shift(self):
 
-
-        # qf, rf = np.linalg.qr(self.H[:, self.right])
-        # q = np.fliplr(qf)
-        # r = np.flipud(rf)
         q, r = np.linalg.qr(self.H[:, self.right])
-        # q, r = sorted_qr(self.H[:, self.right])
         zerorows = np.abs(np.diag(r)) < self.tol
         while (np.any(zerorows) and self.iz < self.zrows):
             ix = np.arange(self.neq)[zerorows]
