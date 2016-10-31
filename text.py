@@ -263,7 +263,8 @@ def join_horizontal(table_list, header_list):
 
         new_table = table
 
-        add_header = header is not None and table.n_cols > 1
+        # add_header = header is not None and table.n_cols > 1
+        add_header = header is not None
 
         if add_header:
             # new_header = multicolumn(new_table.n_cols, header)
