@@ -18,15 +18,16 @@ class Table:
     def __init__(self, contents=None, n_cols=None, has_header=False, 
                  alignment=None, clines=None, hlines=None,
                  super_header=None,
-                 floatfmt='4.3f'):
+                 floatfmt='4.3f', tabu=False):
 
         self.contents = contents if contents is not None else []
         self.n_cols = n_cols
         self.has_header = has_header
-        self.alignment = alignment
+        self.alignment = alignment 
         self.clines = clines if clines is not None else {}
         self.hlines = hlines
         self.floatfmt = floatfmt
+        self.tabu = tabu
 
         if self.hlines is None:
             if has_header:
@@ -37,16 +38,21 @@ class Table:
         if self.n_cols is None:
             self.n_cols = len(contents[-1])
 
+        # Set alignment
         if self.alignment is None:
-            # self.alignment = 'l' + (self.n_cols - 1) * 'c'
-            self.alignment = 'c' * self.n_cols
-        elif len(self.alignment) == 1 and self.n_cols > 1:
+            if self.tabu:
+                self.alignment = self.n_cols * 'X[c]'
+            else:
+                self.alignment = self.n_cols * 'c'
+
+        if len(self.alignment) == 1 and self.n_cols > 1:
             self.alignment *= self.n_cols
 
     def n_rows(self):
         """Return number of rows"""
         return len(self.contents)
 
+    # Important kwargs = booktabs
     def table(self, caption=None, notes=None, position='h!', fontsize='small', 
               caption_above=True, swp=False, **kwargs):
         """Format contents as latex table"""
@@ -74,8 +80,6 @@ class Table:
         if caption is not None and caption_above:
             table_text += r'\caption{' + caption + '}\n'
 
-        # write_tabular(fid, table, headers=headers, alignment=alignment, booktabs=booktabs, 
-                      # floatfmt=floatfmt)
         table_text += self.tabular(**kwargs)
 
         if not swp:
@@ -99,11 +103,15 @@ class Table:
 
         return table_text
 
-    def tabular(self, booktabs=True):
+    def tabular(self, booktabs=True, width=r'\textwidth'):
         """Format contents as latex tabular"""
 
         table_text = ''
-        table_text += r'\begin{tabular}{' + self.alignment + '}\n'
+        if self.tabu:
+            table_text += (r'\begin{tabu} to ' + width + r' {' 
+                           + self.alignment + '}\n')
+        else:
+            table_text += r'\begin{tabular}{' + self.alignment + '}\n'
 
         tstrut = '\\rule{0pt}{2.6ex}'
         bstrut = '\\rule[-0.9ex]{0pt}{0pt}'
@@ -161,7 +169,10 @@ class Table:
         else:
             table_text += r'\hline \hline' + '\n'
 
-        table_text += r'\end{tabular}' + '\n'
+        if self.tabu:
+            table_text += r'\end{tabu}' + '\n'
+        else:
+            table_text += r'\end{tabular}' + '\n'
 
         return table_text
 
@@ -216,7 +227,9 @@ def hstack(table_list):
     alignment = ''.join([table.alignment for table in table_list])
     hlines = list(set(ut.join_lists([table.hlines for table in table_list])))
 
-    new_table = Table(contents, n_cols=n_cols, alignment=alignment, hlines=hlines)
+    tabu = any([table.tabu for table in table_list])
+
+    new_table = Table(contents, n_cols=n_cols, alignment=alignment, tabu=tabu, hlines=hlines)
 
     offset = 0
     for table in table_list:
@@ -227,14 +240,14 @@ def hstack(table_list):
 
     return new_table
 
-def empty_table(n_rows, n_cols, alignment=None):
+def empty_table(n_rows, n_cols, **kwargs):
     """Create an empty table"""
 
     if alignment is None:
         alignment = n_cols * 'c'
 
     contents = [n_cols * [' '] for row in range(n_rows)]
-    return Table(contents, n_cols=n_cols, alignment=alignment)
+    return Table(contents, n_cols=n_cols, **kwargs)
 
 def shift_down(table, new_row, is_header=True):
 
@@ -300,9 +313,11 @@ def join_vertical(table_list, header_list):
 
     assert all([table.n_cols == table_list[0].n_cols for table in table_list])
     assert all([table.alignment == table_list[0].alignment for table in table_list])
+    assert all([table.tabu == table_list[0].tabu for table in table_list])
 
     n_cols = table_list[0].n_cols
     alignment = table_list[0].alignment
+    tabu = table_list[0].tabu
 
     full_contents = []
     full_clines = {}
@@ -328,7 +343,8 @@ def join_vertical(table_list, header_list):
         full_hlines += [val + offset for val in table.hlines]
         offset += table.n_rows()
 
-    return Table(full_contents, n_cols, alignment=alignment, clines=full_clines, hlines=full_hlines)
+    return Table(full_contents, n_cols, alignment=alignment, tabu=tabu,
+                 clines=full_clines, hlines=full_hlines)
 
 # def output_tabulated(table, headers, filename, floatfmt='4.3f', tablefmt='plain'):
     # """Write table to file path"""
@@ -360,6 +376,7 @@ def open_latex(fid):
 \usepackage{booktabs}
 \usepackage{caption}
 \usepackage{setspace}
+\usepackage{tabu}
 
 \allowdisplaybreaks[1]
 
