@@ -6,17 +6,17 @@ class HiddenMarkov:
 
     def __init__(self, P, x_bar, err_density, y_vals):
 
-        self.P = P
-        self.x_bar = x_bar
-        self.err_density = err_density
-        self.y_vals = y_vals
+        self.P = P  # Transition matrix
+        self.x_bar = x_bar  # State values
+        self.err_density = err_density  # Measurement error density function
+        self.y_vals = y_vals    # Data values
 
         if len(self.y_vals.shape) < 2:
             self.y_vals = self.y_vals[np.newaxis, :]
 
-        self.Nx = len(self.x_bar)
-        self.Ny = self.y_vals.shape[0]
-        self.Nt = self.y_vals.shape[1]
+        self.Nx = len(self.x_bar)   # No. of states
+        self.Ny = self.y_vals.shape[0]  # No. of data series
+        self.Nt = self.y_vals.shape[1]  # No. of observations
 
     def set_px_init(self, px_init):
 

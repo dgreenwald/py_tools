@@ -267,8 +267,8 @@ def load_dataset(dataset, **kwargs):
     elif dataset == 'fred':
 
         var_index = {
-            'cpi_deflator' : 'CPIAUCSL',
-            'pce_deflator' : 'PCEPI',
+            # 'cpi_deflator' : 'CPIAUCSL',
+            'pce_deflator' : 'PCECTPI',
             'real_gdp' : 'GDPC1',
         }
 
