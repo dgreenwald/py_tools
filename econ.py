@@ -13,7 +13,7 @@ def get_unit_vecs(P, tol=1e-8, normalize=False):
     
     vals, vecs = np.linalg.eig(P)
     unit = np.abs(vals - 1.0) < tol
-    unit_vecs = vecs[:, unit]
+    unit_vecs = np.real(vecs[:, unit])
     
     if normalize:
         unit_vecs /= np.sum(unit_vecs, axis=0)

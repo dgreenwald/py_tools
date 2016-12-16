@@ -500,7 +500,9 @@ def load_dataset(dataset, **kwargs):
         full_list = sorted(list(var_index.keys()))
 
         start_date = df_curr.index[0]
-        df = df_hist.ix[:start_date, :].append(df_curr)
+        df_hist_sample = df_hist.ix[:start_date, :]
+        df = df_hist_sample.iloc[:-1, :].append(df_curr)
+        # df = df_hist.ix[:start_date, :].append(df_curr)
 
         codes = [var_index[var] for var in full_list]
         df = df.ix[:, codes]
