@@ -5,6 +5,7 @@ from . import econ
 class HiddenMarkov:
 
     def __init__(self, P, x_bar, err_density, y_vals):
+        """Initialize parameters of the HM model"""
 
         self.P = P  # Transition matrix
         self.x_bar = x_bar  # State values
@@ -19,16 +20,19 @@ class HiddenMarkov:
         self.Nt = self.y_vals.shape[1]  # No. of observations
 
     def set_px_init(self, px_init):
+        """Setter function for initial distribution"""
 
         self.px_init = px_init
         return None
 
     def init_stationary(self):
+        """Set initial distribution to stationary distribution"""
 
         self.px_init = np.squeeze(econ.ergodic_dist(self.P))
         return None
 
     def filter(self):
+        """Filter data"""
 
         self.L = 0.0
         self.px_filt_storage = np.zeros((self.Nx, self.Nt))

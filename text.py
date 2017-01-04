@@ -26,6 +26,7 @@ class Table:
         self.alignment = alignment 
         self.clines = clines if clines is not None else {}
         self.hlines = hlines
+        self.super_header = super_header
         self.floatfmt = floatfmt
         self.tabu = tabu
 
