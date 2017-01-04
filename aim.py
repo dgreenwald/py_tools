@@ -6,11 +6,11 @@ class KleinObj:
 
     def __init__(self, A, B, C, Phi, Sig, n_pre):
 
-        self.A = A.asmatrix()
-        self.B = B.asmatrix()
-        self.C = C.asmatrix()
-        self.Phi = Phi.asmatrix()
-        self.Sig = Sig.asmatrix()
+        self.A = np.asmatrix(A)
+        self.B = np.asmatrix(B)
+        self.C = np.asmatrix(C)
+        self.Phi = np.asmatrix(Phi)
+        self.Sig = np.asmatrix(Sig)
         self.n_endog = self.A.shape[0]
         self.n_pre = n_pre
         self.n_uns = self.n_endog - self.n_pre
@@ -18,26 +18,28 @@ class KleinObj:
 
     def solve(self):
 
-        S, T, alp, bet, Q, Z = ordqz(A, B, sort='ouc', output='complex')  
+        S, T, alp, bet, Q, Z = ordqz(
+            self.A, self.B, sort='ouc', output='complex'
+        )  
 
         # TODO: checks here
 
-        Q_star = Q.H 
-        Q1 = Q_star[:n_pre, :].asmatrix()
-        Q2 = Q_star[n_pre:, :].asmatrix()
+        Q_star = np.asmatrix(Q).H 
+        Q1 = np.asmatrix(Q_star[:self.n_pre, :])
+        Q2 = np.asmatrix(Q_star[self.n_pre:, :])
 
-        Z11 = Z[:n_pre, :n_pre].asmatrix()
-        Z12 = Z[:n_pre, n_pre:].asmatrix()
-        Z21 = Z[n_pre:, :n_pre].asmatrix()
-        Z22 = Z[n_pre:, n_pre:].asmatrix()
+        Z11 = np.asmatrix(Z[:self.n_pre, :self.n_pre])
+        Z12 = np.asmatrix(Z[:self.n_pre, self.n_pre:])
+        Z21 = np.asmatrix(Z[self.n_pre:, :self.n_pre])
+        Z22 = np.asmatrix(Z[self.n_pre:, self.n_pre:])
 
-        S11 = S[:n_pre, :n_pre].asmatrix()
-        S12 = S[:n_pre, n_pre:].asmatrix()
-        S22 = S[n_pre:, n_pre:].asmatrix()
+        S11 = np.asmatrix(S[:self.n_pre, :self.n_pre])
+        S12 = np.asmatrix(S[:self.n_pre, self.n_pre:])
+        S22 = np.asmatrix(S[self.n_pre:, self.n_pre:])
 
-        T11 = T[:n_pre, :n_pre].asmatrix()
-        T12 = T[:n_pre, n_pre:].asmatrix()
-        T22 = T[n_pre:, n_pre:].asmatrix()
+        T11 = np.asmatrix(T[:self.n_pre, :self.n_pre])
+        T12 = np.asmatrix(T[:self.n_pre, self.n_pre:])
+        T22 = np.asmatrix(T[self.n_pre:, self.n_pre:])
 
         G_xc = Z11 * (Z12.inverse())
         H_xc = Z11 * (np.solve(S11, T11)) * (Z11.inverse())
@@ -68,7 +70,7 @@ class AimObj:
         self.neq, self.hcols = H.shape
         self.periods = H.shape[1] / self.neq
         self.nlead = nlead
-        self.nlag = self.periods - self.nlead - 1
+        self.nlag = int(self.periods - self.nlead) - 1
         self.tol = tol
         # self.eig_bnd = 1.0
 
