@@ -41,8 +41,8 @@ class KleinObj:
         T12 = np.asmatrix(T[:self.n_pre, self.n_pre:])
         T22 = np.asmatrix(T[self.n_pre:, self.n_pre:])
 
-        G_xc = Z11 * (Z12.inverse())
-        H_xc = Z11 * (np.solve(S11, T11)) * (Z11.inverse())
+        G_xc = Z11 * np.linalg.inv(Z12)
+        H_xc = Z11 * (np.solve(S11, T11)) * np.linalg.inv(Z11)
 
         self.G_x = np.real(G_xc)
         self.H_x = np.real(H_xc)

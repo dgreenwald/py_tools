@@ -298,8 +298,10 @@ def MA(df, lhs_var, rhs_vars, n_lags=16, display=False):
     # Run regression
     return sm_regression(df, lhs, rhs, match='custom', ix=ix, display=display)
 
-def VAR(df, var_list, n_var_lags=1, use_const=True):
+def VAR(df_in, var_list, n_var_lags=1, use_const=True):
     """Estimate VAR using OLS"""
+
+    df = df_in.copy()
 
     # LHS variables
     lhs = var_list
