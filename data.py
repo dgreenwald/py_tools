@@ -14,7 +14,7 @@ drop_dir = home_dir + '/Dropbox/'
 base_dir = drop_dir + 'data/'
 pkl_dir = base_dir + 'pkl/'
 gll_dir = drop_dir + 'gll/Dan/data/'
-gll_pred_dir = drop_dir + 'gll/Dan/Predictability/data/'
+gll_pred_dir = drop_dir + 'gll/Predictability/data/'
 
 # def get_drop_dir():
     # return drop_dir
@@ -593,7 +593,7 @@ def load_dataset(dataset, **kwargs):
 
         df_m = pd.read_excel(
             gll_pred_dir + 'ut_cons.xls',
-            sheetname='All',
+            # sheetname='All',
             # skiprows=1,
             names=(['Dates'] + usecols),
             # usecols=usecols,

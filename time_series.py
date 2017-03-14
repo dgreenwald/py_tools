@@ -213,14 +213,25 @@ def long_horizon_predictive(df, lhs, rhs, horizon, **kwargs):
 class MVOLSResults:
     """Regression object"""
 
-    def __init__(self, nobs, params, fittedvalues, resid, cov_HC0,
+    def __init__(self, nobs, params, fittedvalues, resid, cov_e,
+                 cov_HC0, HC0_se, HC0_tstat,
+                 cov_HC1, HC1_se, HC1_tstat,
                  llf, aic, bic, hqc):
 
         self.nobs = nobs
         self.params = params
         self.fittedvalues = fittedvalues
         self.resid = resid
+        self.cov_e = cov_e
+
         self.cov_HC0 = cov_HC0
+        self.HC0_se = HC0_se
+        self.HC0_tstat = HC0_tstat
+
+        self.cov_HC1 = cov_HC1
+        self.HC1_se = HC1_se
+        self.HC1_tstat = HC1_tstat
+
         self.llf = llf
         self.aic = aic
         self.bic = bic
@@ -241,7 +252,7 @@ class MVOLSResults:
         # self.params = least_sq(self.Xs, self.zs)
         # self.fittedvalues = np.dot(self.Xs, self.params)
         # self.resid = self.zs - self.fittedvalues
-        # self.cov_HC0 = np.dot(self.resid.T, self.resid) / self.nobs
+        # self.cov_e = np.dot(self.resid.T, self.resid) / self.nobs
 
 def mv_ols(df, lhs, rhs, match='inner', ix=None, nw_lags=0):
 
@@ -258,24 +269,51 @@ def mv_ols(df, lhs, rhs, match='inner', ix=None, nw_lags=0):
     match=match
     ix, Xs, zs = match_xy(X, z, how=match, ix=ix)
 
+    # Get sizes
+    T, k = Xs.shape
+    _, nz = zs.shape
+
     nobs = X.shape[0]
     params = least_sq(Xs, zs)
     fittedvalues = np.dot(Xs, params)
     resid = zs - fittedvalues
-    cov_HC0 = np.dot(resid.T, resid) / nobs
+    # cov_HC0 = np.dot(resid.T, resid) / nobs
+
+    # Homoskedastic covariance
+    cov_HC0, cov_e = hc0(Xs, resid)
+    # Note: reshape is transposed since params is (k x n) not (n x k)
+    # otherwise would need to set order='F'
+
+    HC0_se = standard_errors(cov_HC0, T).reshape(params.shape)
+    HC0_tstat = params / HC0_se
+
+    # Heteroskedastic covariance
+    # cov_xeex = np.zeros((nz*k, nz*k))
+    # for tt in range(T):
+        # x_t = Xs[tt, :][:, np.newaxis]
+        # e_t = resid[tt, :][:, np.newaxis]
+        # cov_xeex += np.kron(np.dot(x_t, x_t.T), np.dot(e_t, e_t.T))
+
+    # cov_xeex /= T
+    # cov_HC1 = np.dot(cov_X_inv, np.dot(cov_xeex, cov_X_inv))
+
+    # NOTE: for now, computing both HC0 and HC1
+    cov_HC1, _ = hc1(Xs, resid)
+    HC1_se = standard_errors(cov_HC1, T).reshape(params.shape)
+    HC1_tstat = params / HC1_se
 
     # Compute likelihood
-    T, k = Xs.shape
-    _, n = z.shape
     n_free = np.prod(params.shape)
 
-    log_det_Om = np.log(np.linalg.det(cov_HC0))
-    llf = -0.5 * (T * log_det_Om + T * n * (1.0 + np.log(2.0 * np.pi)))
-    aic = log_det_Om + (2.0 / T) * n_free
-    bic = log_det_Om + (np.log(T) / T) * n_free
-    hqc = log_det_Om + (2.0 * np.log(np.log(T)) / T) * n_free
+    log_det_cov_e = np.log(np.linalg.det(cov_e))
+    llf = -0.5 * (T * log_det_cov_e + T * nz * (1.0 + np.log(2.0 * np.pi)))
+    aic = log_det_cov_e + (2.0 / T) * n_free
+    bic = log_det_cov_e + (np.log(T) / T) * n_free
+    hqc = log_det_cov_e + (2.0 * np.log(np.log(T)) / T) * n_free
 
-    results = MVOLSResults(nobs, params, fittedvalues, resid, cov_HC0,
+    results = MVOLSResults(nobs, params, fittedvalues, resid, cov_e,
+                           cov_HC0, HC0_se, HC0_tstat,
+                           cov_HC1, HC1_se, HC1_tstat,
                            llf, aic, bic, hqc)
 
     return FullResults(results, ix, Xs, zs)
@@ -594,3 +632,40 @@ def run_dls(df, lhs_var, rhs_vars, n_lags=8, display=False):
     const = fr.results.params[0]
 
     return (coint_vec, const)
+
+def hc0(x, e):
+    "Homoskedastic Covariance"
+    cov_e, _, cov_x_inv, _, _, _ = init_cov(x, e)
+    cov_HC0 = np.kron(cov_x_inv, cov_e)
+    return (cov_HC0, cov_e)
+
+def hc1(x, e):
+    "Heteroskedastic Covariance"
+    cov_e, cov_x, cov_x_inv, T, nz, k = init_cov(x, e)
+    cov_xeex = np.zeros((nz*k, nz*k))
+    for tt in range(T):
+        x_t = x[tt, :][:, np.newaxis]
+        e_t = e[tt, :][:, np.newaxis]
+        cov_xeex += np.kron(np.dot(x_t, x_t.T), np.dot(e_t, e_t.T))
+    cov_xeex /= T
+
+    cov_X_inv = np.kron(cov_x_inv, np.eye(nz))
+    cov_HC1 = np.dot(cov_X_inv, np.dot(cov_xeex, cov_X_inv))
+    return (cov_HC1, cov_e)
+
+def init_cov(x, e):
+
+    T, k = x.shape
+    Te, nz = e.shape
+    assert(T == Te)
+
+    cov_e = np.dot(e.T, e) / T
+    cov_x = np.dot(x.T, x) / T
+    cov_x_inv = np.linalg.inv(cov_x)
+
+    return (cov_e, cov_x, cov_x_inv, T, nz, k)
+
+def standard_errors(V, T):
+
+    se = np.sqrt(np.diagonal(V) / T)
+    return se
