@@ -336,6 +336,197 @@ def MA(df, lhs_var, rhs_vars, n_lags=16, display=False):
     # Run regression
     return sm_regression(df, lhs, rhs, match='custom', ix=ix, display=display)
 
+def companion_form(A, use_const=True):
+
+    # Get sizes
+    Ny, Nx = A.shape
+    if use_const:
+        Nlags = (Nx - 1) / Ny
+    else:
+        Nlags = Nx / Ny
+
+    # Pre-allocate
+    A_comp = np.zeros((Nx, Nx))
+
+    # Top rows: VAR coefficients
+    A_comp[:Ny, :] = A
+
+    # Remaining blocks: identity matrices
+    for lag in range(1, Nlags):
+        A_comp[Ny*lag : Ny * (lag + 1), 
+               Ny * (lag - 1) : Ny * lag] \
+            = np.eye(Ny)
+
+    # One for constant term
+    if use_const:
+        A_comp[-1, -1] = 1.0
+
+    return A_comp
+
+def compute_irfs(A, B, Nt_irf):
+    """
+    Inputs:
+    A: transition matrix
+    B: impact matrix
+    Nt_irf: number of periods
+
+    Output:
+    irfs: Ny x Nshock x Nt_irf array
+    """
+
+    # Get sizes
+    Ny, Nx = A.shape
+    Ne = B.shape[1]
+    assert(A.shape[0] == B.shape[0])
+
+    # Update to companion form
+    A_comp = companion_form(A)
+    B_comp = np.zeros((Nx, Ne))
+    B_comp[:Ny, :] = B
+
+    # Run IRFs in companion form
+    irf_comp_mats = np.zeros((Nx, Ne, Nt_irf))
+    irf_comp_mats[:, :, 0] = B_comp
+    for tt in range(1, Nt_irf):
+        irf_comp_mats[:, :, tt] = np.dot(A_comp, irf_comp_mats[:, :, tt-1])
+
+    # Chop extraneous rows
+    return irf_comp_mats[:Ny, :, :]
+
+class ObjVAR:
+    """Vector Auto-Regression"""
+
+    def __init__(self, df_in, var_list, n_var_lags=1, use_const=True,
+                 copy_df=True):
+
+        if copy_df:
+            self.df = df_in.copy()
+        else:
+            self.df = df_in
+
+        self.var_list = var_list
+        self.n_var_lags = n_var_lags
+        self.use_const = use_const
+
+        # Initial estimation
+        self.fit(self.df)
+
+        # Process results
+        self.A = self.fr.results.params.T
+        # self.A_comp = companion_form(self.A)
+        self.resid = self.fr.results.resid
+        self.Ny, self.Nx = self.A.shape
+        self.Nt = self.fr.Xs.shape[0]
+
+        # IRFs
+        self.irfs = None
+
+    def fit(self, df):
+
+        lhs = self.var_list
+        rhs = []
+
+        for lag in range(1, self.n_var_lags + 1):
+            for var in self.var_list:
+                rhs += transform(df, [var], lag=lag)
+
+        # RHS variables
+        if self.use_const:
+            rhs += ['const']
+
+        self.fr = mv_ols(df, lhs, rhs)
+
+    def X(self):
+        return self.fr.Xs
+
+    def y(self):
+        return self.fr.zs
+
+    def ix(self):
+        return self.fr.ix
+
+    def irfs(self, **kwargs):
+        if self.irfs is None:
+            compute_irfs(self, **kwargs)
+        return self.irfs
+
+    # def irfs(self, **kwargs):
+        # if self.irfs is None:
+            # compute_irfs(self, kwargs)
+
+    def compute_irfs(self, B, Nt_irf=20, bootstrap=False):
+
+        """
+        Inputs:
+        B: impact matrix
+        Nt_irf: number of periods
+        """
+
+        self.Nt_irf = Nt_irf
+        self.irfs = compute_irfs(self.A, B, self.Nt_irf)
+
+        if bootstrap:
+            self.irfs_boot = np.zeros((self.irfs.shape + (self.Nboot,)))
+            for i_boot in range(self.Nboot):
+                self.irfs_boot[:, :, :, i_boot] = compute_irfs(self.A_boot[:, :, i_boot], B, self.Nt_irf)
+
+        return
+
+        # # Check
+        # n_shocks = B.shape[1]
+        # assert(B.shape[0] == self.Ny)
+
+        # # Update to companion form
+        # A_comp = companion_form(self.A)
+        # B_comp = np.zeros((self.Nx, n_shocks))
+        # B_comp[:self.Ny, :] = B
+
+        # # Run IRFs in companion form
+        # irf_comp_mats = np.zeros((self.Nx, n_shocks, Nt_irf))
+        # irf_comp_mats[:, :, 0] = B_comp
+        # for tt in range(1, Nt_irf):
+            # irf_comp_mats[:, :, tt] = np.dot(A_comp, irf_comp_mats[:, :, tt-1])
+
+        # # Chop extraneous rows
+        # return irf_comp_mats[:self.Ny, :, :]
+
+    def wild_bootstrap(self, Nboot=1000):
+
+        self.Nboot = Nboot
+
+        x_init = self.X()[0, :]
+
+        self.A_boot = np.zeros((self.Ny, self.Nx, self.Nboot))
+        self.y_boot = np.zeros((self.Nt, self.Ny, Nboot))
+
+        # Draw bootstrapped residuals
+        eta = 1.0 - 2.0 * (np.random.rand(self.Nt, Nboot) > 0.5)
+        self.resid_boot = self.resid[:, :, np.newaxis] * eta[:, np.newaxis, :]
+        
+        # Companion form impact matrix
+        # impact_companion = np.zeros((self.Nx, self.Ny))
+        # impact_companion[:self.Ny, :] = np.eye(self.Ny)
+
+        y_i = np.zeros((self.Nt, self.Ny))
+        X_i = np.zeros((self.Nt, self.Nx))
+
+        for i_boot in range(Nboot):
+
+            x = x_init
+            for tt in range(self.Nt):
+                X_i[tt, :] = x
+                x = np.dot(self.companion_form(), x)
+                x[:self.Ny] += self.resid_boot[tt, :, i_boot]
+                y_i[tt, :] = x[:self.Ny]
+
+            # Store results
+            self.y_boot[:, :, i_boot] = y_i
+
+            # Re-estimate VAR
+            self.A_boot[:, :, i_boot] = least_sq(X_i, y_i).T
+
+        return
+
 def VAR(df_in, var_list, n_var_lags=1, use_const=True):
     """Estimate VAR using OLS"""
 
@@ -343,16 +534,15 @@ def VAR(df_in, var_list, n_var_lags=1, use_const=True):
 
     # LHS variables
     lhs = var_list
-
-    # RHS variables
-    if use_const:
-        rhs = ['const']
-    else:
-        rhs = []
+    rhs = []
 
     for lag in range(1, n_var_lags + 1):
         for var in var_list:
             rhs += transform(df, [var], lag=lag)
+
+    # RHS variables
+    if use_const:
+        rhs += ['const']
 
     # Regression
     return mv_ols(df, lhs, rhs)
