@@ -1,11 +1,14 @@
+import numpy as np
+import py_tools.time_series as ts
+
 def companion_form(A, use_const=True):
 
     # Get sizes
     Ny, Nx = A.shape
     if use_const:
-        Nlags = (Nx - 1) / Ny
+        Nlags = (Nx - 1) // Ny
     else:
-        Nlags = Nx / Ny
+        Nlags = Nx // Ny
 
     # Pre-allocate
     A_comp = np.zeros((Nx, Nx))
@@ -84,8 +87,8 @@ class ObjVAR:
         self.irfs = None
 
         # Bootstrap
-        self.A_boot is None
-        self.y_boot is None
+        self.A_boot = None
+        self.y_boot = None
 
     def fit(self, df):
 
@@ -94,13 +97,13 @@ class ObjVAR:
 
         for lag in range(1, self.n_var_lags + 1):
             for var in self.var_list:
-                rhs += transform(df, [var], lag=lag)
+                rhs += ts.transform(df, [var], lag=lag)
 
         # RHS variables
         if self.use_const:
             rhs += ['const']
 
-        self.fr = mv_ols(df, lhs, rhs)
+        self.fr = ts.mv_ols(df, lhs, rhs)
 
     def X(self):
         return self.fr.Xs
@@ -176,12 +179,14 @@ class ObjVAR:
         y_i = np.zeros((self.Nt, self.Ny))
         X_i = np.zeros((self.Nt, self.Nx))
 
+        A_comp = companion_form(self.A)
+
         for i_boot in range(Nboot):
 
             x = x_init
             for tt in range(self.Nt):
                 X_i[tt, :] = x
-                x = np.dot(self.companion_form(), x)
+                x = np.dot(A_comp, x)
                 x[:self.Ny] += self.resid_boot[tt, :, i_boot]
                 y_i[tt, :] = x[:self.Ny]
 
@@ -189,7 +194,7 @@ class ObjVAR:
             self.y_boot[:, :, i_boot] = y_i
 
             # Re-estimate VAR
-            self.A_boot[:, :, i_boot] = least_sq(X_i, y_i).T
+            self.A_boot[:, :, i_boot] = ts.least_sq(X_i, y_i).T
 
         return
 
@@ -203,7 +208,7 @@ class ObjVAR:
             self.Nt_irf = kwargs.get(Nt_irf, 20) # TODO don't hard code number
 
         Ne = B.shape[1] # TODO: should be a way to set B
-        self.irfs_boot = np.zeros((self.Ny, Ne, self.Nt_irf))
+        self.irfs_boot = np.zeros((self.Ny, Ne, self.Nt_irf, self.Nboot))
         for i_boot in range(self.Nboot):
             self.irfs_boot[:, :, :, i_boot] = compute_irfs(self.A_boot[:, :, i_boot], B, self.Nt_irf)
              
