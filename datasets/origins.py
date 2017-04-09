@@ -9,9 +9,13 @@ import py_tools.data
 # drop_dir = home_dir + '/Dropbox/'
 # base_dir = drop_dir + 'data/'
 # pkl_dir = base_dir + 'pkl/'
-def load(dataset, master_dirs, **kwargs):
+def load(dataset, master_dirs={}, **kwargs):
 
     dirs = master_dirs.copy()
+    if 'drop' not in dirs:
+        home_dir = os.environ['HOME']
+        dirs['drop'] = home_dir + '/Dropbox/'
+
     dirs['gll'] = dirs['drop'] + 'gll/Dan/data/'
     dirs['gll_pred'] = dirs['drop'] + 'gll/Predictability/data/'
 
@@ -97,6 +101,15 @@ def load(dataset, master_dirs, **kwargs):
         infile = 'caydata.txt'
 
         df = pd.read_table(data_dir + infile, delim_whitespace=True, 
+                           names=['dates', 'c', 'a', 'y', 'cay'])
+        df = py_tools.data.date_index(df, '1/1/1952')
+
+    elif dataset == 'cay_current':
+
+        data_dir = dirs['gll']
+        infile = 'cay_current.csv'
+
+        df = pd.read_table(data_dir + infile, sep=',', header=2,
                            names=['dates', 'c', 'a', 'y', 'cay'])
         df = py_tools.data.date_index(df, '1/1/1952')
 
@@ -188,3 +201,4 @@ def load(dataset, master_dirs, **kwargs):
 
         df = resample(df_m, methods_vars)
 
+    return df

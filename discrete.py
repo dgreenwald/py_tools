@@ -7,10 +7,27 @@ Created on Sat Mar  5 07:09:18 2016
 
 import matplotlib.pyplot as plt
 import numpy as np
-import tools
+
+import py_tools.econ as ec
 
 class DiscreteModel:
-    """Object for discrete modeling"""
+    """Object for discrete modeling. 
+    
+    INPUTS:
+    
+    bet: the discount factor
+
+    flow_list: list of flow values for various x, z combinations
+
+    x_grid: the set of endogenous state values 
+        size: (Nx x kx) = (# of gridpoints x # of variables)
+
+    z_grid: the set of exogenous state values
+        size: (Nz x kz) = (# of gridpoints x # of variables)
+
+    Pz: the transition matrix for the exogenous states
+
+    """
 
     def __init__(self, bet, flow_list, x_grid, z_grid, Pz):
         """Constructor"""
@@ -46,11 +63,12 @@ class DiscreteModel:
             indices_old = indices
             
             # Howard improvement step
-            transition_list = [tools.get_transition(index) for index in self.index_list]
+            transition_list = [ec.get_transition(index) for index in self.index_list]
             bP_trans_list = [np.kron(self.bP[ii, :], transition_list[ii]) for ii in range(self.Nz)]
             bP_trans = np.vstack(bP_trans_list)
             
-            opt_flow_list = [self.flow_list[ii][np.arange(self.Nx), np.squeeze(self.index_list[ii])][:, np.newaxis] 
+            opt_flow_list = [self.flow_list[ii][np.arange(self.Nx), 
+                                                np.squeeze(self.index_list[ii])][:, np.newaxis] 
                              for ii in range(self.Nz)]
             opt_flow = np.vstack(opt_flow_list)
             v = np.linalg.solve((np.eye(self.Nx * self.Nz) - bP_trans), opt_flow)
@@ -60,20 +78,24 @@ class DiscreteModel:
             v_next = np.vstack([vi.T for vi in self.v_list])
             W = np.dot(self.bP1, v_next)
             V = R + W
-            indices, v = tools.update_value(V)
+            indices, v = ec.update_value(V)
             self.index_list = np.split(indices, self.Nz)
             
             done = np.all(indices_old == indices)
             
         print('Converged in {} iterations'.format(it))
+
+        self.V = v.reshape((self.Nx, self.Nz), order='F')
+        self.I = indices.reshape((self.Nx, self.Nz), order='F')
+        
         return None
 
     def sim(self, Nsim):
         """Simulate from solution"""
-        z_ix_sim = tools.sim_discrete(self.Pz, Nsim)
+        z_ix_sim = ec.sim_discrete(self.Pz, Nsim)
         z_sim = self.z_grid[z_ix_sim, :]
 
-        x_ix_sim = tools.sim_policy(self.index_list, z_ix_sim)
+        x_ix_sim = ec.sim_policy(self.index_list, z_ix_sim)
         x_sim = self.x_grid[x_ix_sim, :]
         return (x_sim, z_sim)
 
@@ -111,7 +133,7 @@ class LifeCycleModel:
             R = np.vstack(self.flow_lists[tt])
             W = np.dot(self.bP1, v_next)
             V = R + W
-            indices, v = tools.update_value(V)
+            indices, v = ec.update_value(V)
 
             self.v_lists[tt] = np.split(v, self.Nz)
             self.index_lists[tt] = np.split(indices, self.Nz)
@@ -126,10 +148,10 @@ class LifeCycleModel:
         x_sim = np.zeros((self.kx, self.Nt, Nsim))
         
         for ii in range(Nsim):
-            z_ix_sim = tools.sim_discrete(self.Pz, self.Nt)
+            z_ix_sim = ec.sim_discrete(self.Pz, self.Nt)
             z_sim[:, :, ii] = self.z_grid[z_ix_sim, :].T  
             
-            x_ix_sim = tools.sim_life_cycle(self.index_lists, z_ix_sim)
+            x_ix_sim = ec.sim_life_cycle(self.index_lists, z_ix_sim)
             x_sim[:, :, ii] = self.x_grid[x_ix_sim, :].T
             
         return (x_sim, z_sim)

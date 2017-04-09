@@ -90,7 +90,7 @@ def load(dataset_list, reimport=False, no_prefix=True, **kwargs):
 
 def load_dataset(dataset, **kwargs):
 
-    if dataset in ['stockw', 'crsp', 'crsp_q', 'cay', 'cay_source', 'bls_ls',
+    if dataset in ['stockw', 'crsp', 'crsp_q', 'cay', 'cay_current', 'cay_source', 'bls_ls',
                    'fernald', 'tb3ms', 'uc']:
 
         df = py_tools.datasets.origins.load(dataset, dirs, **kwargs)
@@ -184,13 +184,14 @@ def load_dataset(dataset, **kwargs):
         # df = web.DataReader(codes, "fred", start, end)
         # df.rename(columns = {code : var for var, code in zip(var_list, codes)}, inplace=True)
 
-        code_names = { code : name for code, name in var_index.items() }
+        code_names = { code : name for name, code in var_index.items() }
         df = py_tools.datasets.fred.load(code_names=code_names)
 
     elif dataset == 'fred_m':
 
         var_index = {
             'tbill' : 'TB3MS',
+            'mortg' : 'MORTG',
         }
 
         # var_list = sorted(list(var_index.keys()))
@@ -201,7 +202,7 @@ def load_dataset(dataset, **kwargs):
         # df = web.DataReader(codes, "fred", start, end)
         # df.rename(columns = {code : var for var, code in zip(var_list, codes)}, inplace=True)
 
-        code_names = { code : name for code, name in var_index.items() }
+        code_names = { code : name for name, code in var_index.items() }
         df = py_tools.datasets.fred.load(code_names=code_names)
 
     elif dataset[:4] == 'nipa':
@@ -341,6 +342,7 @@ def load_dataset(dataset, **kwargs):
             # if nipa_vintage == '1604':
             var_index = {
                 # 'wage_sal' : 'A576RC1',
+                'compensation' : 'A033RC1',
                 'personal_income' : 'A065RC1',
                 'transfer_payments' : 'A577RC1',
                 'employer_pension_ins' : 'B040RC1',

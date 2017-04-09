@@ -21,6 +21,39 @@ class FullResults:
 
 def deflate(df, var_list, index='cpi', log=False, diff=False, per_capita=False, 
             reimport=False, **kwargs):
+    """Deflates series by price indexes
+    
+    Inputs:
+
+        df: pandas dataframe containing data
+
+        var_list: list of variables to be deflated
+
+        index: price index to use, one of
+
+            cpi: CPI deflator
+            pce: PCE deflator
+            pop: population (to put in per-capita terms)
+
+        log: set to True if the variable is ALREADY in logs rather than levels
+            (this will not take logs)
+
+        diff: set to True if the variable is ALREADY in differences 
+            (this will not take differences)
+
+        per_capita: set to True if you ALSO want to put the variable in per-capita terms
+            (unlike "log" and "diff" this WILL adjust the series)
+
+        reimport: set to True if you want to re-import the raw data instead of using the
+            saved pickle files
+
+    Outputs:
+
+        df: dataframe now including deflated series
+
+        new_var_list: names of deflated variables
+    
+    """
     
     # index_var = 'FRED_' + index + '_index'
     new_var_list = []
