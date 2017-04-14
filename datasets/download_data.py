@@ -15,13 +15,13 @@ def download_if_exists(url, filename):
         print(e)
         return False
 
-save_dir = "/home/dan/data/ahs/"
+# save_dir = "/home/dan/data/ahs/"
+save_dir = '/data/ahs/'
 
+# Note: no national file in 1982
 years = list(range(1973, 1982)) + list(range(1983, 2016, 2))
-# years = range(1973, 2016)
-# years.remove(1982) # no national file
 
-for year in range(2003, 2016, 2):
+for year in years:
 
     year_str = str(year)
     year_dir = save_dir + year_str + '/'
@@ -42,9 +42,6 @@ for year in range(2003, 2016, 2):
         url = "http://www2.census.gov/programs-surveys/ahs/2015/AHS%202015%20National%20PUF%20v1.0%20CSV.zip"
     else:
         raise Exception
-    # elif year <= 2016:
-        # url = "http://www2.census.gov/programs-surveys/ahs/19{0}/AHS%2019{0}%20National%20PUF%20V1.1%20CSV.zip"
-        # url = "http://www2.census.gov/programs-surveys/ahs/19{0}/AHS%2019{0}%20National%20PUF%20V1.1%20CSV.zip".format(short_year)
 
     in_out.makeDir(year_dir)
     filename = year_dir + 'ahs{}.zip'.format(year)
