@@ -90,20 +90,20 @@ class ObjVAR:
         self.A_boot = None
         self.y_boot = None
 
-    def fit(self, df):
+    def fit(self):
 
         lhs = self.var_list
         rhs = []
 
         for lag in range(1, self.n_var_lags + 1):
             for var in self.var_list:
-                rhs += ts.transform(df, [var], lag=lag)
+                rhs += ts.transform(self.df, [var], lag=lag)
 
         # RHS variables
         if self.use_const:
             rhs += ['const']
 
-        self.fr = ts.mv_ols(df, lhs, rhs)
+        self.fr = ts.mv_ols(self.df, lhs, rhs)
 
     def X(self):
         return self.fr.Xs
