@@ -1,4 +1,5 @@
 import matplotlib.pyplot as plt
+import numpy as np
 
 def two_axis(df_in, var1, var2, filepath=None, 
                   label1=None, label2=None, 
@@ -88,7 +89,7 @@ def normalized(df, var_list, filepath=None, invert_list=None):
     
     return None
 
-def clean(f_in, var_list):
+def clean(df_in, var_list):
 
     df = df_in[var_list].replace([np.inf, -np.inf], np.nan)
     return df.dropna()
@@ -96,7 +97,7 @@ def clean(f_in, var_list):
 def hist(df_in, var, label=None, xtitle=None, weight_var=None, 
          bins=None, ylim=None, filepath=None):
 
-    df = clean(df_in)
+    df = clean(df_in, [var, weight_var])
 
     if var not in df or len(df) == 0:
         return False
@@ -117,13 +118,20 @@ def hist(df_in, var, label=None, xtitle=None, weight_var=None,
     if label is not None:
         plt.legend()
 
-    plt.savefig(out_dir + var + '_{0}.{1}'.format(year, filetype))
+    if filepath is not None:
+        plt.savefig(filepath)
+    else:
+        plt.show()
+
     plt.close(fig)
 
     return True
 
-def double_hist(df0, dg1, label0, label1, var, bins=None, 
-                weight_var=None, filepath=None):
+def double_hist(df_in0, df_in1, label0, label1, var, bins=None, 
+                weight_var=None, filepath=None, xtitle=None, ylim=None):
+
+    df0 = clean(df_in0, [var, weight_var])
+    df1 = clean(df_in1, [var, weight_var])
 
     if var not in df0 or var not in df1:
         return False
@@ -147,6 +155,11 @@ def double_hist(df0, dg1, label0, label1, var, bins=None,
     plt.hist(df1[var].values, normed=True, bins=bins, alpha=0.5,
              weights=w1, label=str(label1))
     plt.legend()
+
+    if xtitle is not None:
+        plt.xlabel(xtitle)
+    if ylim is not None:
+        plt.ylim((ylim))
 
     if filepath is not None:
         plt.savefig(filepath)
