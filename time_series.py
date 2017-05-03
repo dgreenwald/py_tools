@@ -701,3 +701,21 @@ def standard_errors(V, T):
 
     se = np.sqrt(np.diagonal(V) / T)
     return se
+
+def lagged_reg(df_in, lhs, rhs_list, n_lags, use_const=True, copy_df=True):
+    """Regression of lhs on 1 through n_lags lags of rhs_list."""
+
+    if copy_df:
+        df = df_in.copy()
+    else:
+        df = df_in
+
+    rhs = []
+    for lag in range(1, n_lags + 1):
+        for var in rhs_list:
+            rhs += transform(df, [var], lag=lag)
+
+    if use_const:
+        rhs += ['const']
+
+    return mv_ols(df, lhs, rhs)

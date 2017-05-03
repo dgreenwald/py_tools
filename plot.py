@@ -1,11 +1,13 @@
 import matplotlib.pyplot as plt
 
-def two_axis(df, var1, var2, filepath=None, 
+def two_axis(df_in, var1, var2, filepath=None, 
                   label1=None, label2=None, 
                   loc1='upper left', loc2='upper right',
                   legend_font=10, label_font=12, normalize=False, 
-                  color1='royalblue', color2='orangered', 
+                  color1='#1f77b4', color2='#ff7f0e', 
                   markevery=4):
+
+    df = df_in[[var1, var2]].dropna()
 
     fig, ax1 = plt.subplots()
 
@@ -54,7 +56,7 @@ def two_axis(df, var1, var2, filepath=None,
 
     return None
 
-def normalized(df, var_list, invert_list=None):
+def normalized(df, var_list, filepath=None, invert_list=None):
     
     if invert_list is None:
         invert_list = len(var_list) * [False]
@@ -85,3 +87,72 @@ def normalized(df, var_list, invert_list=None):
     plt.close(fig)
     
     return None
+
+def clean(f_in, var_list):
+
+    df = df_in[var_list].replace([np.inf, -np.inf], np.nan)
+    return df.dropna()
+
+def hist(df_in, var, label=None, xtitle=None, weight_var=None, 
+         bins=None, ylim=None, filepath=None):
+
+    df = clean(df_in)
+
+    if var not in df or len(df) == 0:
+        return False
+
+    if weight_var is not None:
+        w = df[weight_var].values
+    else:
+        w = np.ones(len(df))
+
+    fig = plt.figure()
+    plt.hist(df[var].values, normed=True, bins=bins, alpha=0.5,
+             weights=w, label=label)
+
+    if xtitle is not None:
+        plt.xlabel(xtitle)
+    if ylim is not None:
+        plt.ylim((ylim))
+    if label is not None:
+        plt.legend()
+
+    plt.savefig(out_dir + var + '_{0}.{1}'.format(year, filetype))
+    plt.close(fig)
+
+    return True
+
+def double_hist(df0, dg1, label0, label1, var, bins=None, 
+                weight_var=None, filepath=None):
+
+    if var not in df0 or var not in df1:
+        return False
+
+    if len(df0) == 0 or len(df1) == 0:
+        return False
+
+    if weight_var is not None:
+        w0 = df0[weight_var].values
+    else:
+        w0 = np.ones(len(df0))
+
+    if weight_var in df1:
+        w1 = df1[weight_var].values
+    else:
+        w1 = np.ones(len(df1))
+
+    fig = plt.figure()
+    plt.hist(df0[var].values, normed=True, bins=bins, alpha=0.5,
+             weights=w0, label=str(label0))
+    plt.hist(df1[var].values, normed=True, bins=bins, alpha=0.5,
+             weights=w1, label=str(label1))
+    plt.legend()
+
+    if filepath is not None:
+        plt.savefig(filepath)
+    else:
+        plt.show()
+
+    plt.close(fig)
+
+    return True

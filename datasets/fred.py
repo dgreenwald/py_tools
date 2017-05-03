@@ -43,7 +43,7 @@ def load(codes=None, code_names={},
     for series in set(codes) - set(download_series):
 
         infile = data_dir + series + '.pkl'
-        df_in = pd.read_pickle(infile)
+        df_in = pd.read_pickle(infile).to_frame()
         if df is None:
             df = df_in
         else:
