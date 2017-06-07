@@ -1,6 +1,8 @@
 import numpy as np
 from py_tools.discrete import DiscreteModel
 import py_tools.econ as ec
+import pyviennacl as p
+from argmax2 import argmax
 
 from colloc import in_out
 
@@ -40,10 +42,10 @@ V = np.zeros((Nx, Nz))
 # in_out.saveEigen(z_grid[:, np.newaxis], '/home/dan/Dropbox/sandbox/discrete/z_grid.out')
 
 # Load these in Eigen using <helper.hpp> and the syntax e.g.
-%
+
 # MatXd Pz;
 # loadEigen("/path/to/Pz.out", Pz)
-%
+
 # Also works with other Eigen types (ArrXXd, VecXd, ArrXd).
 
 # TEST WITH ORIGINAL VERSION
@@ -70,12 +72,13 @@ bet_Pz = bet * Pz # pre-compute
 A = np.zeros((Ns, Ns))
 f_star = np.zeros(Ns)
 indices = (-1 * np.ones(Ns)).astype(int)
-
 done = False
+tag = p.gmres_tag(tolerance = 1e-5, max_iterations = 150, krylov_dim= 50)
 while not done:
 
     old_indices = indices.copy()
 
+    #should this be run with Vienna?
     Om = bet * np.dot(V, Pz.T) # expected future value
     for jj in range(Nz):
 
@@ -83,19 +86,26 @@ while not done:
 
         for ii in range(Nx):
 
+            #should this be run with vienna
             kk = Nx * jj + ii
-
             alternatives = flow[kk, :] + Om[:, jj] # values for possible choices of i
-            max_ix = np.argmax(alternatives) # optimal choice of i
+            max_ix = argmax(alternatives, 3) # optimal choice of i
             max_val = flow[kk, max_ix] # value associated with optimal choice
 
             indices[kk] = max_ix # store optimal index
             f_star[kk] = max_val # store optimal value
             E[ii, max_ix] = 1.0 # put 1 at index in picker matrix
-
+    
         A[Nx * jj : Nx * (jj+1), :] = np.kron(bet_Pz[jj, :], E) # fill in block of A matrix
-
-    v = np.linalg.solve(np.eye(Ns) - A, f_star) # solve for new values if current policy forever
+        
+    #hangs with upper_tag solver, so which to use?
+    A_p = p.Matrix(np.eye(Ns) - A)
+    b_p = p.Vector(f_star)
+    #v = np.linalg.solve(np.eye(Ns)-A, f_star)
+    v_p = p.linalg.solve(A_p, b_p, tag) # solve for new values if current policy forever
+    #print(v)
+    #print(v_p)
+    v = v_p.value
     V = v.reshape((Nx, Nz), order='F') # stack colwise into Nx x Nz matrix
 
     done = np.all(indices == old_indices)
