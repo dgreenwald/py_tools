@@ -19,7 +19,7 @@ int argmax(Eigen::VectorXd x, int approx){
   m_v = viennacl::linalg::max(x_v);
   int m;
   m = m_v;
-  return m % x_i.size();
+  return (m % x_i.size() + x_i.size()) % x_i.size();
 }
 
 int main(){
