@@ -1,7 +1,5 @@
 import pandas as pd
 
-data_dir = '/home/dan/Dropbox/data/frm/fof/'
-
 def load():
 
     data_dir = '/home/dan/Dropbox/data/frm/fof/'

@@ -30,7 +30,7 @@ def load(codes=None, code_names={},
 
     if download_series:
         # df = web.DataReader(codes, "fred", start, end).rename(columns=code_names)
-        df = web.DataReader(download_series, "fred", start, end).rename(columns=code_names)
+        df = web.DataReader(download_series, "fred", start, end)
 
         # Store
         for series in download_series:
@@ -48,5 +48,7 @@ def load(codes=None, code_names={},
             df = df_in
         else:
             df = pd.merge(df, df_in, left_index=True, right_index=True, how='outer')
+
+    df = df.rename(columns=code_names)
 
     return df

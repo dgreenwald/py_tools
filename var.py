@@ -100,8 +100,8 @@ class VAR:
             # rhs += ['const']
 
         # self.fr = ts.mv_ols(self.df, lhs, rhs)
-        self.fr = ts.lagged_reg(self.df, self.var_list, self.var_list, self.n_var_lags, 
-                                use_const=self.use_const)
+        self.fr = ts.lagged_reg(self.df, self.var_list, self.var_list, 
+                                self.n_var_lags, use_const=self.use_const)
 
         # Process results
         self.A = self.fr.results.params.T
@@ -123,10 +123,10 @@ class VAR:
     # def ix(self):
         # return self.fr.ix
 
-    def irfs(self, **kwargs):
-        if self.irfs is None:
-            compute_irfs(self, **kwargs)
-        return self.irfs
+    # def irfs(self, **kwargs):
+        # if self.irfs is None:
+            # compute_irfs(self, **kwargs)
+        # return self.irfs
 
     # def irfs(self, **kwargs):
         # if self.irfs is None:
@@ -170,11 +170,14 @@ class VAR:
 
         return None
 
-    def compute_irfs(self, B, Nt_irf=20, bootstrap=False):
+    def compute_irfs(self, B=None, Nt_irf=20, bootstrap=False):
         """Inputs:
         B: impact matrix
         Nt_irf: number of periods
         """
+
+        if B is None:
+            B = np.eye(self.Ny)
 
         self.Nt_irf = Nt_irf
         self.irfs = compute_irfs(self.A, B, self.Nt_irf)
@@ -182,7 +185,8 @@ class VAR:
         if bootstrap:
             self.irfs_boot = np.zeros((self.irfs.shape + (self.Nboot,)))
             for i_boot in range(self.Nboot):
-                self.irfs_boot[:, :, :, i_boot] = compute_irfs(self.A_boot[:, :, i_boot], B, self.Nt_irf)
+                self.irfs_boot[:, :, :, i_boot] = compute_irfs(self.A_boot[:, :, i_boot], 
+                                                               B, self.Nt_irf)
 
         return
 
@@ -208,7 +212,7 @@ class VAR:
 
         self.Nboot = Nboot
 
-        x_init = self.X()[0, :]
+        x_init = self.X[0, :]
 
         self.A_boot = np.zeros((self.Ny, self.Nx, self.Nboot))
         self.y_boot = np.zeros((self.Nt, self.Ny, Nboot))

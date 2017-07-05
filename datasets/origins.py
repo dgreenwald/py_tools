@@ -1,5 +1,6 @@
 import os
 
+# import ipdb
 import numpy as np
 import pandas as pd
 import py_tools.data
@@ -21,10 +22,20 @@ def load(dataset, master_dirs={}, **kwargs):
 
     if dataset == 'stockw':
 
+        vintage = kwargs.get('stockw_vintage', None)
+
         data_dir = dirs['gll']
-        infile = 'stockw.csv'
-        df = pd.read_table(data_dir + infile, sep=',', 
+
+        if vintage is None:
+            infile = 'stockw.csv'
+            sep = ','
+        else:
+            infile = 'stockw_{}.csv'.format(vintage)
+            sep = ';'
+
+        df = pd.read_table(data_dir + infile, sep=sep, 
                                names=['dates', 'stockw'], usecols=['stockw'])
+
         # df['stockw'] = np.log(df['stockw_level'])
 
         # del df['dates']
@@ -52,7 +63,12 @@ def load(dataset, master_dirs={}, **kwargs):
             'last' : ['P'],
             'sum' : ['D'],
         }
-        df = resample(df_m, methods_vars)
+
+        df = pd.merge(df_m[['P']].resample('QS').last(),
+                      df_m[['D']].resample('QS').sum(),
+                      left_index=True, right_index=True)
+
+        # df = df_m.resample(methods_vars)
 
         df['D4'] = df['D']
         for jj in range(1, 4):
@@ -65,6 +81,7 @@ def load(dataset, master_dirs={}, **kwargs):
         df['Re'] = np.hstack((np.nan, (df['P'][1:] + df['D'][1:]).values / df['P'][:-1].values))
         df['re'] = np.log(df['Re'])
         df['pd'] = df['p'] - df['d4']
+        df['pd_q'] = df['p'] - np.log(df['D'])
 
     elif dataset == 'crsp_q':
 
@@ -94,6 +111,7 @@ def load(dataset, master_dirs={}, **kwargs):
         df['Re'] = np.hstack((np.nan, (df['P'][1:] + df['D'][1:]).values / df['P'][:-1].values))
         df['re'] = np.log(df['Re'])
         df['pd'] = df['p'] - df['d4']
+        df['pd_q'] = df['p'] - np.log(df['D'])
 
     elif dataset == 'cay':
 

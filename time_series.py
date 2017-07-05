@@ -121,6 +121,14 @@ def deflate(df, var_list, index='cpi', log=False, diff=False, per_capita=False,
 
     return (df, new_var_list)
 
+def add_lags(df, var, n_lags, init_lag=1):
+
+    lag_list = []
+    for lag in range(init_lag, n_lags + init_lag):
+        lag_list += transform(df, [var], lag=lag)
+
+    return lag_list
+
 def transform(df, var_list, lag=0, diff=0, other=None,
               # , deflate=False, 
               # deflate_ix='cpi', deflate_log=False, deflate_diff=False,
@@ -172,20 +180,34 @@ def transform(df, var_list, lag=0, diff=0, other=None,
 
     return new_var_list
 
-def regression(df, lhs, rhs, **kwargs):
+def regression(df, lhs, rhs, intercept=True, formula_extra=None, ix=None, **kwargs):
 
     formula = '{0} ~ {1}'.format(lhs, ' + '.join(rhs))
-    return formula_regression(df, formula, **kwargs)
 
-def formula_regression(df, formula, var_list=None, match='inner', ix=None, nw_lags=0, display=False):
+    if ix is None:
+        ix, _ = match_sample(df[[lhs] + rhs].values, how='inner')
 
-    if var_list is not None:
-        ix, _ = match_sample(df[var_list].values, how=match, ix=ix)
+    if formula_extra is not None:
+        formula += ' + ' + formula_extra
+
+    if not intercept:
+        formula += ' -1'
+
+    return formula_regression(df, formula, ix=ix, **kwargs)
+
+def formula_regression(df, formula, var_list=None, match='inner', ix=None, 
+                       nw_lags=0, display=False):
+
+    # if var_list is not None:
+        # ix, Xs, zs = match_sample(df[var_list].values, how=match, ix=ix)
+    # else:
+        # Xs = None
+        # zs = None
 
     if ix is None:
         model = smf.ols(formula=formula, data=df)
     else:
-        model = smf.ols(formula=formula, data=df.ix[ix, :])
+        model = smf.ols(formula=formula, data=df.loc[ix, :])
 
     results = model.fit()
 
@@ -351,15 +373,18 @@ def mv_ols(df, lhs, rhs, match='inner', ix=None, nw_lags=0):
 
     return FullResults(results, ix, Xs, zs)
 
-def MA(df, lhs_var, rhs_vars, n_lags=16, display=False):
+def MA(df, lhs_var, rhs_vars, init_lag=1, default_lags=16, 
+       lags_by_var={}, **kwargs):
 
-    lhs = [lhs_var]
+    lhs = lhs_var
     # lhs += transform(df, [lhs_var], 
     # lhs.append(add_lag(df, lhs_var, lag=0, diff=0))
 
-    rhs = ['const']
+    # rhs = ['const']
+    rhs = []
     for var in rhs_vars:
-        for lag in range(n_lags):
+        this_lag = lags_by_var.get(var, default_lags)
+        for lag in range(init_lag, this_lag + init_lag):
             rhs += transform(df, [var], lag=lag)
             # rhs.append(add_lag(df, var, lag=lag))
 
@@ -367,7 +392,7 @@ def MA(df, lhs_var, rhs_vars, n_lags=16, display=False):
     ix, _, _ = match_xy(df[rhs_vars].values, df[lhs_var].values)
 
     # Run regression
-    return sm_regression(df, lhs, rhs, match='custom', ix=ix, display=display)
+    return regression(df, lhs, rhs, match='custom', ix=ix, **kwargs)
 
 def VAR(df_in, var_list, n_var_lags=1, use_const=True):
     """Estimate VAR using OLS"""
@@ -719,3 +744,39 @@ def lagged_reg(df_in, lhs, rhs_list, n_lags, use_const=True, copy_df=True):
         rhs += ['const']
 
     return mv_ols(df, lhs, rhs)
+
+def detrend_hamilton(df_full, varlist, p=4, h=8):
+    """Apply Hamilton's recommended detrending procedure (instead of HP filter)"""
+
+    fr_list = []
+    for var in varlist:
+
+        df = df_full[[var]].copy()
+
+        rhs = []
+        for ii in range(p):
+            lag = h + ii
+            rhs += transform(df, [var], lag=lag)
+
+        fr = regression(df, var, rhs)
+        fr_list.append(fr)
+
+        df_full[var + '_detrend'] = np.nan
+        df_full.loc[fr.ix, var + '_detrend'] = fr.results.resid
+
+    varlist_detrended = [var + '_detrend' for var in varlist]
+
+    return df_full, varlist_detrended, fr_list
+
+def detrend_time(df_full, varlist):
+
+    for var in varlist:
+
+        df = df_full[[var]].copy() 
+        df['diff'] = df[var].diff()
+        df['diff'] -= df['diff'].mean()
+        df_full[var + '_detrend'] = np.cumsum(df['diff'])
+
+    varlist_detrended = [var + '_detrend' for var in varlist]
+
+    return df_full, varlist_detrended

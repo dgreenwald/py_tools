@@ -9,6 +9,13 @@ import numpy as np
 from . import walker
 # from walker import WalkerRandomSampling
 
+# def lse(x, axis=None):
+    # """Safely computes log(sum(exp(x)))"""
+
+    # x_star = np.amax(x)
+    # x_til = x - x_star
+    # return x_star + np.log(np.sum(np.exp(x_til), axis=axis))
+
 def get_unit_vecs(P, tol=1e-8, normalize=False):
     
     vals, vecs = np.linalg.eig(P)

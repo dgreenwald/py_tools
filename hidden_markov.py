@@ -1,15 +1,17 @@
+import ipdb
 import numpy as np
+from scipy.misc import logsumexp
 
 from . import econ
 
 class HiddenMarkov:
 
-    def __init__(self, P, err_density, y_vals):
+    def __init__(self, P, log_err_density, y_vals):
         """Initialize parameters of the HM model"""
 
         self.P = P  # Transition matrix
         # self.x_bar = x_bar  # State values
-        self.err_density = err_density  # Measurement error density function
+        self.log_err_density = log_err_density  # Measurement error density function
         self.y_vals = y_vals    # Data values
 
         if len(self.y_vals.shape) < 2:
@@ -21,6 +23,7 @@ class HiddenMarkov:
         self.Nt = self.y_vals.shape[1]  # No. of observations
 
         self.px_filt_storage = np.zeros((self.Nx, self.Nt))
+        self.log_p_err_storage = np.zeros((self.Nx, self.Nt))
 
     def set_px_init(self, px_init):
         """Setter function for initial distribution"""
@@ -42,15 +45,17 @@ class HiddenMarkov:
 
         px_pred = self.px_init
         for tt in range(self.Nt):
-            # p_err = self.err_density(self.y_vals[:, tt], self.x_bar, tt)
-            p_err = self.err_density(self.y_vals[:, tt], tt)
-            py_all = p_err * px_pred
-            py_marg = np.sum(py_all)
+            # p_err = self.log_err_density(self.y_vals[:, tt], self.x_bar, tt)
+            log_p_err = self.log_err_density(self.y_vals[:, tt], tt)
+            log_py_all = log_p_err + np.log(px_pred)
+            # log_py_marg = econ.lse(log_py_all)
+            log_py_marg = logsumexp(log_py_all)
             
-            px_filt = py_all / py_marg
+            px_filt = np.exp(log_py_all - log_py_marg)
             px_pred = np.dot(px_filt, self.P.T)
             
+            self.log_p_err_storage[:, tt] = log_p_err
             self.px_filt_storage[:, tt] = px_filt
-            self.L += np.log(py_marg)
+            self.L += log_py_marg
             
         return None
