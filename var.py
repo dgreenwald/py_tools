@@ -1,5 +1,6 @@
 import numpy as np
 import py_tools.time_series as ts
+from py_tools.utilities import as_list
 
 def companion_form(A, use_const=True):
 
@@ -58,7 +59,7 @@ def compute_irfs(A, B, Nt_irf):
     # Chop extraneous rows
     return irf_comp_mats[:Ny, :, :]
 
-class ObjVAR:
+class VAR:
     """Vector Auto-Regression"""
 
     def __init__(self, df_in, var_list, n_var_lags=1, use_const=True,
@@ -74,14 +75,7 @@ class ObjVAR:
         self.use_const = use_const
 
         # Initial estimation
-        self.fit(self.df)
-
-        # Process results
-        self.A = self.fr.results.params.T
-        # self.A_comp = companion_form(self.A)
-        self.resid = self.fr.results.resid
-        self.Ny, self.Nx = self.A.shape
-        self.Nt = self.fr.Xs.shape[0]
+        self.fit()
 
         # IRFs
         self.irfs = None
@@ -90,29 +84,44 @@ class ObjVAR:
         self.A_boot = None
         self.y_boot = None
 
-    def fit(self, df):
+    # def lagged_reg(self, lhs, rhs_list, n_lags, use_const=True):
 
-        lhs = self.var_list
-        rhs = []
+    def fit(self):
 
-        for lag in range(1, self.n_var_lags + 1):
-            for var in self.var_list:
-                rhs += ts.transform(df, [var], lag=lag)
+        # lhs = self.var_list
+        # rhs = []
 
-        # RHS variables
-        if self.use_const:
-            rhs += ['const']
+        # for lag in range(1, self.n_var_lags + 1):
+            # for var in self.var_list:
+                # rhs += ts.transform(self.df, [var], lag=lag)
 
-        self.fr = ts.mv_ols(df, lhs, rhs)
+        # # RHS variables
+        # if self.use_const:
+            # rhs += ['const']
 
-    def X(self):
-        return self.fr.Xs
+        # self.fr = ts.mv_ols(self.df, lhs, rhs)
+        self.fr = ts.lagged_reg(self.df, self.var_list, self.var_list, self.n_var_lags, 
+                                use_const=self.use_const)
 
-    def y(self):
-        return self.fr.zs
+        # Process results
+        self.A = self.fr.results.params.T
+        # self.A_comp = companion_form(self.A)
+        self.resid = self.fr.results.resid
+        self.Ny, self.Nx = self.A.shape
+        self.Nt = self.fr.Xs.shape[0]
 
-    def ix(self):
-        return self.fr.ix
+        self.X = self.fr.Xs
+        self.y = self.fr.zs
+        self.ix = self.fr.ix
+
+    # def X(self):
+        # return self.fr.Xs
+
+    # def y(self):
+        # return self.fr.zs
+
+    # def ix(self):
+        # return self.fr.ix
 
     def irfs(self, **kwargs):
         if self.irfs is None:
@@ -123,10 +132,46 @@ class ObjVAR:
         # if self.irfs is None:
             # compute_irfs(self, kwargs)
 
-    def compute_irfs(self, B, Nt_irf=20, bootstrap=False):
+    def add_series_recursive(self, new_series_in):
+        """Add additional series to the VAR using a recursive structure. 
+        The new series can be affected by the previous series, but cannot 
+        affect the previous series."""
 
-        """
-        Inputs:
+        new_series = as_list(new_series_in)
+        self.var_list += new_series
+
+        # Shift existing parameters
+        A_old = self.A.copy()
+        Ny_old = self.Ny
+        Nx_old = self.Nx
+
+        N_new = len(new_series)
+        self.Ny += N_new
+        self.Nx += N_new * self.n_var_lags
+        A1_new = np.zeros((Ny_old, self.Nx))
+
+        for lag in range(self.n_var_lags):
+            A1_new[:, self.Ny * lag : self.Ny * lag + Ny_old] \
+                = A_old[:, Ny_old * lag : Ny_old * (lag + 1)]
+
+        fr_new = ts.lagged_reg(self.df, new_series, self.var_list, self.n_var_lags, 
+                               use_const=self.use_const)
+
+        A2_new = fr_new.results.params.T
+        self.A = np.vstack((A1_new, A2_new))
+
+        # self.resid = fr_new.results.resid
+        # self.Ny, self.Nx = self.A.shape
+        # self.Nt = fr_new.Xs.shape[0]
+
+        # self.X = fr_new.Xs
+        # self.y = fr_new.zs
+        # self.ix = fr_new.ix
+
+        return None
+
+    def compute_irfs(self, B, Nt_irf=20, bootstrap=False):
+        """Inputs:
         B: impact matrix
         Nt_irf: number of periods
         """
@@ -212,5 +257,4 @@ class ObjVAR:
         for i_boot in range(self.Nboot):
             self.irfs_boot[:, :, :, i_boot] = compute_irfs(self.A_boot[:, :, i_boot], B, self.Nt_irf)
              
-
         return

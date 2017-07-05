@@ -6,9 +6,9 @@ R = 1.0 / 0.99
 bet = 0.98
 rho_z = 0.95
 sig_z = 0.1
-Nz = 3
+Nz = 11
 
-Nx = 5
+Nx = 50
 x_grid = np.linspace(0.0, 5.0, Nx)
 z_grid, Pz = ec.discrete_approx(rho_z, sig_z, Nz)
 

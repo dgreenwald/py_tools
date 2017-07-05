@@ -22,6 +22,10 @@ dirs['pkl'] = dirs['base'] + 'pkl/'
 # def dirs['get_drop']():
     # return dirs['drop']
 
+def merge_date(df1, df2):
+
+    return pd.merge(df1, df2, left_index=True, right_index=True)
+
 def date_index(df, startdate, freq='QS'):
     df.set_index(pd.date_range(startdate, periods=len(df), freq=freq), inplace=True)
     return df

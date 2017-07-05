@@ -1,18 +1,52 @@
 import datetime
+import os
 import pandas as pd
 import pandas_datareader.data as web
+import pickle
+
+data_dir = '/home/dan/Dropbox/data/fred/'
 
 def load(codes=None, code_names={}, 
          start=datetime.datetime(1900, 1, 1),
-         end = datetime.datetime.today()):
+         end = datetime.datetime.today(),
+         reimport=False):
     """Load data from FRED, will replace codes with names if code_names is passed as a dict"""
 
     if codes is None:
         codes = list(code_names.keys())
 
-    # start = datetime.datetime(1900, 1, 1)
-    # end = datetime.datetime.today()
-    df = web.DataReader(codes, "fred", start, end)
-    df.rename(columns=code_names, inplace=True)
+    stored_series_file = data_dir + 'series.pkl'
+    if os.path.isfile(stored_series_file):
+        stored_series = pickle.load(open(stored_series_file, 'rb'))
+    else:
+        stored_series = []
+
+    if reimport:
+        download_series = codes
+    else:
+        download_series = list(set(codes) - set(stored_series))
+
+    df = None
+
+    if download_series:
+        # df = web.DataReader(codes, "fred", start, end).rename(columns=code_names)
+        df = web.DataReader(download_series, "fred", start, end).rename(columns=code_names)
+
+        # Store
+        for series in download_series:
+            df[series].to_pickle(data_dir + series + '.pkl')
+
+        stored_series = list(set(stored_series + download_series))
+        pickle.dump(stored_series, open(stored_series_file, 'wb'))
+
+    # Now load stored series
+    for series in set(codes) - set(download_series):
+
+        infile = data_dir + series + '.pkl'
+        df_in = pd.read_pickle(infile).to_frame()
+        if df is None:
+            df = df_in
+        else:
+            df = pd.merge(df, df_in, left_index=True, right_index=True, how='outer')
 
     return df

@@ -2,6 +2,13 @@ from collections import Mapping
 import itertools
 import numpy as np
 
+def as_list(x):
+
+    if not isinstance(x, list):
+        return [x]
+    else:
+        return x
+
 def split(x, lengths, axis=0):
     """Split a numpy matrix or array into pieces with lengths according to input list"""
     indices = [lengths[0]]
