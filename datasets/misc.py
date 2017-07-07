@@ -1,4 +1,4 @@
-import numpy as np
+# import numpy as np
 import os
 import pandas as pd
 from py_tools.data import date_index
@@ -14,6 +14,7 @@ def load(dataset, master_dirs={}):
     data_dir = dirs['base'] + 'misc/'
 
     if dataset == 'cleveland_fed':
+
         infile = data_dir + 'cleveland_fed_inflation_expectations.xlsx'
         df = pd.read_excel(
             infile,
@@ -24,5 +25,20 @@ def load(dataset, master_dirs={}):
 
         del df['Date']
         date_index(df, '1982/1/1', 'MS')
+
+    elif dataset == 'gertler_karadi':
+
+        infile = data_dir + 'gk_factors.csv'
+        df = pd.read_csv(infile)
+        datestr = df['year'].astype(str) + '/' + df['month'].astype(str) + '/1'
+        df.set_index(pd.to_datetime(datestr), inplace=True)
+        df.drop(['year', 'month'], axis=1, inplace=True)
+
+    elif dataset == 'gz':
+
+        infile = data_dir + 'gz.csv'
+        df = pd.read_csv(infile)
+        df = date_index(df, '1973-01-01', freq='MS')
+        df.drop(['date'], axis=1, inplace=True)
 
     return df

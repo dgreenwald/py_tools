@@ -6,6 +6,8 @@ from scipy.stats import multivariate_normal, invwishart, gamma, invgamma
 import pandas as pd
 
 import py_tools.time_series as ts
+from py_tools.data import merge_date
+from py_tools import vector_autoregression as vr
 
 # def ols_likelihood(X, Y, S):
 
@@ -87,7 +89,7 @@ def post_mode(X, Y, b_bar, Om_inv_bar, Psi_bar, df_bar):
         - 0.5 * (Nt - p + df_bar) * np.log(np.abs(1.0 + np.prod(evals_D_Psi_term)))
     )
 
-    return (B_hat, XX_inv, Psi_hat, df_hat, L)
+    return (B_hat, XX_inv, Psi_hat, df_hat, eps_hat, L)
 
 def draw_mniw(b_hat, XX_inv, Psi_hat, df_hat, Ny, Nx):
 
@@ -106,8 +108,9 @@ def xtx(x):
 
     return np.dot(x.T, x)
 
-def compute_irfs(B, Ny, p, Nirf, impact):
+def compute_irfs(B, p, Nirf, impact):
 
+    Ny, Nshock = impact.shape
     B_comp = np.vstack(( 
         B[:p * Ny, :].T, 
         np.hstack((np.eye(Ny * (p - 1)), np.zeros((Ny * (p-1), Ny))))                 
@@ -119,7 +122,7 @@ def compute_irfs(B, Ny, p, Nirf, impact):
         np.eye(Ny), np.zeros(((p-1)*Ny, Ny))
     ))
 
-    virf = np.zeros((Nirf, Ny, Ny))
+    virf = np.zeros((Nirf, Ny, Nshock))
 
     for tt in range(Nirf):
         virf[tt, :, :] = np.dot(ts.quad_form(msel, cc_dy), impact)
@@ -326,7 +329,7 @@ class BVAR:
             self.Psi_bar = np.zeros((self.Ny, self.Ny))
             self.df_bar = 0.0
 
-        self.Nt_star = self.X_star.shape[1]
+        self.Nt_star = self.X_star.shape[0]
 
         self.X_all = np.vstack((self.X_star, self.X))
         self.Y_all = np.vstack((self.Y_star, self.Y))
@@ -335,28 +338,31 @@ class BVAR:
             # self.Phi_star, self.Sig_star = fit_ols(self.X_star, self.Y_star)
             # self.Phi_hat, self.Sig_hat = fit_ols(self.X_all, self.Y_all)
 
-        self.Nt_all = self.X_all.shape[1]
+        self.Nt_all = self.X_all.shape[0]
 
         return None
 
     def fit(self):
 
-        self.B_hat, self.XX_inv, self.Psi_hat, self.df_hat, _ = self.eval_post_mode(self.X_all, self.Y_all)
+        (self.B_hat, self.XX_inv, self.Psi_hat, self.df_hat, 
+         self.eps_hat, _
+         ) = self.eval_post_mode(self.X_all, self.Y_all)
         self.b_hat = self.B_hat.T.flatten()
 
         return None
 
     def eval_post_mode(self, X, Y):
 
-        return post_mode(X, Y, self.b_bar, self.Om_inv_bar, self.Psi_bar, self.df_bar)
+        return post_mode(X, Y, self.b_bar, self.Om_inv_bar, 
+                         self.Psi_bar, self.df_bar)
 
     def objfcn_glp(self, x):
 
         self.hyperparams = np.exp(x) 
         self.add_prior()
 
-        _, _, _, _, L_like = self.eval_post_mode(self.X_all, self.Y_all)
-        _, _, _, _, L_dummy = self.eval_post_mode(self.X_star, self.Y_star)
+        _, _, _, _, _, L_like = self.eval_post_mode(self.X_all, self.Y_all)
+        _, _, _, _, _, L_dummy = self.eval_post_mode(self.X_star, self.Y_star)
 
         L_prior = eval_glp_hyperprior(
             self.hyperparams, self.gam_hyp_shape, self.gam_hyp_scale,
@@ -380,7 +386,7 @@ class BVAR:
         print("delta = {0}".format(self.hyperparams[1]))
         print("lambda = {0}".format(self.hyperparams[2]))
         print("psi:")
-        print(self.hyperparams[2:])
+        print(self.hyperparams[3:])
 
         return None
 
@@ -426,7 +432,38 @@ class BVAR:
             else:
                 impact = np.eye(self.Ny)
 
-            self.irf_sim[jj, :, :, :] = compute_irfs(self.B_sim[jj, :, :], self.Ny, self.p, Nirf, impact)
+            self.irf_sim[jj, :, :, :] = compute_irfs(self.B_sim[jj, :, :], self.p, Nirf, impact)
+
+        return None
+
+    def add_instrument(self, df_new, policy_var, instrument):
+
+        self.policy_var = policy_var
+        self.instrument = instrument
+        self.df = merge_date(self.df, df_new[[instrument]], how='outer')
+        return None
+
+    def compute_irfs_instrument(self, Nirf=41, exact_sigma=True):
+        """Computes IRFs from sampled parameters using instrument
+        to define structural shocks.
+        """
+
+        self.irf_sim = np.zeros((self.Nsim, Nirf, self.Ny, 1))
+        df_sim = self.df.copy()
+
+        for jj in range(self.Nsim):
+
+            eps_hat = (self.Y_all - np.dot(self.X_all, self.B_sim[jj, :, :]))[self.Nt_star:, :]
+            for ii, var in enumerate(self.y_vars):
+                df_sim['u_' + var] = np.nan
+                df_sim.loc[self.ix, ['u_' + var]] = eps_hat[:, ii]
+
+            if exact_sigma:
+                impact = vr.instrument_var(df_sim, self.y_vars, self.policy_var, self.instrument, Sig=self.Sig_sim[jj, :, :])
+            else:
+                impact = vr.instrument_var(df_sim, self.y_vars, self.policy_var, self.instrument)
+
+            self.irf_sim[jj, :, :, :] = compute_irfs(self.B_sim[jj, :, :], self.p, Nirf, impact)
 
         return None
 

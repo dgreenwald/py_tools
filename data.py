@@ -1,11 +1,11 @@
 # TODO: data about type of series (log, real, units, etc)
 # TODO: default index for deflation
 
-import datetime
+# import datetime
 import numpy as np
 import os
 import pandas as pd
-import pandas_datareader.data as web
+# import pandas_datareader.data as web
 
 import py_tools.datasets
 import py_tools.utilities as ut
@@ -22,9 +22,9 @@ dirs['pkl'] = dirs['base'] + 'pkl/'
 # def dirs['get_drop']():
     # return dirs['drop']
 
-def merge_date(df1, df2):
+def merge_date(df1, df2, **kwargs):
 
-    return pd.merge(df1, df2, left_index=True, right_index=True)
+    return pd.merge(df1, df2, left_index=True, right_index=True, **kwargs)
 
 def date_index(df, startdate, freq='QS'):
     df.set_index(pd.date_range(startdate, periods=len(df), freq=freq), inplace=True)

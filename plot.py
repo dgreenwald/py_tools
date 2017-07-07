@@ -198,17 +198,25 @@ def double_hist(df_in0, df_in1, label0, label1, var, bins=None,
 
     return True
 
-def var_irfs(irfs, varlist, filepath=None):
+def var_irfs(irfs, var_list, shock_list=None, titles={}, filepath=None, n_per_row=None, plot_scale=3):
 
-    Nsim, Nirf, Ny, _ = irfs.shape
+    if shock_list is None:
+        shock_list = var_list
+
+    Nsim, Nirf, Ny, Nshock = irfs.shape
 
     center = np.median(irfs, axis=0)
     bands = np.percentile(irfs, [16, 84], axis=0)
 
+    if n_per_row is None:
+        n_per_row = Nshock
+
+    n_rows = (((Ny * Nshock) - 1) // n_per_row) + 1
+
     fig = plt.figure()
     for iy in range(Ny):
-        for ishock in range(Ny):
-            plt.subplot(Ny, Ny, Ny*ishock + iy + 1)
+        for ishock in range(Nshock):
+            plt.subplot(n_rows, n_per_row, Ny*ishock + iy + 1)
 
             plt.plot(np.zeros(Nirf), color='gray', linestyle=':')
             plt.plot(center[:, iy, ishock], color='blue')
@@ -217,13 +225,15 @@ def var_irfs(irfs, varlist, filepath=None):
 
             plt.xlim((0, Nirf - 1))
 
-            plt.title('{0} to {1}'.format(varlist[iy], varlist[ishock]))
+            var_title = titles.get(var_list[iy], var_list[iy])
+            shock_title = titles.get(shock_list[ishock], shock_list[ishock])
+            plt.title('{0} to {1}'.format(var_title, shock_title))
 
 # plt.show()
     if filepath is None:
         plt.show()
     else:
-        fig.set_size_inches((3 * Ny, 3 * Ny))
+        fig.set_size_inches((plot_scale * n_per_row, plot_scale * n_rows))
         plt.tight_layout()
         plt.savefig(filepath)
         plt.close(fig)

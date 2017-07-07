@@ -2,6 +2,59 @@ import numpy as np
 import py_tools.time_series as ts
 from py_tools.utilities import as_list
 
+def instrument_var(df, var_list, policy_var, instrument, Sig=None, resid_prefix='u_'):
+
+    assert policy_var == var_list[0] # Is this important?
+
+    ix_samp = np.ones(len(df), dtype=bool)
+    for var in var_list:
+
+        # Regress residuals on instrument
+        lhs = resid_prefix + var
+        rhs = ['const', instrument]
+        fr_u = ts.sm_regression(df, lhs, rhs)
+
+        # Store fitted values
+        df[resid_prefix + 'hat_' + var] = np.nan
+        df.loc[fr_u.ix, [resid_prefix + 'hat_' + var]] = fr_u.results.fittedvalues
+
+        # Update sample
+        ix_samp = np.logical_and(ix_samp, fr_u.ix)
+
+    gam = np.zeros((len(var_list) - 1, 1))
+    for ii, var in enumerate(var_list[1:]):
+
+        # Regress residuals on u_hat_policy
+        lhs = resid_prefix + var
+        rhs = ['const', resid_prefix + 'hat_' + policy_var]
+        fr_2s = ts.sm_regression(df, lhs, rhs)
+
+        # Store coefficient on u_hat_policy
+        gam[ii] = fr_2s.results.params[1]
+
+    # Compute variance/covariance matrix (if needed)
+    if Sig is None:
+        u_list = [resid_prefix + var for var in var_list]
+        u = df.loc[ix_samp, u_list].values
+        Sig = np.dot(u.T, u) / u.shape[0]
+
+    Sig11 = Sig[0, 0]
+    Sig21 = Sig[1:, 0][:, np.newaxis]
+    Sig22 = Sig[1:, 1:]
+
+    Q = (np.dot(gam, np.dot(Sig11, gam.T))
+         - (np.dot(Sig21, gam.T) + np.dot(gam, Sig21.T))
+         + Sig22)
+    s12s12p = np.dot((Sig21 - np.dot(gam, Sig11)).T,
+                     np.linalg.solve(
+                         Q, Sig21 - np.dot(gam, Sig11)
+                     ))
+    s11 = np.sqrt(Sig11 - s12s12p)
+
+    S = np.vstack((s11, s11 * gam))
+
+    return S 
+
 def companion_form(A, use_const=True):
 
     # Get sizes
@@ -79,6 +132,7 @@ class VAR:
 
         # IRFs
         self.irfs = None
+        self.Nt_irf = None
 
         # Bootstrap
         self.A_boot = None
@@ -143,7 +197,7 @@ class VAR:
         # Shift existing parameters
         A_old = self.A.copy()
         Ny_old = self.Ny
-        Nx_old = self.Nx
+        # Nx_old = self.Nx
 
         N_new = len(new_series)
         self.Ny += N_new
@@ -254,7 +308,7 @@ class VAR:
             self.wild_bootstrap(**kwargs)
 
         if self.Nt_irf is None:
-            self.Nt_irf = kwargs.get(Nt_irf, 20) # TODO don't hard code number
+            self.Nt_irf = kwargs.get('Nt_irf', 20) # TODO don't hard code number
 
         Ne = B.shape[1] # TODO: should be a way to set B
         self.irfs_boot = np.zeros((self.Ny, Ne, self.Nt_irf, self.Nboot))
