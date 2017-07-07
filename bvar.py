@@ -1,7 +1,8 @@
-import ipdb
+# import ipdb
 import numpy as np
+from scipy.optimize import minimize
 from scipy.special import gammaln
-from scipy.stats import multivariate_normal, invwishart
+from scipy.stats import multivariate_normal, invwishart, gamma, invgamma
 import pandas as pd
 
 import py_tools.time_series as ts
@@ -21,6 +22,10 @@ import py_tools.time_series as ts
 
     # return L
 
+def log_abs_det(x):
+
+    return np.log(np.abs(np.linalg.det(x)))
+
 def fit_ols(X, Y):
 
     Phi = ts.least_sq(X, Y)
@@ -29,7 +34,18 @@ def fit_ols(X, Y):
 
     return (Phi, Sig)
 
-def post_mode(X, Y, b_bar, Om_inv_bar, Psi_bar):
+def eval_glp_hyperprior(hyperparams, gam_hyp_shape, gam_hyp_scale,
+                        igam_hyp_shape, igam_hyp_scale):
+
+    gam_params = hyperparams[:3]
+    L = np.sum(gamma.logpdf(gam_params, gam_hyp_shape, scale=gam_hyp_scale))
+
+    igam_params = hyperparams[3:]
+    L += np.sum(invgamma.logpdf(igam_params, igam_hyp_shape, scale=igam_hyp_scale))
+
+    return L
+
+def post_mode(X, Y, b_bar, Om_inv_bar, Psi_bar, df_bar):
 
     Nt, Nx = X.shape
     _, Ny = Y.shape
@@ -48,12 +64,30 @@ def post_mode(X, Y, b_bar, Om_inv_bar, Psi_bar):
     # Posterior for Sig
     eps_hat = (Y - np.dot(X, B_hat))
     B_diff = B_hat - B_bar
-    Psi_hat = Psi_bar + np.dot(eps_hat.T, eps_hat) + ts.quad_form(B_diff, Om_inv_bar)
-    df_hat = Nt - p + Ny + 2
+    ee_B_om = np.dot(eps_hat.T, eps_hat) + ts.quad_form(B_diff, Om_inv_bar)
+    Psi_hat = Psi_bar + ee_B_om
+    df_hat = Nt - p + df_bar
 
     # Marginal likelihood
-    ipdb.set_trace()
-    return (B_hat, XX_inv, Psi_hat, df_hat)
+    Om_bar = np.diag(1.0 / np.diagonal(Om_inv_bar)) 
+    D_Om = np.linalg.cholesky(Om_bar)
+    D_Psi = np.linalg.cholesky(np.linalg.inv(Psi_hat))
+
+    D_Om_term = xtx(np.dot(X, D_Om))
+    D_Psi_term = ts.quad_form(D_Psi, ee_B_om)
+
+    evals_D_Om_term, _ = np.linalg.eig(D_Om_term)
+    evals_D_Psi_term, _ = np.linalg.eig(D_Psi_term)
+    
+    L = (
+        -0.5 * Ny * (Nt - p) * np.log(np.pi) 
+        + gammaln(0.5 * (Nt - p + df_bar)) - gammaln(0.5 * df_bar)
+        - 0.5 * (Nt - p) * log_abs_det(Psi_hat) 
+        - 0.5 * Ny * np.log(np.abs(1.0 + np.prod(evals_D_Om_term)))
+        - 0.5 * (Nt - p + df_bar) * np.log(np.abs(1.0 + np.prod(evals_D_Psi_term)))
+    )
+
+    return (B_hat, XX_inv, Psi_hat, df_hat, L)
 
 def draw_mniw(b_hat, XX_inv, Psi_hat, df_hat, Ny, Nx):
 
@@ -93,6 +127,30 @@ def compute_irfs(B, Ny, p, Nirf, impact):
 
     return virf # tt x var x shock
 
+def glp_hyperprior(Ny, gam_hyp_modes=None, gam_hyp_stds=None, 
+                   igam_hyp_scale=None, igam_hyp_shape=None):
+
+    # Gamma hyperprior
+    if gam_hyp_modes is None:
+        gam_hyp_modes = np.array((0.2, 1.0, 1.0))
+
+    if gam_hyp_stds is None:
+        gam_hyp_stds = np.array((0.4, 1.0, 1.0))
+
+    # Solve quadratic
+    b = -(2.0 + (gam_hyp_modes / gam_hyp_stds) ** 2)
+    gam_hyp_shape = 0.5 * (-b + np.sqrt((b ** 2) - 4.0))
+    gam_hyp_scale = gam_hyp_modes / (gam_hyp_shape - 1.0)
+
+    # Inverse gamma hyperprior 
+    if igam_hyp_shape is None:
+        igam_hyp_shape = (0.02 ** 2) * np.ones(Ny)
+
+    if igam_hyp_scale is None:
+        igam_hyp_scale = (0.02 ** 2) * np.ones(Ny)
+
+    return (gam_hyp_shape, gam_hyp_scale, igam_hyp_shape, igam_hyp_scale) 
+
 def mniw_prior(params, Ny, Nx, p):
 
     lam = params[0]
@@ -102,17 +160,19 @@ def mniw_prior(params, Ny, Nx, p):
     B_bar_T[:Ny, :Ny] = np.eye(Ny)
     b_bar = B_bar_T.flatten()
 
-    om_inv_diag_1 = psi / (lam ** 2)
+    df_bar = Ny + 2
+
+    om_inv_diag_1 = psi / ((df_bar - Ny - 1) * (lam ** 2))
     om_inv_diag_mat = np.zeros((p, Ny))
     for ss in range(p):
         om_inv_diag_mat[ss, :] = om_inv_diag_1 * ((ss + 1) ** 2)
     
-    om_inv_diag = np.hstack((om_inv_diag_mat.flatten(), 0.0))
+    om_inv_diag = np.hstack((om_inv_diag_mat.flatten(), 1e-6))
     Om_inv_bar = np.diag(om_inv_diag)
 
-    return (b_bar, Om_inv_bar)
+    return (b_bar, Om_inv_bar, df_bar)
 
-def co_persistence_prior(params, Nx, Ny, p, ybar, sbar):
+def co_persistence_prior(params, Nx, Ny, p, ybar):
 
     mu, delta = params
 
@@ -220,6 +280,9 @@ class BVAR:
                     np.array((1.0, 1.0, 0.2)), (0.02 ** 2) * np.ones(self.Ny)
                 ))
 
+                (self.gam_hyp_shape, self.gam_hyp_scale, 
+                 self.igam_hyp_shape, self.igam_hyp_scale) = glp_hyperprior(self.Ny)
+
             else:
 
                 self.hyperparams = np.array((0.2, 1.0, 1, 1.0, 1.0, 1.0, 0.0, 1.0))
@@ -239,14 +302,18 @@ class BVAR:
             else:
                 self.rwlist = rwlist
 
-    def add_prior(self, compute_ols=True):
+    def add_prior(self):
 
         if self.glp_prior:
 
-            self.X_star, self.Y_star = co_persistence_prior(self.hyperparams[:2], self.Nx, self.Ny, 
-                                                            self.p, self.ybar, self.sbar)
+            self.X_star, self.Y_star = co_persistence_prior(
+                self.hyperparams[:2], self.Nx, self.Ny, self.p, self.ybar
+            )
 
-            self.b_bar, self.Om_inv_bar = mniw_prior(self.hyperparams[2:], self.Ny, self.Nx, self.p)
+            self.b_bar, self.Om_inv_bar, self.df_bar = mniw_prior(
+                self.hyperparams[2:], self.Ny, self.Nx, self.p
+            )
+
             self.Psi_bar = np.diag(self.hyperparams[3:])
 
         else: # standard MN prior
@@ -257,15 +324,16 @@ class BVAR:
             self.b_bar = np.zeros((self.Nx * self.Ny))
             self.Om_inv_bar = np.zeros((self.Nx, self.Nx))
             self.Psi_bar = np.zeros((self.Ny, self.Ny))
+            self.df_bar = 0.0
 
         self.Nt_star = self.X_star.shape[1]
 
         self.X_all = np.vstack((self.X_star, self.X))
         self.Y_all = np.vstack((self.Y_star, self.Y))
 
-        if compute_ols:
-            self.Phi_star, self.Sig_star = fit_ols(self.X_star, self.Y_star)
-            self.Phi_hat, self.Sig_hat = fit_ols(self.X_all, self.Y_all)
+        # if compute_ols:
+            # self.Phi_star, self.Sig_star = fit_ols(self.X_star, self.Y_star)
+            # self.Phi_hat, self.Sig_hat = fit_ols(self.X_all, self.Y_all)
 
         self.Nt_all = self.X_all.shape[1]
 
@@ -273,10 +341,46 @@ class BVAR:
 
     def fit(self):
 
-        self.B_hat, self.XX_inv, self.Psi_hat, self.df_hat = post_mode(
-            self.X_all, self.Y_all, self.b_bar, self.Om_inv_bar, self.Psi_bar
-        )
+        self.B_hat, self.XX_inv, self.Psi_hat, self.df_hat, _ = self.eval_post_mode(self.X_all, self.Y_all)
         self.b_hat = self.B_hat.T.flatten()
+
+        return None
+
+    def eval_post_mode(self, X, Y):
+
+        return post_mode(X, Y, self.b_bar, self.Om_inv_bar, self.Psi_bar, self.df_bar)
+
+    def objfcn_glp(self, x):
+
+        self.hyperparams = np.exp(x) 
+        self.add_prior()
+
+        _, _, _, _, L_like = self.eval_post_mode(self.X_all, self.Y_all)
+        _, _, _, _, L_dummy = self.eval_post_mode(self.X_star, self.Y_star)
+
+        L_prior = eval_glp_hyperprior(
+            self.hyperparams, self.gam_hyp_shape, self.gam_hyp_scale,
+            self.igam_hyp_shape, self.igam_hyp_scale
+        )
+
+        L_post = L_like - L_dummy + L_prior
+
+        return L_post
+
+    def glp_mode(self):
+
+        fcn = lambda x: -self.objfcn_glp(x)
+        x0 = np.log(self.hyperparams)
+
+        res = minimize(fcn, x0, method='Nelder-Mead', options={'maxiter': 10000, 'disp' : True})
+
+        print(res)
+        print("Final hyperparameters:")
+        print("mu = {0}".format(self.hyperparams[0]))
+        print("delta = {0}".format(self.hyperparams[1]))
+        print("lambda = {0}".format(self.hyperparams[2]))
+        print("psi:")
+        print(self.hyperparams[2:])
 
         return None
 
