@@ -197,3 +197,35 @@ def double_hist(df_in0, df_in1, label0, label1, var, bins=None,
     plt.close(fig)
 
     return True
+
+def var_irfs(irfs, varlist, filepath=None):
+
+    Nsim, Nirf, Ny, _ = irfs.shape
+
+    center = np.median(irfs, axis=0)
+    bands = np.percentile(irfs, [16, 84], axis=0)
+
+    fig = plt.figure()
+    for iy in range(Ny):
+        for ishock in range(Ny):
+            plt.subplot(Ny, Ny, Ny*ishock + iy + 1)
+
+            plt.plot(np.zeros(Nirf), color='gray', linestyle=':')
+            plt.plot(center[:, iy, ishock], color='blue')
+            plt.plot(bands[0, :, iy, ishock], color='black', linestyle='--')
+            plt.plot(bands[1, :, iy, ishock], color='black', linestyle='--')
+
+            plt.xlim((0, Nirf - 1))
+
+            plt.title('{0} to {1}'.format(varlist[iy], varlist[ishock]))
+
+# plt.show()
+    if filepath is None:
+        plt.show()
+    else:
+        fig.set_size_inches((3 * Ny, 3 * Ny))
+        plt.tight_layout()
+        plt.savefig(filepath)
+        plt.close(fig)
+
+    return None 
