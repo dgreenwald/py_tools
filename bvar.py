@@ -8,6 +8,7 @@ import pandas as pd
 import py_tools.time_series as ts
 from py_tools.data import merge_date
 from py_tools import vector_autoregression as vr
+import py_tools.state_space as ss
 
 # def ols_likelihood(X, Y, S):
 
@@ -167,8 +168,8 @@ def mniw_prior(params, Ny, Nx, p):
 
     om_inv_diag_1 = psi / ((df_bar - Ny - 1) * (lam ** 2))
     om_inv_diag_mat = np.zeros((p, Ny))
-    for ss in range(p):
-        om_inv_diag_mat[ss, :] = om_inv_diag_1 * ((ss + 1) ** 2)
+    for lag in range(p):
+        om_inv_diag_mat[lag, :] = om_inv_diag_1 * ((lag + 1) ** 2)
     
     om_inv_diag = np.hstack((om_inv_diag_mat.flatten(), 1e-6))
     Om_inv_bar = np.diag(om_inv_diag)
@@ -248,7 +249,8 @@ def mn_prior(lam, Nx, Ny, p, rwlist, ybar, sbar):
 class BVAR:
     """Bayesian VAR"""
 
-    def __init__(self, df_in, y_vars, p=1, hyperparams_init=None, rwlist=None, glp_prior=False):
+    def __init__(self, df_in, y_vars, p=1, hyperparams_init=None, rwlist=None, glp_prior=False,
+                 data_augmentation_vars=[]):
 
         # Copy data
         self.y_vars = y_vars
@@ -268,9 +270,15 @@ class BVAR:
         self.x_vars += ['const']
 
         # Cut down to common indices
-        self.ix = np.all(pd.notnull(self.df[self.y_vars + self.x_vars]), axis=1)
-        self.Y = self.df.loc[self.ix, self.y_vars].values
-        self.X = self.df.loc[self.ix, self.x_vars].values
+        drop_nan_vars = [var for var in self.y_vars + self.x_vars 
+                         if var not in data_augmentation_vars]
+        self.ix = np.all(pd.notnull(self.df[drop_nan_vars]), axis=1)
+        self.Y_data = self.df.loc[self.ix, self.y_vars].values
+        self.X_data = self.df.loc[self.ix, self.x_vars].values
+
+        # Separate values in case of data augmentation
+        self.Y = self.Y_data
+        self.X = self.X_data
 
         self.Nt, self.Nx = self.X.shape
 
@@ -294,9 +302,6 @@ class BVAR:
 
             self.hyperparams = hyperparams_init
 
-        self.ybar = np.mean(self.Y, axis=0)
-        self.sbar = np.std(self.Y, axis=0)
-
         # Right now only needed for MN prior
         if not self.glp_prior:
 
@@ -304,6 +309,9 @@ class BVAR:
                 self.rwlist = np.ones(self.Ny)
             else:
                 self.rwlist = rwlist
+
+            self.ybar = np.mean(self.Y_data, axis=0)
+            self.sbar = np.std(self.Y_data, axis=0)
 
     def add_prior(self):
 
@@ -398,13 +406,79 @@ class BVAR:
 
         for jj in range(self.Nsim):
 
-            b_t, Sig_t = draw_mniw(self.b_hat, self.XX_inv, self.Psi_hat, self.df_hat,
+            b_j, Sig_j = draw_mniw(self.b_hat, self.XX_inv, self.Psi_hat, self.df_hat,
                                    self.Ny, self.Nx)
 
-            self.B_sim[jj, :, :] = np.reshape(b_t, (self.Ny, self.Nx)).T
-            self.Sig_sim[jj, :, :] = Sig_t
+            self.B_sim[jj, :, :] = np.reshape(b_j, (self.Ny, self.Nx)).T
+            self.Sig_sim[jj, :, :] = Sig_j
 
         return None
+
+    def augment_data(self, B, Sig, sample=True):
+
+        # Picks out top Ny observations
+        Z = np.zeros((self.Ny, self.Nx))
+        Z[:self.Ny, :self.Ny] = np.eye(self.Ny)
+
+        # Shocks only go to top Ny observations
+        R = Z.T
+
+        # No measurement error
+        H = np.zeros((self.Ny, self.Ny))
+
+        # Initial conditions
+        x_init = self.Y_data[0, :]
+        P_init = np.zeros((self.Ny, self.Ny))
+
+        for iy in range(self.Ny):
+            if np.isnan(x_init[iy]):
+                x_init[iy] = 0.0
+                P_init[iy, iy] = 1e+6
+
+        A = vr.companion_form(B)
+        ssm = ss.StateSpaceModel(A, R, Sig, Z, H)
+
+        if sample:
+            X_samp = ssm.draw_states(self.Y_data, x_init, P_init)
+        else:
+            sse = ss.StateSpaceEstimates(ssm, self.Y_data)
+            sse.kalman_filter(x_init, P_init)
+            sse.disturbance_smoother()
+            sse.state_smoother()
+            X_samp = sse.x_smooth
+
+        self.Y = X_samp[:, :self.Ny]
+
+    # def sample_with_data_augmentation(self, Nsim=1000, Nburn=1000):
+
+        # self.Nsim = Nsim
+
+        # self.B_sim = np.zeros((self.Nsim, self.Nx, self.Ny))
+        # self.Sig_sim = np.zeros((self.Nsim, self.Ny, self.Ny))
+        # self.Y_sim = np.zeros((self.Nsim, self.Nt, self.Ny))
+
+        # for jj in range(self.Nsim): 
+
+            # # Update data
+            # self.X_all = np.vstack((self.X_star, self.X))
+            # self.Y_all = np.vstack((self.Y_star, self.Y))
+
+            # self.fit()
+
+            # # Coefficient drawing block
+            # b_j, Sig_j = draw_mniw(self.b_hat, self.XX_inv, self.Psi_hat, self.df_hat,
+                                   # self.Ny, self.Nx)
+           
+            # B_j = np.reshape(b_j, (self.Ny, self.Nx)).T
+
+            # # DATA AUGMENTATION BLOCK
+
+            # # Compute companion form and set up state space model
+            # A = vr.companion_form(B_j)
+            # ssm = ss.StateSpaceModel(A, R, Sig_j, Z, H)
+            # self.Y = ssm.draw_states(self.Y_data, x_init, P_init)
+
+        # return None 
 
     # def sample_glp(self, Nsim=1000, Nburn=1000):
 
