@@ -4,6 +4,7 @@ from scipy.optimize import minimize
 from scipy.special import gammaln
 from scipy.stats import multivariate_normal, invwishart, gamma, invgamma
 import pandas as pd
+import re
 
 import py_tools.time_series as ts
 from py_tools.data import merge_date
@@ -246,6 +247,14 @@ def mn_prior(lam, Nx, Ny, p, rwlist, ybar, sbar):
 
     return (X_star, Y_star)
 
+def check_nan_var(var, data_augmentation_vars):
+
+    for da in data_augmentation_vars:
+        if re.match('(L\d*_)?' + da, var) is not None:
+            return False
+
+    return True
+
 class BVAR:
     """Bayesian VAR"""
 
@@ -271,10 +280,18 @@ class BVAR:
 
         # Cut down to common indices
         drop_nan_vars = [var for var in self.y_vars + self.x_vars 
-                         if var not in data_augmentation_vars]
+                         if check_nan_var(var, data_augmentation_vars)]
         self.ix = np.all(pd.notnull(self.df[drop_nan_vars]), axis=1)
         self.Y_data = self.df.loc[self.ix, self.y_vars].values
         self.X_data = self.df.loc[self.ix, self.x_vars].values
+
+        # Sample mean and std
+        self.ybar = np.zeros(self.Ny)
+        self.sbar = np.zeros(self.Ny)
+        for ii in range(self.Ny):
+            ix_i = np.isfinite(self.Y_data[:, ii])
+            self.ybar[ii] = np.mean(self.Y_data[ix_i, ii], axis=0)
+            self.sbar[ii] = np.std(self.Y_data[ix_i, ii], axis=0)
 
         # Separate values in case of data augmentation
         self.Y = self.Y_data
@@ -310,8 +327,6 @@ class BVAR:
             else:
                 self.rwlist = rwlist
 
-            self.ybar = np.mean(self.Y_data, axis=0)
-            self.sbar = np.std(self.Y_data, axis=0)
 
     def add_prior(self):
 
@@ -398,6 +413,38 @@ class BVAR:
 
         return None
 
+    def glp_em(self, n_iter=5):
+
+        Y_sim = np.zeros((n_iter,) + self.Y.shape)
+
+        self.Y[np.isnan(self.Y)] = 0.0
+        self.X[np.isnan(self.X)] = 0.0
+
+        for ii in range(n_iter):
+
+            Y_sim[ii, :, :] = self.Y
+
+            print("\n\n\nITERATION {}\n\n\n".format(ii))
+
+            fcn = lambda x: -self.objfcn_glp(x)
+            x0 = np.log(self.hyperparams)
+            res = minimize(fcn, x0, method='Nelder-Mead', options={'maxiter': 10000, 'disp' : True})
+
+            print(res)
+            print("Fitted hyperparameters:")
+            print("mu = {0}".format(self.hyperparams[0]))
+            print("delta = {0}".format(self.hyperparams[1]))
+            print("lambda = {0}".format(self.hyperparams[2]))
+            print("psi:")
+            print(self.hyperparams[3:])
+
+            B_hat, _, Psi_hat, df_hat, _, _ = self.eval_post_mode(self.X_all, self.Y_all)
+            Sig_hat = Psi_hat / (df_hat + self.Ny + 1)
+
+            self.augment_data(B_hat, Sig_hat, sample=False)
+
+        return None
+
     def sample(self, Nsim=1000):
 
         self.Nsim = Nsim
@@ -415,6 +462,7 @@ class BVAR:
         return None
 
     def augment_data(self, B, Sig, sample=True):
+        """Draw missing data from state space model."""
 
         # Picks out top Ny observations
         Z = np.zeros((self.Ny, self.Nx))
