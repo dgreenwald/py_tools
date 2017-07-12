@@ -3,7 +3,7 @@ import os
 import pandas as pd
 from py_tools.data import date_index
 
-def load(nipa_table=None, nipa_vintage='1604', nipa_quarterly=True, master_dirs={}):
+def load(nipa_table=None, nipa_vintage='1706', nipa_quarterly=True, master_dirs={}):
     """Load NIPA table, specify table (e.g., 20100) vintage (when downloaded) and whether quarterly data"""
 
     assert(nipa_table is not None) # Need to pick a table
@@ -39,7 +39,7 @@ def load(nipa_table=None, nipa_vintage='1604', nipa_quarterly=True, master_dirs=
         # header=[0, 1],
         index_col=2,
     )
-    df_curr = clean_nipa(df_t)
+    df_curr = clean_nipa(df_t, nipa_quarterly=nipa_quarterly)
     df_curr = df_curr.apply(pd.to_numeric, errors='coerce')
     # df_curr = df_curr.convert_objects(convert_dates=False, convert_numeric=True)
 
@@ -51,7 +51,7 @@ def load(nipa_table=None, nipa_vintage='1604', nipa_quarterly=True, master_dirs=
         # header=[0, 1],
         index_col=2,
     )
-    df_hist = clean_nipa(df_t)
+    df_hist = clean_nipa(df_t, nipa_quarterly=nipa_quarterly)
     df_hist = df_hist.apply(pd.to_numeric, errors='coerce')
 
     # Combine datasets
@@ -217,6 +217,20 @@ def load(nipa_table=None, nipa_vintage='1604', nipa_quarterly=True, master_dirs=
                 'wage_sal' : 'A576RC1',
             })
 
+    elif nipa_table == '70405':
+
+        var_index = {
+            'housing_output' : 'A2007C1',
+            'gross_housing_va' : 'A2009C1',
+            'gross_owner_va' : 'B1300C1',
+            'gross_tenant_va' : 'B1301C1',
+            'net_housing_va' : 'B952RC1',
+            'taxes' : 'B1031C1',
+            'net_op_surplus' : 'W165RC1',
+            'net_interest' : 'B1037C1',
+            'rental_income' : 'B1035C1',
+        }
+
     full_list = sorted(list(var_index.keys()))
     codes = [var_index[var] for var in full_list]
     df = df.ix[:, codes]
@@ -224,7 +238,7 @@ def load(nipa_table=None, nipa_vintage='1604', nipa_quarterly=True, master_dirs=
 
     return df
 
-def clean_nipa(df_t):
+def clean_nipa(df_t, nipa_quarterly=True):
 
     df_t = df_t.ix[df_t.index != ' ', :]
     df_t = df_t.ix[pd.notnull(df_t.index), :]
@@ -233,10 +247,14 @@ def clean_nipa(df_t):
 
     df = df_t.transpose()
     start_date = df.index[0]
-    yr = int(np.floor(start_date))
-    q = int(10 * (start_date - yr) + 1)
-    mon = int(3 * (q - 1) + 1)
 
-    date_index(df, '{0}/1/{1}'.format(mon, yr))
+    if nipa_quarterly:
+        yr = int(np.floor(start_date))
+        q = int(10 * (start_date - yr) + 1)
+        mon = int(3 * (q - 1) + 1)
+
+        date_index(df, '{0}/1/{1}'.format(mon, yr))
+    else:
+        date_index(df, '1/1/{0}'.format(int(start_date)), freq='AS')
 
     return df
