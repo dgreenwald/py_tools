@@ -1,9 +1,10 @@
 import numpy as np
 import os
 import pandas as pd
-from py_tools.data import date_index
+# from py_tools.data import date_index
+import py_tools.data
 
-def load(nipa_table=None, nipa_vintage='1706', nipa_quarterly=True, master_dirs={}):
+def load(nipa_table=None, nipa_vintage='1706', nipa_quarterly=True, master_dirs={}, **kwargs):
     """Load NIPA table, specify table (e.g., 20100) vintage (when downloaded) and whether quarterly data"""
 
     assert(nipa_table is not None) # Need to pick a table
@@ -253,8 +254,8 @@ def clean_nipa(df_t, nipa_quarterly=True):
         q = int(10 * (start_date - yr) + 1)
         mon = int(3 * (q - 1) + 1)
 
-        date_index(df, '{0}/1/{1}'.format(mon, yr))
+        py_tools.data.date_index(df, '{0}/1/{1}'.format(mon, yr))
     else:
-        date_index(df, '1/1/{0}'.format(int(start_date)), freq='AS')
+        py_tools.data.date_index(df, '1/1/{0}'.format(int(start_date)), freq='AS')
 
     return df

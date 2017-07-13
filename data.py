@@ -7,7 +7,7 @@ import os
 import pandas as pd
 # import pandas_datareader.data as web
 
-import py_tools.datasets
+import py_tools.datasets as ds
 import py_tools.utilities as ut
 
 # TODO: probably shouldn't be hard-coded
@@ -97,7 +97,7 @@ def load_dataset(dataset, **kwargs):
     if dataset in ['stockw', 'crsp', 'crsp_q', 'cay', 'cay_current', 'cay_source', 'bls_ls',
                    'fernald', 'tb3ms', 'uc']:
 
-        df = py_tools.datasets.origins.load(dataset, dirs, **kwargs)
+        df = ds.origins.load(dataset, dirs, **kwargs)
     
     elif dataset == 'payouts':
 
@@ -189,7 +189,7 @@ def load_dataset(dataset, **kwargs):
         # df.rename(columns = {code : var for var, code in zip(var_list, codes)}, inplace=True)
 
         code_names = { code : name for name, code in var_index.items() }
-        df = py_tools.datasets.fred.load(code_names=code_names)
+        df = ds.fred.load(code_names=code_names)
 
     elif dataset == 'fred_m':
 
@@ -207,11 +207,12 @@ def load_dataset(dataset, **kwargs):
         # df.rename(columns = {code : var for var, code in zip(var_list, codes)}, inplace=True)
 
         code_names = { code : name for name, code in var_index.items() }
-        df = py_tools.datasets.fred.load(code_names=code_names)
+        df = ds.fred.load(code_names=code_names)
 
     elif dataset[:4] == 'nipa':
 
-        df = py_tools.datasets.nipa(nipa_table=dataset, **kwargs)
+        nipa_table = dataset[5:]
+        df = ds.nipa.load(nipa_table=nipa_table, **kwargs)
 
     elif dataset == 'shiller':
 
