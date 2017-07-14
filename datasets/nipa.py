@@ -209,7 +209,7 @@ def load(nipa_table=None, nipa_vintage='1706', nipa_quarterly=True, master_dirs=
             'real_pc_disp_inc' : 'A229RX0',
         }
 
-        if nipa_vintage == '1604':
+        if nipa_vintage in ['1604', '1706']:
             var_index.update({
                 'wage_sal' : 'A034RC1',
             })
@@ -236,6 +236,19 @@ def load(nipa_table=None, nipa_vintage='1706', nipa_quarterly=True, master_dirs=
     codes = [var_index[var] for var in full_list]
     df = df.ix[:, codes]
     df.rename(columns = {code : var for var, code in zip(full_list, codes)}, inplace=True)
+
+    if nipa_table == '11400':
+        df['earnings_corp'] = df['after_tax_profits_corp'] + df['net_interest_corp']
+        df['earnings_corp_nonfin'] = df['after_tax_profits_corp_nonfin'] + df['net_interest_corp_nonfin']
+    elif nipa_table == '20100':
+        df['employee_net_social'] = df['personal_social'] - df['employer_social']
+        df['total_other'] = df['proprietors_income'] + df['rental_income'] + df['dividends'] + df['interest']
+        df['tax_share'] = df['wage_sal'] / (df['wage_sal'] + df['total_other'])
+        df['tax'] = df['tax_share'] * df['personal_current_taxes']
+        df['nyd'] = (df['wage_sal'] + df['transfer_payments'] + df['employer_pension_ins']
+                     - df['employee_net_social'] - df['tax'])
+        df['comp_no_transfers'] = df['wage_sal'] + df['employer_pension_ins'] + df['employer_social']
+        df['total_comp'] = df['comp_no_transfers'] + df['transfer_payments']
 
     return df
 
