@@ -578,7 +578,7 @@ class BVAR:
             eps_hat = (self.Y_all - np.dot(self.X_all, self.B_sim[jj, :, :]))[self.Nt_star:, :]
             for ii, var in enumerate(self.y_vars):
                 df_sim['u_' + var] = np.nan
-                df_sim.loc[self.ix, ['u_' + var]] = eps_hat[:, ii]
+                df_sim.loc[self.ix, 'u_' + var] = eps_hat[:, ii]
 
             if exact_sigma:
                 impact = vr.instrument_var(df_sim, self.y_vars, self.policy_var, self.instrument, Sig=self.Sig_sim[jj, :, :])

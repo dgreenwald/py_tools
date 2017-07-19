@@ -59,10 +59,10 @@ def load(dataset, master_dirs={}, **kwargs):
 # df = pd.merge(df, df_m['D'].resample('QS').sum().to_frame(),
                         # left_index=True, right_index=True)
 
-        methods_vars = {
-            'last' : ['P'],
-            'sum' : ['D'],
-        }
+        # methods_vars = {
+            # 'last' : ['P'],
+            # 'sum' : ['D'],
+        # }
 
         df = pd.merge(df_m[['P']].resample('QS').last(),
                       df_m[['D']].resample('QS').sum(),
@@ -186,7 +186,8 @@ def load(dataset, master_dirs={}, **kwargs):
 
         df_m = py_tools.data.date_index(df_m, '01/01/1934', freq='MS')
 
-        df = resample(df_m, {'first' : 'rf'}).to_frame()
+        # df = resample(df_m, {'first' : 'rf'}).to_frame()
+        df = df_m.resample('QS').first()
 
     elif dataset == 'uc':
 
@@ -213,10 +214,11 @@ def load(dataset, master_dirs={}, **kwargs):
         df_m = df_m[usecols]
         df_m = py_tools.data.date_index(df_m, '07/01/1960', freq='MS')
 
-        methods_vars = {
-            'first' : usecols,
-        }
+        # methods_vars = {
+            # 'first' : usecols,
+        # }
 
-        df = resample(df_m, methods_vars)
+        # df = resample(df_m, methods_vars)
+        df = df_m[usecols].resample('QS').first()
 
     return df

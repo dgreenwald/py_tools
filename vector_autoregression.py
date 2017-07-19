@@ -16,7 +16,7 @@ def instrument_var(df, var_list, policy_var, instrument, Sig=None, resid_prefix=
 
         # Store fitted values
         df[resid_prefix + 'hat_' + var] = np.nan
-        df.loc[fr_u.ix, [resid_prefix + 'hat_' + var]] = fr_u.results.fittedvalues
+        df.loc[fr_u.ix, resid_prefix + 'hat_' + var] = fr_u.results.fittedvalues
 
         # Update sample
         ix_samp = np.logical_and(ix_samp, fr_u.ix)
