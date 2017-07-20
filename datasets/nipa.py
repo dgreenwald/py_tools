@@ -97,12 +97,38 @@ def load(nipa_table=None, nipa_vintage='1706', nipa_quarterly=True, master_dirs=
     
     elif nipa_table == '10106':
    
+        temp_index = {
+            'gdp' : 'A191RX1',
+            'pce' : 'DPCERX1',
+            'pce_goods' : 'DGDSRX1',
+            'pce_durables' : 'DDURRX1',
+            'pce_nondurables' : 'DNDGRX1',
+            'pce_services' : 'DSERRX1',
+            'invest' : 'A006RX1',
+            'invest_fixed' : 'A007RX1',
+            'invest_nonres' : 'A008RX1',
+            'invest_nonres_struct' : 'B009RX1',
+            'invest_nonres_equip' : 'Y033RX1',
+            'invest_nonres_ip' : 'Y001RX1',
+            'invest_res' : 'A011RX1',
+            'invest_inventory' : 'A014RX1',
+            'net_exports' : 'A019RX1',
+            'exports' : 'A020RX1',
+            'exports_goods' : 'A253RX1',
+            'exports_services' : 'A646RX1',
+            'imports' : 'A021RX1',
+            'imports_goods' : 'A255RX1',
+            'imports_services' : 'B656RX1',
+            'govt' : 'A822RX1',
+            'govt_federal' : 'A823RX1',
+            'govt_federal_defense' : 'A824RX1',
+            'govt_federal_nondefense' : 'A825RX1',
+            'govt_nonfed' : 'A829RX1',
+            'residual' : 'A960RX1',
+        }
+
         var_index = {
-            'real_gdp' : 'A191RX1',
-            'real_pce' : 'DPCERX1',
-            'real_private_inv' : 'A006RX1',
-            'real_net_exports' : 'A019RX1',
-            'real_govt_expend' : 'A822RX1',
+            'real_' + key : val for key, val in temp_index.items()
         }
 
     elif nipa_table == '10109':
@@ -159,12 +185,13 @@ def load(nipa_table=None, nipa_vintage='1706', nipa_quarterly=True, master_dirs=
             'after_tax_profits' : 'W328RC1',
             'net_dividends' : 'B467RC1',
             'undistributed_profits' : 'W332RC1',
-            # 'gross_value_added_chained' : 'B455RX1',
+            'gross_value_added_chained' : 'B455RX1',
             'net_value_added_chained' : 'A457RX1',
         }
 
         # Total corporate
         corp_index = {
+            'gross_value_added' : 'A438RC1',
             'cons_fixed_cap' : 'A438RC1',
             'net_value_added' : 'A439RC1',
             'compensation' : 'A442RC1',
@@ -205,6 +232,7 @@ def load(nipa_table=None, nipa_vintage='1706', nipa_quarterly=True, master_dirs=
             'dividends' : 'B703RC1',
             'interest' : 'A064RC1',
             'personal_current_taxes' : 'W055RC1',
+            'disp_inc' : 'A067RC1',
             'real_disp_inc' : 'A067RX1',
             'real_pc_disp_inc' : 'A229RX0',
         }
@@ -234,7 +262,8 @@ def load(nipa_table=None, nipa_vintage='1706', nipa_quarterly=True, master_dirs=
 
     full_list = sorted(list(var_index.keys()))
     codes = [var_index[var] for var in full_list]
-    df = df.ix[:, codes]
+    # df = df.ix[:, codes]
+    df = df.loc[:,~df.columns.duplicated()]
     df.rename(columns = {code : var for var, code in zip(full_list, codes)}, inplace=True)
 
     if nipa_table == '11400':

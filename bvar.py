@@ -539,7 +539,7 @@ class BVAR:
 
         # return None
 
-    def compute_irfs_sim(self, Nirf=41, impact_type='identity'):
+    def compute_irfs_sim(self, Nirf=41, impact=None, impact_type='identity'):
         """ Computes IRFs from sampled parameters.
 
         impact_type should be 'identity' or 'cholesky'.
@@ -549,10 +549,11 @@ class BVAR:
 
         for jj in range(self.Nsim):
 
-            if impact_type == 'cholesky':
-                impact = np.linalg.cholesky(self.Sig_sim[jj, :, :])
-            else:
-                impact = np.eye(self.Ny)
+            if impact is None:
+                if impact_type == 'cholesky':
+                    impact = np.linalg.cholesky(self.Sig_sim[jj, :, :])
+                else:
+                    impact = np.eye(self.Ny)
 
             self.irf_sim[jj, :, :, :] = compute_irfs(self.B_sim[jj, :, :], self.p, Nirf, impact)
 

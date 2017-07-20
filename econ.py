@@ -36,6 +36,15 @@ def check_ergodic(invariant, tol=1e-8):
     invariant_test = invariant - invariant[0, :]
     is_ergodic = np.amax(np.abs(invariant_test)) < tol
     return is_ergodic
+
+def markov_std(P, vals):
+
+    Ev = np.dot(P, vals)
+    Ev2 = np.dot(P, vals ** 2)
+    V = Ev2 - (Ev ** 2)
+    sig = np.sqrt(V)
+
+    return sig
     
 def update_value(V):
     

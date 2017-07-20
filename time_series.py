@@ -8,7 +8,8 @@ from scipy.linalg import solve_discrete_lyapunov
 from tabulate import tabulate
 
 # from py_tools.debug import disp 
-import py_tools.data as dt
+# import py_tools.data as dt
+from py_tools.datasets import loader
 # import py_tools.utilities as ut
 
 class FullResults:
@@ -95,7 +96,7 @@ def deflate(df, var_list, index='cpi', log=False, diff=False, per_capita=False,
 
             if index_var not in df:
 
-                df_new = dt.load([dataset], reimport=reimport, **kwargs)
+                df_new = loader.load([dataset], reimport=reimport, **kwargs)
 
                 if index == 'pop':
                     df_new[index_var] = df_new['NIPA_20100_real_disp_inc'] / df_new['NIPA_20100_real_pc_disp_inc']
