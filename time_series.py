@@ -9,7 +9,7 @@ from tabulate import tabulate
 
 # from py_tools.debug import disp 
 # import py_tools.data as dt
-from py_tools.datasets import loader
+# from py_tools.datasets import loader
 from py_tools.plot import two_axis
 # import py_tools.utilities as ut
 
@@ -82,6 +82,8 @@ def deflate(df, var_list, index='cpi', log=False, diff=False, per_capita=False,
         new_var_list: names of deflated variables
     
     """
+
+    from py_tools.datasets.loader import load
     
     # index_var = 'FRED_' + index + '_index'
     new_var_list = []
@@ -123,7 +125,7 @@ def deflate(df, var_list, index='cpi', log=False, diff=False, per_capita=False,
 
             if index_var not in df:
 
-                df_new = loader.load([dataset], reimport=reimport, **kwargs)
+                df_new = load([dataset], reimport=reimport, **kwargs)
 
                 if index == 'pop':
                     df_new[index_var] = df_new['NIPA_20100_real_disp_inc'] / df_new['NIPA_20100_real_pc_disp_inc']

@@ -3,7 +3,8 @@ import os
 # import ipdb
 import numpy as np
 import pandas as pd
-import py_tools.data
+import py_tools.time_series as ts
+# import py_tools.data
 # from py_tools.data import date_index
 
 # home_dir = os.environ['HOME']
@@ -41,7 +42,7 @@ def load(dataset, master_dirs={}, **kwargs):
         # del df['dates']
         # del df['stockw_level']
 
-        df = py_tools.data.date_index(df, '1/1/1952')
+        df = ts.date_index(df, '1/1/1952')
 
     elif dataset == 'crsp':
 
@@ -51,7 +52,7 @@ def load(dataset, master_dirs={}, **kwargs):
         df_m = pd.read_table(data_dir + infile, sep=',',
                                names=['date', 'vwretd', 'vwretx'],
                                usecols=['vwretd', 'vwretx'])
-        df_m = py_tools.data.date_index(df_m, '12/1/1925', freq='MS')
+        df_m = ts.date_index(df_m, '12/1/1925', freq='MS')
         df_m['P'] = (df_m['vwretx'] + 1.0).cumprod()
         df_m['D'] = np.hstack((np.nan, df_m['P'][:-1])) * (df_m['vwretd'] - df_m['vwretx'])
 
@@ -95,7 +96,7 @@ def load(dataset, master_dirs={}, **kwargs):
             usecols=['vwretd', 'vwretx'],
         )
 
-        df = py_tools.data.date_index(df, '10/1/1925')
+        df = ts.date_index(df, '10/1/1925')
 
         df['P'] = (df['vwretx'] + 1.0).cumprod()
         df['D'] = np.hstack((np.nan, df['P'][:-1])) * (df['vwretd'] - df['vwretx'])
@@ -120,7 +121,7 @@ def load(dataset, master_dirs={}, **kwargs):
 
         df = pd.read_table(data_dir + infile, delim_whitespace=True, 
                            names=['dates', 'c', 'a', 'y', 'cay'])
-        df = py_tools.data.date_index(df, '1/1/1952')
+        df = ts.date_index(df, '1/1/1952')
 
     elif dataset == 'cay_current':
 
@@ -129,7 +130,7 @@ def load(dataset, master_dirs={}, **kwargs):
 
         df = pd.read_table(data_dir + infile, sep=',', header=2,
                            names=['dates', 'c', 'a', 'y', 'cay'])
-        df = py_tools.data.date_index(df, '1/1/1952')
+        df = ts.date_index(df, '1/1/1952')
 
     elif dataset == 'cay_source':
 
@@ -141,7 +142,7 @@ def load(dataset, master_dirs={}, **kwargs):
             sheetname='Sheet1',
         )
 
-        df = py_tools.data.date_index(df, '1/1/1947')
+        df = ts.date_index(df, '1/1/1947')
 
     elif dataset == 'bls_ls':
 
@@ -151,7 +152,7 @@ def load(dataset, master_dirs={}, **kwargs):
         df = pd.read_table(data_dir + infile, sep=',',
                                names=['dates', 'bls_ls'],
                                usecols=['bls_ls'])
-        df = py_tools.data.date_index(df, '1/1/1947')
+        df = ts.date_index(df, '1/1/1947')
         # start = datetime.datetime(1900, 1, 1)
         # end = datetime.date.today()
         # df_fred = web.DataReader(['GDPC1'], "fred", start, end)
@@ -170,7 +171,7 @@ def load(dataset, master_dirs={}, **kwargs):
         df['tfp_util'] = np.cumsum(df['dtfp_util'] / 400.0)
         df['tfp'] = np.cumsum(df['dtfp'] / 400.0)
 
-        df = py_tools.data.date_index(df, '01/01/1947')
+        df = ts.date_index(df, '01/01/1947')
 
     elif dataset == 'tb3ms':
 
@@ -184,7 +185,7 @@ def load(dataset, master_dirs={}, **kwargs):
         df_m['rf'] = 0.25 * np.log(1.0 + 0.01 * df_m['tb3ms'])
         df_m = df_m['rf'].to_frame()
 
-        df_m = py_tools.data.date_index(df_m, '01/01/1934', freq='MS')
+        df_m = ts.date_index(df_m, '01/01/1934', freq='MS')
 
         # df = resample(df_m, {'first' : 'rf'}).to_frame()
         df = df_m.resample('QS').first()
@@ -199,7 +200,7 @@ def load(dataset, master_dirs={}, **kwargs):
             # usecols=usecols,
         # )
 
-        # df_m = py_tools.data.date_index(df_m, '7/01/1960', freq='MS')
+        # df_m = ts.date_index(df_m, '7/01/1960', freq='MS')
 
         usecols = ['{:d}'.format(ii + 1) for ii in range(12)]
 
@@ -212,7 +213,7 @@ def load(dataset, master_dirs={}, **kwargs):
         )
 
         df_m = df_m[usecols]
-        df_m = py_tools.data.date_index(df_m, '07/01/1960', freq='MS')
+        df_m = ts.date_index(df_m, '07/01/1960', freq='MS')
 
         # methods_vars = {
             # 'first' : usecols,

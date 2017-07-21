@@ -1,8 +1,7 @@
 import numpy as np
 import os
 import pandas as pd
-# from py_tools.data import date_index
-import py_tools.data
+import py_tools.time_series as ts
 
 def load(nipa_table=None, nipa_vintage='1706', nipa_quarterly=True, master_dirs={}, **kwargs):
     """Load NIPA table, specify table (e.g., 20100) vintage (when downloaded) and whether quarterly data"""
@@ -296,8 +295,8 @@ def clean_nipa(df_t, nipa_quarterly=True):
         q = int(10 * (start_date - yr) + 1)
         mon = int(3 * (q - 1) + 1)
 
-        py_tools.data.date_index(df, '{0}/1/{1}'.format(mon, yr))
+        ts.date_index(df, '{0}/1/{1}'.format(mon, yr))
     else:
-        py_tools.data.date_index(df, '1/1/{0}'.format(int(start_date)), freq='AS')
+        ts.date_index(df, '1/1/{0}'.format(int(start_date)), freq='AS')
 
     return df

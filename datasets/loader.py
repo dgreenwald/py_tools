@@ -2,7 +2,7 @@ import numpy as np
 import os
 import pandas as pd
 
-import py_tools.data as dt
+import py_tools.time_series as ts
 import py_tools.utilities as ut
 
 from py_tools.datasets import fred, nipa, origins
@@ -103,7 +103,7 @@ def load_dataset(dataset, **kwargs):
 
             yr, q = (int(string) for string in ut.split_str(df_new.ix[0, 'DATES'], 4))
             mon = 3 * (q - 1) + 1
-            dt.date_index(df_new, '{0}/1/{1}'.format(mon, yr))
+            ts.date_index(df_new, '{0}/1/{1}'.format(mon, yr))
             del df_new['DATES']
 
             df_new = df_new.apply(pd.to_numeric, errors='coerce')
@@ -192,7 +192,7 @@ def load_dataset(dataset, **kwargs):
         })
 
         df_m = df_m[colnames]
-        df_m = dt.date_index(df_m, '01/01/1871', freq='MS')
+        df_m = ts.date_index(df_m, '01/01/1871', freq='MS')
 
         methods_vars = {
             # 'sum' : ['Dividend', 'Earnings'],
@@ -201,7 +201,7 @@ def load_dataset(dataset, **kwargs):
             'last' : ['real_P', 'CAPE'],
         }
 
-        df = dt.resample(df_m, methods_vars)
+        df = ts.resample(df_m, methods_vars)
 
     return df
 
@@ -220,9 +220,9 @@ def clean_nipa(df_t, nipa_quarterly=True):
         q = int(10 * (start_date - yr) + 1)
         mon = int(3 * (q - 1) + 1)
 
-        dt.date_index(df, '{0}/1/{1}'.format(mon, yr))
+        ts.date_index(df, '{0}/1/{1}'.format(mon, yr))
     else:
-        dt.date_index(df, '1/1/{0}'.format(int(start_date)), freq='AS')
+        ts.date_index(df, '1/1/{0}'.format(int(start_date)), freq='AS')
 
     return df
 
