@@ -18,7 +18,7 @@ def load(dataset_list, reimport=False, no_prefix=True, **kwargs):
     df = None
     for dataset in dataset_list:
 
-        suffix = dt.get_suffix(dataset, **kwargs)
+        suffix = get_suffix(dataset, **kwargs)
         pkl_file = dirs['pkl'] + dataset + suffix + '.pkl'
         
         if not os.path.exists(pkl_file) or reimport:
@@ -225,3 +225,19 @@ def clean_nipa(df_t, nipa_quarterly=True):
         dt.date_index(df, '1/1/{0}'.format(int(start_date)), freq='AS')
 
     return df
+
+def get_suffix(dataset, **kwargs):
+
+    if dataset[:4] == 'nipa':
+
+        nipa_vintage = kwargs.get('nipa_vintage', '1604')
+        suffix = nipa_vintage
+
+    else:
+        
+        suffix = ''
+
+    if suffix != '':
+        suffix = '_' + suffix
+
+    return suffix

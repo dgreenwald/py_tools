@@ -10,7 +10,34 @@ from tabulate import tabulate
 # from py_tools.debug import disp 
 # import py_tools.data as dt
 from py_tools.datasets import loader
+from py_tools.plot import two_axis
 # import py_tools.utilities as ut
+
+def merge_date(df1, df2, **kwargs):
+
+    return pd.merge(df1, df2, left_index=True, right_index=True, **kwargs)
+
+def date_index(df, startdate, freq='QS'):
+    df.set_index(pd.date_range(startdate, periods=len(df), freq=freq), inplace=True)
+    return df
+
+def resample(df, methods_vars, freq='QS'):
+    df_resamp = None
+
+    for method, var_list in methods_vars.items():
+
+        if var_list is not None:
+
+            df_new = getattr(df[var_list].resample(freq), method)()
+
+            # if len(var_list) == 1:
+                # df_new = df_new.to_frame()
+            if df_resamp is None:
+                df_resamp = df_new
+            else:
+                df_resamp = pd.merge(df_resamp, df_new, left_index=True, right_index=True)
+
+    return df_resamp
 
 class FullResults:
     """Regression results with index and samples"""
@@ -781,3 +808,35 @@ def detrend_time(df_full, varlist):
     varlist_detrended = [var + '_detrend' for var in varlist]
 
     return df_full, varlist_detrended
+
+def lead_lag_correlations(df_in, var1, var2, lags=None,
+                          max_leads=8, max_lags=8, make_plot=False,
+                          **kwargs):
+
+    df = df_in[[var1, var2]].copy() 
+
+    if lags is None:
+        assert(max_lags >= 0)
+        assert(max_leads >= 0)
+        lags = range(-max_lags, max_leads + 1)
+
+    table = np.zeros((len(lags), 2))
+
+    for ii, lag in enumerate(lags):  
+
+        lag_var = 'L({0})_{1}'.format(lag, var2)
+        df[lag_var] = df[var2].shift(lag)
+
+        corrs = df[[var1, lag_var]].corr()
+        this_corr = corrs[var1][lag_var]
+
+        table[ii, 0] = lag
+        table[ii, 1] = this_corr
+
+    best_lag = int(table[np.argmax(np.abs(table[:, 1])), 0])
+    best_lag_var2 = 'L({0})_{1}'.format(best_lag, var2)
+
+    if make_plot:
+        two_axis(df, var1, best_lag_var2, **kwargs)
+
+    return table 
