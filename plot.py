@@ -1,5 +1,8 @@
+import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
+
+from py_tools.time_series import clean
 
 def two_axis(df_in, var1, var2, filepath=None, 
                   label1=None, label2=None, 
@@ -7,7 +10,7 @@ def two_axis(df_in, var1, var2, filepath=None,
                   legend_font=10, label_font=12, normalize=False, 
                   color1='#1f77b4', color2='#ff7f0e', 
                   flip1=False, flip2=False,
-                  markevery=4):
+                  markevery=4, legend=True):
 
     df = df_in[[var1, var2]].dropna()
 
@@ -36,8 +39,9 @@ def two_axis(df_in, var1, var2, filepath=None,
         df[var2].plot(ax=ax2, linestyle='-', linewidth=2, label=leglabel2, color=color2,
                       marker='o', fillstyle='none', markersize=5, mew=1.5, markevery=markevery)
 
-    ax1.legend(loc=loc1, fontsize=legend_font)
-    ax2.legend(loc=loc2, fontsize=legend_font)
+    if legend:
+        ax1.legend(loc=loc1, fontsize=legend_font)
+        ax2.legend(loc=loc2, fontsize=legend_font)
 
     ax1.set_ylabel(label1, color=color1, fontsize=label_font)
     for tl in ax1.get_yticklabels():
@@ -117,21 +121,16 @@ def normalized(df, var_list, filepath=None, invert_list=[]):
     
     return None
 
-def clean(df_in, var_list):
-
-    df = df_in[var_list].replace([np.inf, -np.inf], np.nan)
-    return df.dropna()
-
-def hist(df_in, var, label=None, xtitle=None, weight_var=None, 
+def hist(df_in, var, label=None, xtitle=None, wvar=None, 
          bins=None, ylim=None, filepath=None):
 
-    df = clean(df_in, [var, weight_var])
+    df = clean(df_in[[var, wvar]])
 
     if var not in df or len(df) == 0:
         return False
 
-    if weight_var is not None:
-        w = df[weight_var].values
+    if wvar is not None:
+        w = df[wvar].values
     else:
         w = np.ones(len(df))
 
@@ -155,37 +154,51 @@ def hist(df_in, var, label=None, xtitle=None, weight_var=None,
 
     return True
 
-def double_hist(df_in0, df_in1, label0, label1, var, bins=None, 
-                weight_var=None, filepath=None, xtitle=None, ylim=None):
+def double_hist(df_in1, df_in2, label1='Var 1', label2='Var 2', var=None,
+                var1=None, var2=None, bins=None, wvar=None, wvar1=None,
+                wvar2=None, filepath=None, xtitle=None, ylim=None,
+                legend_font=10, label_font=12):
 
-    df0 = clean(df_in0, [var, weight_var])
-    df1 = clean(df_in1, [var, weight_var])
+    if var is not None:
+        assert var1 is None and var2 is None
+        var1 = var
+        var2 = var
 
-    if var not in df0 or var not in df1:
+    if wvar is not None:
+        assert wvar1 is None and wvar2 is None
+        wvar1 = wvar
+        wvar2 = wvar
+
+    df1 = clean(df_in1[[var, wvar1]])
+    df2 = clean(df_in2[[var, wvar2]])
+
+    if var not in df1 or var not in df2:
         return False
 
-    if len(df0) == 0 or len(df1) == 0:
+    if len(df1) == 0 or len(df2) == 0:
         return False
 
-    if weight_var is not None:
-        w0 = df0[weight_var].values
-    else:
-        w0 = np.ones(len(df0))
-
-    if weight_var in df1:
-        w1 = df1[weight_var].values
+    if wvar2 is not None:
+        w1 = df1[wvar].values
     else:
         w1 = np.ones(len(df1))
 
+    if wvar in df2:
+        w2 = df2[wvar].values
+    else:
+        w2 = np.ones(len(df2))
+
     fig = plt.figure()
-    plt.hist(df0[var].values, normed=True, bins=bins, alpha=0.5,
-             weights=w0, label=str(label0))
+    matplotlib.rcParams.update({'font.size' : label_font})
+
     plt.hist(df1[var].values, normed=True, bins=bins, alpha=0.5,
              weights=w1, label=str(label1))
-    plt.legend()
+    plt.hist(df2[var].values, normed=True, bins=bins, alpha=0.5,
+             weights=w2, label=str(label2))
+    plt.legend(fontsize=legend_font)
 
     if xtitle is not None:
-        plt.xlabel(xtitle)
+        plt.xlabel(xtitle, fontsize=label_font)
     if ylim is not None:
         plt.ylim((ylim))
 

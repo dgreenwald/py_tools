@@ -7,7 +7,7 @@ import pandas as pd
 import re
 
 import py_tools.time_series as ts
-from py_tools.data import merge_date
+from py_tools.time_series import merge_date
 from py_tools import vector_autoregression as vr
 import py_tools.state_space as ss
 

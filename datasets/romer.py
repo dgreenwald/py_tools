@@ -1,5 +1,5 @@
 import pandas as pd
-from py_tools.data import date_index
+from py_tools.time_series import date_index
 
 def load():
 

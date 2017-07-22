@@ -10,7 +10,6 @@ from tabulate import tabulate
 # from py_tools.debug import disp 
 # import py_tools.data as dt
 # from py_tools.datasets import loader
-from py_tools.plot import two_axis
 # import py_tools.utilities as ut
 
 def merge_date(df1, df2, **kwargs):
@@ -776,7 +775,9 @@ def lagged_reg(df_in, lhs, rhs_list, n_lags, use_const=True, copy_df=True):
     return mv_ols(df, lhs, rhs)
 
 def detrend_hamilton(df_full, varlist, p=4, h=8):
-    """Apply Hamilton's recommended detrending procedure (instead of HP filter)"""
+    """Apply Hamilton's recommended detrending procedure (instead of HP filter)
+    Returns a dataframe including detrended variables with suffix '_detrend'
+    """
 
     fr_list = []
     for var in varlist:
@@ -799,6 +800,9 @@ def detrend_hamilton(df_full, varlist, p=4, h=8):
     return df_full, varlist_detrended, fr_list
 
 def detrend_time(df_full, varlist):
+    """Remove a linear time trend from the variables in var_list.  
+    Returns a dataframe including detrended variables with suffix '_detrend'
+    """
 
     for var in varlist:
 
@@ -814,6 +818,12 @@ def detrend_time(df_full, varlist):
 def lead_lag_correlations(df_in, var1, var2, lags=None,
                           max_leads=8, max_lags=8, make_plot=False,
                           **kwargs):
+    """Compute the correlation between var1 and leads/lags of var2.  
+    Setting make_plot to True will make two-axis plot under lag yielding 
+    highest magnitude
+    """
+
+    from py_tools.plot import two_axis
 
     df = df_in[[var1, var2]].copy() 
 
@@ -842,3 +852,10 @@ def lead_lag_correlations(df_in, var1, var2, lags=None,
         two_axis(df, var1, best_lag_var2, **kwargs)
 
     return table 
+
+def clean(df_in):
+    """Remove infinite and nan values from dataset"""
+
+    df = df_in.copy().replace([np.inf, -np.inf], np.nan)
+    return df.dropna()
+

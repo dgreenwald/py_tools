@@ -1,7 +1,7 @@
 # import numpy as np
 import os
 import pandas as pd
-from py_tools.data import date_index
+from py_tools.time_series import date_index
 
 def load(dataset, master_dirs={}):
     """Load data from one-off file"""
