@@ -795,6 +795,9 @@ def detrend_hamilton(df_full, varlist, p=4, h=8):
         df_full[var + '_detrend'] = np.nan
         df_full.loc[fr.ix, var + '_detrend'] = fr.results.resid
 
+        df_full[var + '_trend'] = np.nan
+        df_full.loc[fr.ix, var + '_trend'] = fr.results.fittedvalues
+
     varlist_detrended = [var + '_detrend' for var in varlist]
 
     return df_full, varlist_detrended, fr_list
