@@ -12,9 +12,9 @@ from tabulate import tabulate
 # from py_tools.datasets import loader
 # import py_tools.utilities as ut
 
-def merge_date(df1, df2, **kwargs):
+def merge_date(df1, df2, how='outer', **kwargs):
 
-    return pd.merge(df1, df2, left_index=True, right_index=True, **kwargs)
+    return pd.merge(df1, df2, left_index=True, right_index=True, how=how, **kwargs)
 
 def date_index(df, startdate, freq='QS'):
     df.set_index(pd.date_range(startdate, periods=len(df), freq=freq), inplace=True)
