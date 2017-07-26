@@ -211,7 +211,8 @@ def double_hist(df_in1, df_in2, label1='Var 1', label2='Var 2', var=None,
 
     return True
 
-def var_irfs(irfs, var_list, shock_list=None, titles={}, filepath=None, n_per_row=None, plot_scale=3):
+def var_irfs(irfs, var_list, shock_list=None, titles={}, filepath=None,
+             n_per_row=None, plot_scale=3):
 
     if shock_list is None:
         shock_list = var_list
