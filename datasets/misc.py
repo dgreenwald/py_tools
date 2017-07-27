@@ -24,7 +24,7 @@ def load(dataset, master_dirs={}):
         )
 
         del df['Date']
-        date_index(df, '1982/1/1', 'MS')
+        date_index(df, '1982/1/1', freq='MS')
 
     elif dataset == 'gertler_karadi':
 
@@ -40,5 +40,23 @@ def load(dataset, master_dirs={}):
         df = pd.read_csv(infile)
         df = date_index(df, '1973-01-01', freq='MS')
         df.drop(['date'], axis=1, inplace=True)
+
+    elif dataset == 'fernald':
+
+        infile = data_dir + 'fernald_tfp.xls'
+        df = pd.read_excel(
+            infile,
+            skiprows=1,
+            sheetname='quarterly',
+            skip_footer=6,
+        )
+
+        del df['date']
+        date_index(df, '1947/1/1', freq='QS')
+
+    elif dataset == 'price_rent':
+
+        infile = data_dir + 'price_rent.pkl'
+        df = pd.read_pickle(infile)
 
     return df

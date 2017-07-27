@@ -209,12 +209,23 @@ def transform(df, var_list, lag=0, diff=0, other=None,
 
     return new_var_list
 
-def regression(df, lhs, rhs, intercept=True, formula_extra=None, ix=None, **kwargs):
+def regression(df_in, lhs, rhs, intercept=True, formula_extra=None, ix=None, 
+               trend=None, **kwargs):
 
     formula = '{0} ~ {1}'.format(lhs, ' + '.join(rhs))
 
+    df = df_in[[lhs] + rhs].copy()
+
     if ix is None:
-        ix, _ = match_sample(df[[lhs] + rhs].values, how='inner')
+        ix, _ = match_sample(df.values, how='inner')
+
+    if trend is not None:
+        if trend in ['linear', 'quadratic']:
+            df['t'] = np.arange(len(df))
+            formula += ' + t '
+        if trend == 'quadratic':
+            df['t2'] = np.arange(len(df)) ** 2
+            formula += ' + t2 '
 
     if formula_extra is not None:
         formula += ' + ' + formula_extra
@@ -225,7 +236,7 @@ def regression(df, lhs, rhs, intercept=True, formula_extra=None, ix=None, **kwar
     return formula_regression(df, formula, ix=ix, **kwargs)
 
 def formula_regression(df, formula, var_list=None, match='inner', ix=None, 
-                       nw_lags=0, display=False):
+                       nw_lags=0, display=False, trend=None):
 
     # if var_list is not None:
         # ix, Xs, zs = match_sample(df[var_list].values, how=match, ix=ix)
