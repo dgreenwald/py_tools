@@ -52,3 +52,26 @@ class PresetDict(dict):
                 self[k] = v
         for k, v in kwargs.items():
             self[k] = v
+
+def swap_all_axes(a, target_axes, count=0):
+
+    if count == len(a.shape):
+
+        return a
+
+    else:
+
+        ix = target_axes.index(count)
+
+        if ix != count:
+            new_axes = target_axes.copy()
+            a_new = np.swapaxes(a, ix, count)
+
+            new_axes[count] = target_axes[ix]
+            new_axes[ix] = target_axes[count] 
+        else:
+            new_axes = target_axes
+            a_new = a
+        
+        return swap_all_axes(a_new, new_axes, count=(count+1))
+
