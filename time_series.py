@@ -2,13 +2,11 @@
 import numpy as np
 import pandas as pd
 import re
-import statsmodels.api as sm
-import statsmodels.formula.api as smf
 from scipy.linalg import solve_discrete_lyapunov
 from tabulate import tabulate
 
 # from py_tools.debug import disp 
-# import py_tools.data as dt
+import py_tools.data as dt
 # from py_tools.datasets import loader
 # import py_tools.utilities as ut
 
@@ -37,14 +35,6 @@ def resample(df, methods_vars, freq='QS'):
                 df_resamp = pd.merge(df_resamp, df_new, left_index=True, right_index=True)
 
     return df_resamp
-
-class FullResults:
-    """Regression results with index and samples"""
-    def __init__(self, results, ix, Xs, zs):
-        self.results = results
-        self.ix = ix
-        self.Xs = Xs
-        self.zs = zs
 
 def deflate(df, var_list, index='cpi', log=False, diff=False, per_capita=False, 
             reimport=False, **kwargs):
@@ -209,81 +199,6 @@ def transform(df, var_list, lag=0, diff=0, other=None,
 
     return new_var_list
 
-def regression(df_in, lhs, rhs, intercept=True, formula_extra=None, ix=None, 
-               trend=None, **kwargs):
-
-    formula = '{0} ~ {1}'.format(lhs, ' + '.join(rhs))
-
-    df = df_in[[lhs] + rhs].copy()
-
-    if ix is None:
-        ix, _ = match_sample(df.values, how='inner')
-
-    if trend is not None:
-        if trend in ['linear', 'quadratic']:
-            df['t'] = np.arange(len(df))
-            formula += ' + t '
-        if trend == 'quadratic':
-            df['t2'] = np.arange(len(df)) ** 2
-            formula += ' + t2 '
-
-    if formula_extra is not None:
-        formula += ' + ' + formula_extra
-
-    if not intercept:
-        formula += ' -1'
-
-    return formula_regression(df, formula, ix=ix, **kwargs)
-
-def formula_regression(df, formula, var_list=None, match='inner', ix=None, 
-                       nw_lags=0, display=False, trend=None):
-
-    # if var_list is not None:
-        # ix, Xs, zs = match_sample(df[var_list].values, how=match, ix=ix)
-    # else:
-        # Xs = None
-        # zs = None
-
-    if ix is None:
-        model = smf.ols(formula=formula, data=df)
-    else:
-        model = smf.ols(formula=formula, data=df.loc[ix, :])
-
-    results = model.fit()
-
-    if nw_lags > 0:
-        results = results.get_robustcov_results('HAC', maxlags=nw_lags)
-    else:
-        results = results.get_robustcov_results('HC0')
-
-    if display:
-        print(results.summary())
-
-    return FullResults(results, ix, Xs=None, zs=None)
-
-def sm_regression(df, lhs, rhs, match='inner', ix=None, nw_lags=0, display=False):
-    """Regression using statsmodels"""
-
-    if 'const' in rhs and 'const' not in df:
-        df['const'] = 1.0
-
-    X = df.ix[:, rhs].values
-    z = df.ix[:, lhs].values
-
-    ix, Xs, zs = match_xy(X, z, how=match, ix=ix)
-
-    model = sm.OLS(zs, Xs)
-    results = model.fit()
-    if nw_lags > 0:
-        results = results.get_robustcov_results('HAC', maxlags=nw_lags)
-    else:
-        results = results.get_robustcov_results('HC0')
-
-    if display:
-        print(results.summary())
-
-    return FullResults(results, ix, Xs, zs)
-
 def long_horizon_contemp(df, lhs, rhs, horizon, **kwargs):
 
     raise Exception
@@ -292,7 +207,7 @@ def long_horizon_contemp(df, lhs, rhs, horizon, **kwargs):
     lhs_long = long_list[0]
     rhs_long = long_list[1:]
 
-    return regression(df, lhs_long, rhs_long, **kwargs)
+    return dt.regression(df, lhs_long, rhs_long, **kwargs)
 
 def long_horizon_predictive(df, lhs, rhs, horizon, **kwargs):
 
@@ -303,7 +218,7 @@ def long_horizon_predictive(df, lhs, rhs, horizon, **kwargs):
         lhs_diff = transform(df, [lhs], lag=-jj)[0]
         df['lhs_long'] += df[lhs_diff]
 
-    return regression(df, 'lhs_long', rhs, **kwargs)
+    return dt.regression(df, 'lhs_long', rhs, **kwargs)
 
 class MVOLSResults:
     """Regression object"""
@@ -341,7 +256,7 @@ class MVOLSResults:
         # z = df.ix[:, lhs].values
 
         # self.match=match
-        # self.ix, self.Xs, self.zs = match_xy(X, z, how=self.match, ix=ix)
+        # self.ix, self.Xs, self.zs = dt.match_xy(X, z, how=self.match, ix=ix)
 
         # self.nobs = X.shape[0]
         # self.params = least_sq(self.Xs, self.zs)
@@ -362,7 +277,7 @@ def mv_ols(df, lhs, rhs, match='inner', ix=None, nw_lags=0):
     z = df.ix[:, lhs].values
 
     match=match
-    ix, Xs, zs = match_xy(X, z, how=match, ix=ix)
+    ix, Xs, zs = dt.match_xy(X, z, how=match, ix=ix)
 
     # Get sizes
     T, k = Xs.shape
@@ -411,7 +326,7 @@ def mv_ols(df, lhs, rhs, match='inner', ix=None, nw_lags=0):
                            cov_HC1, HC1_se, HC1_tstat,
                            llf, aic, bic, hqc)
 
-    return FullResults(results, ix, Xs, zs)
+    return dt.FullResults(results, ix, Xs, zs)
 
 def MA(df, lhs_var, rhs_vars, init_lag=1, default_lags=16, 
        lags_by_var={}, **kwargs):
@@ -429,10 +344,10 @@ def MA(df, lhs_var, rhs_vars, init_lag=1, default_lags=16,
             # rhs.append(add_lag(df, var, lag=lag))
 
     # Get sample indices
-    ix, _, _ = match_xy(df[rhs_vars].values, df[lhs_var].values)
+    ix, _, _ = dt.match_xy(df[rhs_vars].values, df[lhs_var].values)
 
-    # Run regression
-    return regression(df, lhs, rhs, match='custom', ix=ix, **kwargs)
+    # Run dt.regression
+    return dt.regression(df, lhs, rhs, match='custom', ix=ix, **kwargs)
 
 def VAR(df_in, var_list, n_var_lags=1, use_const=True):
     """Estimate VAR using OLS"""
@@ -487,7 +402,7 @@ class LongHorizonMA:
 
         print("Need to fix!")
         raise Exception
-        # # First stage: MA regression
+        # # First stage: MA dt.regression
         # fr = MA(df, lhs_var, [rhs_var], n_lags)
 
         # # Second stage: compute LH coefficient
@@ -670,39 +585,6 @@ def orthogonalize_errors(u):
     e = (np.linalg.solve(H, u.T)).T
     return (e, H)
 
-def match_sample(X, how='inner', ix=None):
-
-    if how == 'inner':
-        ix = np.all(pd.notnull(X), axis=1)
-    elif how == 'outer':
-        ix = np.any(pd.notnull(X), axis=1)
-    elif how != 'custom':
-        raise Exception
-        
-    Xs = X[ix, :]
-    Xs[pd.isnull(Xs)] = 0.0
-    
-    return (ix, Xs)
-
-def match_xy(X, z, how='inner', ix=None):
-
-    # TODO: should change so that originals not modified
-    if len(z.shape) == 1:
-        z = z[:, np.newaxis]
-        
-    if len(X.shape) == 1:
-        X = X[:, np.newaxis]
-
-    Xall = np.hstack((X, z))
-    ix, Xall_s = match_sample(Xall, how=how, ix=ix)
-
-    Nx = X.shape[1]
-
-    Xs = Xall_s[:, :Nx]
-    zs = Xall_s[:, Nx:]
-    
-    return (ix, Xs, zs)
-
 def least_sq(X, z):
     return np.linalg.solve(np.dot(X.T, X), np.dot(X.T, z))
 
@@ -723,7 +605,7 @@ def run_dls(df, lhs_var, rhs_vars, n_lags=8, display=False):
             # rhs.append(add_lag(df, var, lag, diff=1))
             
     # Regression
-    fr = sm_regression(df, lhs, rhs, display=display)
+    fr = dt.sm_regression(df, lhs, rhs, display=display)
     
     coint_vec = np.hstack([np.ones(1), -fr.results.params[1 : n_rhs + 1]])
     const = fr.results.params[0]
@@ -800,7 +682,7 @@ def detrend_hamilton(df_full, varlist, p=4, h=8):
             lag = h + ii
             rhs += transform(df, [var], lag=lag)
 
-        fr = regression(df, var, rhs)
+        fr = dt.regression(df, var, rhs)
         fr_list.append(fr)
 
         df_full[var + '_detrend'] = np.nan
