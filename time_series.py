@@ -748,14 +748,3 @@ def lead_lag_correlations(df_in, var1, var2, lags=None,
         two_axis(df, var1, best_lag_var2, **kwargs)
 
     return table 
-
-def clean(df_in):
-    """Remove infinite and nan values from dataset"""
-
-    df = df_in.copy().replace([np.inf, -np.inf], np.nan)
-    return df.dropna()
-
-def dropna_ix(df):
-
-    ix = np.all(pd.notnull(df).values, axis=1)
-    return df.loc[ix, :], ix

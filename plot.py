@@ -2,7 +2,7 @@ import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 
-from py_tools.time_series import clean
+from py_tools.data import clean
 
 def two_axis(df_in, var1, var2, filepath=None, 
                   label1=None, label2=None, 

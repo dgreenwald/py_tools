@@ -164,3 +164,13 @@ def sm_regression(df, lhs, rhs, match='inner', ix=None, nw_lags=0, display=False
 
     return FullResults(results, ix, Xs, zs)
 
+def clean(df_in):
+    """Remove infinite and nan values from dataset"""
+
+    df = df_in.copy().replace([np.inf, -np.inf], np.nan)
+    return df.dropna()
+
+def dropna_ix(df):
+
+    ix = np.all(pd.notnull(df).values, axis=1)
+    return df.loc[ix, :], ix

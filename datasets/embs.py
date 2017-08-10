@@ -1,3 +1,4 @@
+import numpy as np
 import pandas as pd
 
 data_dir = '/home/dan/Dropbox/data/frm/'
@@ -35,3 +36,9 @@ def aggregate(df_in, weight='rpb'):
         df_agg[var] = df_agg['wtd_' + var + '_total'] / df_agg[weight + '_total']
 
     return df_agg[var_list] 
+
+def resample_cpr(cpr, freq='QS'):
+
+    log_survival = np.log((1.0 - 0.01 * cpr) ** (1.0 / 12.0))
+    log_survival_resamp = log_survival.resample(freq).mean()
+    return 100.0 * (1.0 - np.exp(12.0 * log_survival_resamp))

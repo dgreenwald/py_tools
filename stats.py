@@ -1,12 +1,12 @@
 import numpy as np
 from scipy.stats import norm
 
-def weighted_quantile(values, weights, quantiles, sort=True):
+def weighted_quantile(values_in, weights_in, quantiles, sort=True):
 
     if sort:
-        sorter = np.argsort(values)
-        values = values[sorter]
-        weights = weights[sorter]
+        sorter = np.argsort(values_in)
+        values = values_in[sorter].astype(np.float64)
+        weights = weights_in[sorter].astype(np.float64)
     
     cumulative_weights = np.cumsum(weights) - weights[0]
     cumulative_weights /= cumulative_weights[-1]
