@@ -59,4 +59,16 @@ def load(dataset, master_dirs={}):
         infile = data_dir + 'price_rent.pkl'
         df = pd.read_pickle(infile)
 
+    elif dataset == 'shiller':
+
+        infile = data_dir + 'shiller.csv'
+        df = pd.read_csv(infile)
+        df = df.loc[pd.notnull(df['Date']), :]
+        df = date_index(df, '1871-01-01', 'MS')
+        del df['Date']
+        del df['date_frac']
+
+        for col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors='coerce')
+
     return df
