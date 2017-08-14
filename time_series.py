@@ -209,7 +209,7 @@ def long_horizon_contemp(df, lhs, rhs, horizon, **kwargs):
 
     return dt.regression(df, lhs_long, rhs_long, **kwargs)
 
-def long_horizon_predictive(df, lhs, rhs, horizon, **kwargs):
+def long_horizon_predictive(df, lhs, rhs, horizon, norm_lhs=False, **kwargs):
 
     # lhs_long = transform(df, [lhs], lag=-1, diff=horizon, other='cumsum')[0]
 
@@ -218,6 +218,8 @@ def long_horizon_predictive(df, lhs, rhs, horizon, **kwargs):
         lhs_diff = transform(df, [lhs], lag=-jj)[0]
         df['lhs_long'] += df[lhs_diff]
 
+    if norm_lhs:
+        df['lhs_long'] /= horizon
     return dt.regression(df, 'lhs_long', rhs, **kwargs)
 
 class MVOLSResults:
