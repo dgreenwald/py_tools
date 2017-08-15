@@ -220,6 +220,7 @@ def long_horizon_predictive(df, lhs, rhs, horizon, norm_lhs=False, **kwargs):
 
     if norm_lhs:
         df['lhs_long'] /= horizon
+
     return dt.regression(df, 'lhs_long', rhs, **kwargs)
 
 class MVOLSResults:
