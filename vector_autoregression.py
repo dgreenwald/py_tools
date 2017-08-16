@@ -1,5 +1,6 @@
 import numpy as np
-import py_tools.time_series as ts
+from py_tools import data as dt, time_series as ts
+# import py_tools.time_series as ts
 from py_tools.utilities import as_list
 
 def instrument_var(df, var_list, policy_var, instrument, Sig=None, resid_prefix='u_'):
@@ -12,7 +13,7 @@ def instrument_var(df, var_list, policy_var, instrument, Sig=None, resid_prefix=
         # Regress residuals on instrument
         lhs = resid_prefix + var
         rhs = ['const', instrument]
-        fr_u = ts.sm_regression(df, lhs, rhs)
+        fr_u = dt.sm_regression(df, lhs, rhs)
 
         # Store fitted values
         df[resid_prefix + 'hat_' + var] = np.nan
@@ -27,7 +28,7 @@ def instrument_var(df, var_list, policy_var, instrument, Sig=None, resid_prefix=
         # Regress residuals on u_hat_policy
         lhs = resid_prefix + var
         rhs = ['const', resid_prefix + 'hat_' + policy_var]
-        fr_2s = ts.sm_regression(df, lhs, rhs)
+        fr_2s = dt.sm_regression(df, lhs, rhs)
 
         # Store coefficient on u_hat_policy
         gam[ii] = fr_2s.results.params[1]
@@ -153,7 +154,7 @@ class VAR:
         # if self.use_const:
             # rhs += ['const']
 
-        # self.fr = ts.mv_ols(self.df, lhs, rhs)
+        # self.fr = dt.mv_ols(self.df, lhs, rhs)
         self.fr = ts.lagged_reg(self.df, self.var_list, self.var_list, 
                                 self.n_var_lags, use_const=self.use_const)
 
@@ -297,7 +298,7 @@ class VAR:
             self.y_boot[:, :, i_boot] = y_i
 
             # Re-estimate VAR
-            self.A_boot[:, :, i_boot] = ts.least_sq(X_i, y_i).T
+            self.A_boot[:, :, i_boot] = dt.least_sq(X_i, y_i).T
 
         return
 

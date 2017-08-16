@@ -6,7 +6,7 @@ from scipy.stats import multivariate_normal, invwishart, gamma, invgamma
 import pandas as pd
 import re
 
-import py_tools.time_series as ts
+from py_tools import data as dt, math as mt, time_series as ts
 from py_tools.time_series import merge_date
 from py_tools import vector_autoregression as vr
 import py_tools.state_space as ss
@@ -32,7 +32,7 @@ def log_abs_det(x):
 
 def fit_ols(X, Y):
 
-    Phi = ts.least_sq(X, Y)
+    Phi = dt.least_sq(X, Y)
     e = Y - np.dot(X, Phi)
     Sig = xtx(e) / X.shape[0]
 
@@ -68,7 +68,7 @@ def post_mode(X, Y, b_bar, Om_inv_bar, Psi_bar, df_bar):
     # Posterior for Sig
     eps_hat = (Y - np.dot(X, B_hat))
     B_diff = B_hat - B_bar
-    ee_B_om = np.dot(eps_hat.T, eps_hat) + ts.quad_form(B_diff, Om_inv_bar)
+    ee_B_om = np.dot(eps_hat.T, eps_hat) + mt.quad_form(B_diff, Om_inv_bar)
     Psi_hat = Psi_bar + ee_B_om
     df_hat = Nt - p + df_bar
 
@@ -78,7 +78,7 @@ def post_mode(X, Y, b_bar, Om_inv_bar, Psi_bar, df_bar):
     D_Psi = np.linalg.cholesky(np.linalg.inv(Psi_hat))
 
     D_Om_term = xtx(np.dot(X, D_Om))
-    D_Psi_term = ts.quad_form(D_Psi, ee_B_om)
+    D_Psi_term = mt.quad_form(D_Psi, ee_B_om)
 
     evals_D_Om_term, _ = np.linalg.eig(D_Om_term)
     evals_D_Psi_term, _ = np.linalg.eig(D_Psi_term)
@@ -127,7 +127,7 @@ def compute_irfs(B, p, Nirf, impact):
     virf = np.zeros((Nirf, Ny, Nshock))
 
     for tt in range(Nirf):
-        virf[tt, :, :] = np.dot(ts.quad_form(msel, cc_dy), impact)
+        virf[tt, :, :] = np.dot(mt.quad_form(msel, cc_dy), impact)
         cc_dy = np.dot(B_comp, cc_dy)
 
     return virf # tt x var x shock

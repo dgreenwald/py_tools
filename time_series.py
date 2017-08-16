@@ -223,114 +223,6 @@ def long_horizon_predictive(df, lhs, rhs, horizon, norm_lhs=False, **kwargs):
 
     return dt.regression(df, 'lhs_long', rhs, **kwargs)
 
-class MVOLSResults:
-    """Regression object"""
-
-    def __init__(self, nobs, params, fittedvalues, resid, cov_e,
-                 cov_HC0, HC0_se, HC0_tstat,
-                 cov_HC1, HC1_se, HC1_tstat,
-                 llf, aic, bic, hqc):
-
-        self.nobs = nobs
-        self.params = params
-        self.fittedvalues = fittedvalues
-        self.resid = resid
-        self.cov_e = cov_e
-
-        self.cov_HC0 = cov_HC0
-        self.HC0_se = HC0_se
-        self.HC0_tstat = HC0_tstat
-
-        self.cov_HC1 = cov_HC1
-        self.HC1_se = HC1_se
-        self.HC1_tstat = HC1_tstat
-
-        self.llf = llf
-        self.aic = aic
-        self.bic = bic
-        self.hqc = hqc
-
-    # def __init__(self, df, lhs, rhs, match='inner', ix=None, nw_lags=0):
-
-        # if 'const' in rhs and 'const' not in df:
-            # df['const'] = 1.0
-
-        # X = df.ix[:, rhs].values
-        # z = df.ix[:, lhs].values
-
-        # self.match=match
-        # self.ix, self.Xs, self.zs = dt.match_xy(X, z, how=self.match, ix=ix)
-
-        # self.nobs = X.shape[0]
-        # self.params = least_sq(self.Xs, self.zs)
-        # self.fittedvalues = np.dot(self.Xs, self.params)
-        # self.resid = self.zs - self.fittedvalues
-        # self.cov_e = np.dot(self.resid.T, self.resid) / self.nobs
-
-def mv_ols(df, lhs, rhs, match='inner', ix=None, nw_lags=0):
-
-    if 'const' in rhs and 'const' not in df:
-        df['const'] = 1.0
-
-    if nw_lags > 0:
-        print("Need to code")
-        raise Exception
-
-    X = df.ix[:, rhs].values
-    z = df.ix[:, lhs].values
-
-    match=match
-    ix, Xs, zs = dt.match_xy(X, z, how=match, ix=ix)
-
-    # Get sizes
-    T, k = Xs.shape
-    _, nz = zs.shape
-
-    nobs = X.shape[0]
-    params = least_sq(Xs, zs)
-    fittedvalues = np.dot(Xs, params)
-    resid = zs - fittedvalues
-    # cov_HC0 = np.dot(resid.T, resid) / nobs
-
-    # Homoskedastic covariance
-    cov_HC0, cov_e = hc0(Xs, resid)
-    # Note: reshape is transposed since params is (k x n) not (n x k)
-    # otherwise would need to set order='F'
-
-    HC0_se = standard_errors(cov_HC0, T).reshape(params.shape)
-    HC0_tstat = params / HC0_se
-
-    # Heteroskedastic covariance
-    # cov_xeex = np.zeros((nz*k, nz*k))
-    # for tt in range(T):
-        # x_t = Xs[tt, :][:, np.newaxis]
-        # e_t = resid[tt, :][:, np.newaxis]
-        # cov_xeex += np.kron(np.dot(x_t, x_t.T), np.dot(e_t, e_t.T))
-
-    # cov_xeex /= T
-    # cov_HC1 = np.dot(cov_X_inv, np.dot(cov_xeex, cov_X_inv))
-
-    # NOTE: for now, computing both HC0 and HC1
-    cov_HC1, _ = hc1(Xs, resid)
-    HC1_se = standard_errors(cov_HC1, T).reshape(params.shape)
-    HC1_tstat = params / HC1_se
-
-    # Compute likelihood
-    n_free = np.prod(params.shape)
-
-    log_det_cov_e = np.log(np.linalg.det(cov_e))
-    llf = -0.5 * (T * log_det_cov_e + T * nz * (1.0 + np.log(2.0 * np.pi)))
-    aic = log_det_cov_e + (2.0 / T) * n_free
-    bic = log_det_cov_e + (np.log(T) / T) * n_free
-    hqc = log_det_cov_e + (2.0 * np.log(np.log(T)) / T) * n_free
-
-    results = MVOLSResults(nobs, params, fittedvalues, resid, cov_e,
-                           cov_HC0, HC0_se, HC0_tstat,
-                           cov_HC1, HC1_se, HC1_tstat,
-                           llf, aic, bic, hqc)
-
-    return dt.FullResults(results, ix, Xs, zs)
-
 def MA(df, lhs_var, rhs_vars, init_lag=1, default_lags=16, 
        lags_by_var={}, **kwargs):
 
@@ -370,7 +262,7 @@ def VAR(df_in, var_list, n_var_lags=1, use_const=True):
         rhs += ['const']
 
     # Regression
-    return mv_ols(df, lhs, rhs)
+    return dt.mv_ols(df, lhs, rhs)
 
 def VECM(df, var_list, n_var_lags=1, n_dls_lags=8):
     """Estimate VECM using DLS"""
@@ -396,7 +288,7 @@ def VECM(df, var_list, n_var_lags=1, n_dls_lags=8):
             # rhs.append(add_lag(df, var, lag))
 
     # Regression
-    return mv_ols(df, lhs, rhs)
+    return dt.mv_ols(df, lhs, rhs)
 
 class LongHorizonMA:
     """Long Horizon Moving Average Regression"""
@@ -588,12 +480,6 @@ def orthogonalize_errors(u):
     e = (np.linalg.solve(H, u.T)).T
     return (e, H)
 
-def least_sq(X, z):
-    return np.linalg.solve(np.dot(X.T, X), np.dot(X.T, z))
-
-def quad_form(A, X):
-    return np.dot(A.T, np.dot(X, A))
-
 # Estimate cointegrating relationship using DLS
 def run_dls(df, lhs_var, rhs_vars, n_lags=8, display=False):
 
@@ -647,11 +533,6 @@ def init_cov(x, e):
 
     return (cov_e, cov_x, cov_x_inv, T, nz, k)
 
-def standard_errors(V, T):
-
-    se = np.sqrt(np.diagonal(V) / T)
-    return se
-
 def lagged_reg(df_in, lhs, rhs_list, n_lags, use_const=True, copy_df=True):
     """Regression of lhs on 1 through n_lags lags of rhs_list."""
 
@@ -668,7 +549,7 @@ def lagged_reg(df_in, lhs, rhs_list, n_lags, use_const=True, copy_df=True):
     if use_const:
         rhs += ['const']
 
-    return mv_ols(df, lhs, rhs)
+    return dt.mv_ols(df, lhs, rhs)
 
 def detrend_hamilton(df_full, varlist, p=4, h=8):
     """Apply Hamilton's recommended detrending procedure (instead of HP filter)

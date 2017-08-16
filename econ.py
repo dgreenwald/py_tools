@@ -139,3 +139,4 @@ def discrete_approx(rho, sig_e, N, cons=0.0):
     P /= np.sum(P, axis=1)
 
     return (y, P)
+
