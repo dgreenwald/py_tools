@@ -33,7 +33,7 @@ def load(table='shares', reimport=False):
                 'year',
                 'top_10', 'top_5', 'top_1', 'top_0_5', 'top_0_1', 'top_0_01',
                 'blank',
-                '10_to_5', '5_to_1', '1_to_0_5', '0_5_to_0_1', '0_1_to_0_01',
+                'top_10_to_5', 'top_5_to_1', 'top_1_to_0_5', 'top_0_5_to_0_1', 'top_0_1_to_0_01',
             ]
 
             tables = ['A2', 'A3']
