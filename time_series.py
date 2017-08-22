@@ -14,6 +14,15 @@ def merge_date(df1, df2, how='outer', **kwargs):
 
     return pd.merge(df1, df2, left_index=True, right_index=True, how=how, **kwargs)
 
+def merge_date_many(df_list, how='outer', **kwargs):
+
+    df = df_list[0]
+    for ii in range(1, len(df_list)):
+        df = pd.merge(df, df_list[ii], left_index=True, right_index=True,
+                        how=how, **kwargs)
+
+    return df
+
 def date_index(df, startdate, freq='QS'):
     df.set_index(pd.date_range(startdate, periods=len(df), freq=freq), inplace=True)
     return df
@@ -209,19 +218,21 @@ def long_horizon_contemp(df, lhs, rhs, horizon, **kwargs):
 
     return dt.regression(df, lhs_long, rhs_long, **kwargs)
 
-def long_horizon_predictive(df, lhs, rhs, horizon, norm_lhs=False, **kwargs):
+def long_horizon_predictive(df_in, lhs, rhs, horizon, norm_lhs=False, **kwargs):
 
     # lhs_long = transform(df, [lhs], lag=-1, diff=horizon, other='cumsum')[0]
 
-    df['lhs_long'] = 0
+    df = df_in[[lhs] + rhs].copy()
+    lhs_long = '{0}_{1}_Per_Diff'.format(lhs, horizon)
+    df[lhs_long] = 0
     for jj in range(1, horizon + 1):
         lhs_diff = transform(df, [lhs], lag=-jj)[0]
-        df['lhs_long'] += df[lhs_diff]
+        df[lhs_long] += df[lhs_diff]
 
     if norm_lhs:
-        df['lhs_long'] /= horizon
+        df[lhs_long] /= horizon
 
-    return dt.regression(df, 'lhs_long', rhs, **kwargs)
+    return dt.regression(df, lhs_long, rhs, **kwargs)
 
 def MA(df, lhs_var, rhs_vars, init_lag=1, default_lags=16, 
        lags_by_var={}, **kwargs):
@@ -632,3 +643,54 @@ def lead_lag_correlations(df_in, var1, var2, lags=None,
         two_axis(df, var1, best_lag_var2, **kwargs)
 
     return table 
+
+def rolling_forecast(df_in, lhs, rhs=[], use_const=True, **kwargs):
+
+    df, ix = dt.dropna_ix(df_in[lhs + rhs])
+    
+    y = df[lhs].values
+    
+    if use_const:
+        X = np.ones((len(df), len(rhs) + 1))
+        if rhs:
+            X[:, 1:] = df[rhs].values
+    else:
+        X = df[rhs].values
+
+    return rolling_forecast_internal(y, X, **kwargs), ix
+
+def rolling_forecast_internal(y, X, t_min=None):
+    """y should be Nt x Ny, X should be Nt x Nx"""
+
+    if len(y.shape) == 1: y = y[:, np.newaxis]
+    if len(X.shape) == 1: X = X[:, np.newaxis]
+
+    Nt, Ny = y.shape
+    _, Nx = X.shape
+
+    if t_min is None:
+        t_min = Nx + 2
+    forecast = np.nan * np.ones((Nt, Ny))
+    
+    XX_t = np.dot(X[:t_min, :].T, X[:t_min, :])
+    Xy_t = np.dot(X[:t_min, :].T, y[:t_min, :])
+
+    for tt in range(t_min, Nt):
+
+        x_t = X[tt, :][:, np.newaxis]
+        y_t = y[tt, :][:, np.newaxis]
+
+        # Forecast this period
+        bet_t = np.linalg.solve(XX_t, Xy_t)
+        forecast[tt, :] = np.dot(bet_t.T, x_t)
+
+        # Testing
+        # XX_check = np.dot(X[:tt, :].T, X[:tt, :])
+        # Xy_check = np.dot(X[:tt, :].T, y[:tt, :])
+        # bet_check = np.linalg.solve(XX_check, Xy_check)
+
+        # Update forecast
+        XX_t += np.dot(x_t, x_t.T)
+        Xy_t += np.dot(x_t, y_t.T) 
+
+    return forecast
