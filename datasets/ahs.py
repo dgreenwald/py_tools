@@ -5,12 +5,14 @@ import pandas as pd
 
 # from colloc import in_out
 
-data_dir = "/home/dan/data/ahs/"
+# data_dir = "/home/dan/data/ahs/"
+raw_data_dir = "/data/ahs/"
+data_dir = "/home/dan/Dropbox/data/ahs/"
 
 def load(year, reimport=False, **kwargs):
 
     year_str = str(year)
-    year_dir = data_dir + year_str + '/'
+    year_dir = raw_data_dir + year_str + '/'
     short_year = year_str[-2:]
 
     pkl_file = data_dir + 'ahs_{}.pkl'.format(year)
@@ -58,6 +60,15 @@ def load(year, reimport=False, **kwargs):
                         right_on='control',
                     )
 
+        keep_list = ['MORT', 'AMMORT', 'PMT', 'ZINC', 'WEIGHT', 'YRMOR', 'LPRICE', 
+                         'HHSAL', 'ZINCN', 'INT', 'INTW']
+        keep_list += ['AMMRT' + str(val) for val in range(2, 5)]
+        keep_list += ['PMT' + str(val) for val in range(2, 5)]
+
+        # Get overlap with variables in this data set
+        keep_list = [var for var in keep_list if var in df]
+
+        df = df[keep_list]
         df.to_pickle(pkl_file)
 
     else:
