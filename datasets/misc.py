@@ -3,7 +3,7 @@ import os
 import pandas as pd
 from py_tools.time_series import date_index
 
-def load(dataset, master_dirs={}):
+def load(dataset, master_dirs={}, **kwargs):
     """Load data from one-off file"""
 
     dirs = master_dirs.copy()
@@ -70,5 +70,17 @@ def load(dataset, master_dirs={}):
 
         for col in df.columns:
             df[col] = pd.to_numeric(df[col], errors='coerce')
+
+    elif dataset == 'welch_goyal':
+        """Include keyword argument freq to specify frequency of dataset"""
+
+        infile = data_dir + 'welch_goyal_2016.xlsx'
+        freq_name = kwargs.get('frequency', 'Monthly')
+        df = pd.read_excel(
+            infile, sheetname=freq_name,
+        )
+
+        freq_code = freq_name[0] + 'S'
+        df = date_index(df, '1871-01-01', freq=freq_code)
 
     return df

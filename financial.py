@@ -8,4 +8,3 @@ def get_coupon(rm_in, freq=1):
     q_star = rm_t / (1 - (1.0 / ((1.0 + rm_t) ** (30 * freq))))
     
     return q_star
-

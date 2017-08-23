@@ -1,4 +1,5 @@
 import pandas as pd
+from . import fred
 
 def load():
 
@@ -28,3 +29,18 @@ def load():
 
 # Merge
     return pd.merge(df, df_a, left_index=True, right_index=True)
+
+def load_fred():
+
+    var_titles = {
+        'HMLBSHNO' : 'debt',
+        'HNOREMV' : 'value',
+        'HNODPI' : 'income',
+        'HHMSDODNS' : 'debt_sa',
+        'DHUTRC1Q027SBEA' : 'housing_services',
+    }
+    
+    var_list = var_titles.keys()
+    df = fred.load(var_list).rename(columns=var_titles).loc['1952-01-01':, :]
+
+    return df
