@@ -1,6 +1,7 @@
 import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 
 from py_tools.data import clean
 
@@ -253,3 +254,40 @@ def var_irfs(irfs, var_list, shock_list=None, titles={}, filepath=None,
         plt.close(fig)
 
     return None 
+
+def plot_series(df_in, var_names, directory, title=None, labels={},
+                linestyles={}, markers={}, markevery=8, markersize=5, mew=2,
+                fillstyle='none', fontsize=12, plot_type='pdf', ylabel=None):
+
+    matplotlib.rcParams.update({'font.size' : fontsize})
+
+    if title is None:
+        title = '_'.join(var_names)
+
+    fig = plt.figure()
+
+    ix = np.any(pd.notnull(df_in[var_names]), axis=1)
+    df = df_in.loc[ix, var_names].copy()
+
+    for var in var_names:
+
+        label = labels.get(var, var)
+        linestyle = linestyles.get(var, '-')
+
+        marker = markers.get(var, None)
+        plt.plot(df.index, df[var], linewidth=2, linestyle=linestyle, label=label,
+                 markevery=markevery, markersize=markersize, mew=mew)
+
+    if len(var_names) > 1:
+        plt.legend(fontsize=fontsize)
+
+    plt.xlim(df.index[[0, -1]])
+
+    if ylabel is not None:
+        plt.ylabel(ylabel)
+
+    plt.tight_layout()
+    plt.savefig('{0}{1}.{2}'.format(directory, title, plot_type))
+
+    plt.close(fig)
+
