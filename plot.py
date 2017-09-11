@@ -125,7 +125,12 @@ def normalized(df, var_list, filepath=None, invert_list=[]):
 def hist(df_in, var, label=None, xtitle=None, wvar=None, 
          bins=None, ylim=None, filepath=None):
 
-    df = clean(df_in[[var, wvar]])
+    if wvar is None:
+        varlist = [var]
+    else:
+        varlist = [var, wvar]
+
+    df = clean(df_in[varlist])
 
     if var not in df or len(df) == 0:
         return False
