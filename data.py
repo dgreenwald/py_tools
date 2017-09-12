@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+import pdb
 
 import statsmodels.api as sm
 import statsmodels.formula.api as smf
@@ -164,10 +165,11 @@ def sm_regression(df, lhs, rhs, match='inner', ix=None, nw_lags=0, display=False
 
     return FullResults(results, ix, Xs, zs)
 
-def clean(df_in):
+def clean(df_in, var_list):
     """Remove infinite and nan values from dataset"""
 
-    df = df_in.copy().replace([np.inf, -np.inf], np.nan)
+    good_list = [var for var in var_list if var in df_in]
+    df = df_in[good_list].copy().replace([np.inf, -np.inf], np.nan)
     return df.dropna()
 
 def dropna_ix(df):
