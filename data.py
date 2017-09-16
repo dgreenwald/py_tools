@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 import pdb
+import pickle
 
 import statsmodels.api as sm
 import statsmodels.formula.api as smf
@@ -293,3 +294,11 @@ def standard_errors(V, T):
 def least_sq(X, z):
     return np.linalg.solve(np.dot(X.T, X), np.dot(X.T, z))
 
+def to_pickle(x, path):
+
+    pickle.dump(x, open(path, "wb"))
+    return None
+
+def read_pickle(path):
+
+    return pickle.load(open(path, "rb"))
