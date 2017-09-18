@@ -81,6 +81,7 @@ def two_axis(df_in, var1, var2, filepath=None,
         ax2.set_ylim(ax2_ylim_new)
 
     if filepath is not None:
+        plt.tight_layout()
         plt.savefig(filepath)
     else:
         plt.show()
