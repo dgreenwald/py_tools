@@ -3,7 +3,13 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-from py_tools.data import clean
+# from py_tools.data import clean
+import py_tools.data as dt
+
+def save_hist(vals, path, **kwargs):
+
+    h = np.histogram(vals, **kwargs)
+    dt.to_pickle(h, path)
 
 def two_axis(df_in, var1, var2, filepath=None, 
                   label1=None, label2=None, 
@@ -123,15 +129,14 @@ def normalized(df, var_list, filepath=None, invert_list=[]):
     
     return None
 
-def hist(df_in, var, label=None, xtitle=None, wvar=None, 
-         bins=None, ylim=None, filepath=None):
+def hist(df_in, var, label=None, xlabel=None, ylabel=None, wvar=None, 
+         bins=None, xlim=None, ylim=None, filepath=None,
+         legend_font=10, label_font=12, copy_path=None, color=None):
 
-    if wvar is None:
-        varlist = [var]
-    else:
-        varlist = [var, wvar]
+    # if color is None:
+        # color = 'blue'
 
-    df = clean(df_in[varlist])
+    df = dt.clean(df_in, [var, wvar])
 
     if var not in df or len(df) == 0:
         return False
@@ -141,16 +146,22 @@ def hist(df_in, var, label=None, xtitle=None, wvar=None,
     else:
         w = np.ones(len(df))
 
+    # TODO: could use kwargs for some of these
     fig = plt.figure()
+    matplotlib.rcParams.update({'font.size' : label_font})
     plt.hist(df[var].values, normed=True, bins=bins, alpha=0.5,
-             weights=w, label=label)
+             weights=w, label=label, color=color)
 
-    if xtitle is not None:
-        plt.xlabel(xtitle)
+    if xlabel is not None:
+        plt.xlabel(xlabel)
+    if ylabel is not None:
+        plt.ylabel(ylabel)
+    if xlim is not None:
+        plt.xlim((xlim))
     if ylim is not None:
         plt.ylim((ylim))
     if label is not None:
-        plt.legend()
+        plt.legend(fontsize=legend_font)
 
     if filepath is not None:
         plt.savefig(filepath)
@@ -159,12 +170,17 @@ def hist(df_in, var, label=None, xtitle=None, wvar=None,
 
     plt.close(fig)
 
+    if copy_path is not None:
+        save_hist(df[var].values, copy_path, normed=True, bins=bins, weights=w)
+
     return True
 
 def double_hist(df_in1, df_in2, label1='Var 1', label2='Var 2', var=None,
                 var1=None, var2=None, bins=None, wvar=None, wvar1=None,
-                wvar2=None, filepath=None, xtitle=None, ylim=None,
-                legend_font=10, label_font=12):
+                wvar2=None, filepath=None, xlabel=None, ylabel=None, xlim=None,
+                ylim=None, legend_font=10, label_font=12, 
+                copy_path1=None, copy_path2=None, color1=None, color2=None):
+    """Plots double histogram overlaying var1 from df_in1 and var2 from df_in2"""
 
     if var is not None:
         assert var1 is None and var2 is None
@@ -176,10 +192,20 @@ def double_hist(df_in1, df_in2, label1='Var 1', label2='Var 2', var=None,
         wvar1 = wvar
         wvar2 = wvar
 
-    df1 = clean(df_in1[[var, wvar1]])
-    df2 = clean(df_in2[[var, wvar2]])
+    # if color1 is None:
+        # color1 = 'cornflowerblue'
+    # if color2 is None:
+        # color2 = 'orange'
 
-    if var not in df1 or var not in df2:
+    # if copy_str is not None:
+        # assert copy_path1 is None and copy_path2 is None
+        # copy_path1 = copy_str + '_' + var1 + '.pkl'
+        # copy_path2 = copy_str + '_' + var2 + '.pkl'
+
+    df1 = dt.clean(df_in1, [var1, wvar1])
+    df2 = dt.clean(df_in2, [var2, wvar2])
+
+    if var1 not in df1 or var2 not in df2:
         return False
 
     if len(df1) == 0 or len(df2) == 0:
@@ -198,14 +224,19 @@ def double_hist(df_in1, df_in2, label1='Var 1', label2='Var 2', var=None,
     fig = plt.figure()
     matplotlib.rcParams.update({'font.size' : label_font})
 
-    plt.hist(df1[var].values, normed=True, bins=bins, alpha=0.5,
-             weights=w1, label=str(label1))
-    plt.hist(df2[var].values, normed=True, bins=bins, alpha=0.5,
-             weights=w2, label=str(label2))
+    plt.hist(df1[var1].values, normed=True, bins=bins, alpha=0.5,
+             weights=w1, label=str(label1), color=color1)
+    plt.hist(df2[var2].values, normed=True, bins=bins, alpha=0.5,
+             weights=w2, label=str(label2), color=color2)
     plt.legend(fontsize=legend_font)
 
-    if xtitle is not None:
-        plt.xlabel(xtitle, fontsize=label_font)
+    if xlabel is not None:
+        plt.xlabel(xlabel, fontsize=label_font)
+    if ylabel is not None:
+        plt.ylabel(ylabel, fontsize=label_font)
+
+    if xlim is not None:
+        plt.xlim((xlim))
     if ylim is not None:
         plt.ylim((ylim))
 
@@ -215,6 +246,11 @@ def double_hist(df_in1, df_in2, label1='Var 1', label2='Var 2', var=None,
         plt.show()
 
     plt.close(fig)
+
+    if copy_path1 is not None:
+        save_hist(df1[var1].values, copy_path1, normed=True, bins=bins, weights=w1)
+    if copy_path2 is not None:
+        save_hist(df2[var2].values, copy_path1, normed=True, bins=bins, weights=w2)
 
     return True
 

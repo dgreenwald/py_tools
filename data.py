@@ -1,5 +1,7 @@
 import numpy as np
 import pandas as pd
+import pdb
+import pickle
 
 import statsmodels.api as sm
 import statsmodels.formula.api as smf
@@ -164,10 +166,11 @@ def sm_regression(df, lhs, rhs, match='inner', ix=None, nw_lags=0, display=False
 
     return FullResults(results, ix, Xs, zs)
 
-def clean(df_in):
+def clean(df_in, var_list):
     """Remove infinite and nan values from dataset"""
 
-    df = df_in.copy().replace([np.inf, -np.inf], np.nan)
+    good_list = [var for var in var_list if var in df_in]
+    df = df_in[good_list].copy().replace([np.inf, -np.inf], np.nan)
     return df.dropna()
 
 def dropna_ix(df):
@@ -291,3 +294,11 @@ def standard_errors(V, T):
 def least_sq(X, z):
     return np.linalg.solve(np.dot(X.T, X), np.dot(X.T, z))
 
+def to_pickle(x, path):
+
+    pickle.dump(x, open(path, "wb"))
+    return None
+
+def read_pickle(path):
+
+    return pickle.load(open(path, "rb"))
