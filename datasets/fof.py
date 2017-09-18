@@ -1,9 +1,10 @@
 import pandas as pd
 from . import fred
+from py_tools import time_series as ts
+
+data_dir = '/home/dan/Dropbox/data/fof/'
 
 def load():
-
-    data_dir = '/home/dan/Dropbox/data/frm/fof/'
 
     value_var = 'LM155035015.Q'
     debt_var = 'FL153165105.Q'
@@ -44,3 +45,31 @@ def load_fred():
     df = fred.load(var_list).rename(columns=var_titles).loc['1952-01-01':, :]
 
     return df
+
+def load_csv():
+    """Load from CSV files"""
+
+    infile = data_dir + 'csv/fof.csv'
+    df = pd.read_csv(infile, skiprows=5)
+    df = ts.date_index(df, '1945-10-01', freq='QS')
+    df = df.loc['1951-10-01':, :]
+
+# Update names
+    raw_labels = {
+            '156012005' : 'income',
+            '155035005' : 'value',
+            '153165105' : 'debt',
+            }
+
+    for prefix in ['LM', 'FA', 'FU', 'FL']:
+        these_labels = {
+                prefix + key + '.Q' : prefix + '_' + val for key, val in raw_labels.items()
+                }
+        df = df.rename(columns=these_labels)
+        
+    for col in df.columns:
+        if col != 'Time Period':
+            df[col] = pd.to_numeric(df[col])
+
+    return df.rename(columns={'FA_income' : 'income', 'FL_debt' : 'debt',
+                              'FL_value' : 'value'})[['income', 'debt', 'value']]

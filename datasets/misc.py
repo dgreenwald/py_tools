@@ -56,7 +56,8 @@ def load(dataset, master_dirs={}, **kwargs):
 
     elif dataset == 'price_rent':
 
-        infile = data_dir + 'price_rent.pkl'
+        # infile = data_dir + 'price_rent.pkl'
+        infile = data_dir + 'price_rent_new.pkl'
         df = pd.read_pickle(infile)
 
     elif dataset == 'shiller':
