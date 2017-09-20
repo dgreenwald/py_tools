@@ -16,7 +16,7 @@ def load():
             )
 
     df.rename(columns={value_var : 'value', debt_var : 'debt'}, inplace=True)
-    df.set_index(pd.date_range('1/1/1952', periods=len(df), freq='QS'), inplace=True)
+    df.set_index(pd.date_range('10/1/1945', periods=len(df), freq='QS'), inplace=True)
 
     income_var = 'FA156012005.Q' # Disposable Personal Income
     df_a = pd.read_table(
@@ -26,10 +26,13 @@ def load():
             )
     df_a.rename(columns={income_var : 'income'}, inplace=True)
 #ipdb.set_trace()
-    df_a.set_index(pd.date_range('1/1/1952', periods=len(df_a), freq='QS'), inplace=True)
+    df_a.set_index(pd.date_range('10/1/1945', periods=len(df_a), freq='QS'), inplace=True)
 
-# Merge
-    return pd.merge(df, df_a, left_index=True, right_index=True)
+    df = pd.merge(df, df_a, left_index=True, right_index=True).loc['1951-10-01':, :]
+    for var in ['debt', 'value', 'income']:
+        df[var] = pd.to_numeric(df[var], errors='coerce')
+
+    return df
 
 def load_fred():
 

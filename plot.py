@@ -298,8 +298,9 @@ def var_irfs(irfs, var_list, shock_list=None, titles={}, filepath=None,
     return None 
 
 def plot_series(df_in, var_names, directory, title=None, labels={},
-                linestyles={}, markers={}, markevery=8, markersize=5, mew=2,
-                fillstyle='none', fontsize=12, plot_type='pdf', ylabel=None):
+                linestyles={}, markers={}, colors={}, markevery=8,
+                markersize=5, mew=2, fillstyle='none', fontsize=12,
+                plot_type='pdf', ylabel=None, sample='outer'):
 
     matplotlib.rcParams.update({'font.size' : fontsize})
 
@@ -308,17 +309,25 @@ def plot_series(df_in, var_names, directory, title=None, labels={},
 
     fig = plt.figure()
 
-    ix = np.any(pd.notnull(df_in[var_names]), axis=1)
+    if sample == 'outer':
+        ix = np.any(pd.notnull(df_in[var_names]), axis=1)
+    elif sample == 'inner':
+        ix = np.all(pd.notnull(df_in[var_names]), axis=1)
+    else:
+        raise Exception
+
     df = df_in.loc[ix, var_names].copy()
 
     for var in var_names:
 
         label = labels.get(var, var)
         linestyle = linestyles.get(var, '-')
+        color = colors.get(var, None)
 
         marker = markers.get(var, None)
-        plt.plot(df.index, df[var], linewidth=2, linestyle=linestyle, label=label,
-                 markevery=markevery, markersize=markersize, mew=mew)
+        plt.plot(df.index, df[var], linewidth=2, linestyle=linestyle,
+                 label=label, marker=marker, markevery=markevery,
+                 markersize=markersize, mew=mew, color=color)
 
     if len(var_names) > 1:
         plt.legend(fontsize=fontsize)
