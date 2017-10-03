@@ -190,7 +190,7 @@ def load(nipa_table=None, nipa_vintage='1706', nipa_quarterly=True, master_dirs=
 
         # Total corporate
         corp_index = {
-            'gross_value_added' : 'A438RC1',
+            'gross_value_added' : 'A451RC1',
             'cons_fixed_cap' : 'A438RC1',
             'net_value_added' : 'A439RC1',
             'compensation' : 'A442RC1',
