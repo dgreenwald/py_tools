@@ -19,17 +19,18 @@ def load():
     df.set_index(pd.date_range('10/1/1945', periods=len(df), freq='QS'), inplace=True)
 
     income_var = 'FA156012005.Q' # Disposable Personal Income
+    gross_income_var = 'FA156010001.Q' # Disposable Personal Income
     df_a = pd.read_table(
             data_dir + 'atab101d.prn',
             delimiter=' ',
-            usecols=[income_var],
+            usecols=[income_var, gross_income_var],
             )
-    df_a.rename(columns={income_var : 'income'}, inplace=True)
+    df_a.rename(columns={income_var : 'income', gross_income_var : 'gross_income'}, inplace=True)
 #ipdb.set_trace()
     df_a.set_index(pd.date_range('10/1/1945', periods=len(df_a), freq='QS'), inplace=True)
 
     df = pd.merge(df, df_a, left_index=True, right_index=True).loc['1951-10-01':, :]
-    for var in ['debt', 'value', 'income']:
+    for var in ['debt', 'value', 'income', 'gross_income']:
         df[var] = pd.to_numeric(df[var], errors='coerce')
 
     return df
@@ -60,6 +61,7 @@ def load_csv():
 # Update names
     raw_labels = {
             '156012005' : 'income',
+            '156010001' : 'gross_income',
             '155035005' : 'value',
             '153165105' : 'debt',
             }
@@ -74,5 +76,5 @@ def load_csv():
         if col != 'Time Period':
             df[col] = pd.to_numeric(df[col])
 
-    return df.rename(columns={'FA_income' : 'income', 'FL_debt' : 'debt',
-                              'FL_value' : 'value'})[['income', 'debt', 'value']]
+    return df.rename(columns={'FA_income' : 'income', 'FA_gross_income' : 'gross_income', 
+                              'FL_debt' : 'debt', 'FL_value' : 'value'})[['income', 'gross_income', 'debt', 'value']]

@@ -93,6 +93,7 @@ def match_xy(X, z, how='inner', ix=None):
 
 def regression(df_in, lhs, rhs, intercept=True, formula_extra=None, ix=None, 
                trend=None, **kwargs):
+    """Run regression from pandas dataframe"""
 
     formula = '{0} ~ {1}'.format(lhs, ' + '.join(rhs))
 
