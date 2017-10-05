@@ -1,4 +1,4 @@
-# import numpy as np
+import numpy as np
 import os
 import pandas as pd
 from py_tools.time_series import date_index
@@ -13,7 +13,38 @@ def load(dataset, master_dirs={}, **kwargs):
 
     data_dir = dirs['base'] + 'misc/'
 
-    if dataset == 'cleveland_fed':
+    if dataset == 'canada_fof':
+        
+        # outsheet qdate cltv clti mortgages residentialstructures land income
+
+        columns={
+            # 'mortgages3' : 'debt',
+            # 'residentialstructures1' : 'value',
+            # 'householddisposableincome3' : 'income',
+            'residentialstructures' : 'structures',
+            'mortgages' : 'debt',
+        }
+
+        infile = data_dir + 'canada_accounts.csv'
+        df = pd.read_csv(infile, sep='\t').rename(columns=columns)
+
+        for var in ['debt', 'structures', 'land', 'income']:
+            df[var] = df[var].astype(np.float64)
+
+        df['value'] = df['structures'] + df['land']
+
+        date_index(df, '1990/1/1', freq='QS')
+
+    elif dataset == 'canada_rates':
+
+        infile = data_dir + 'canada_rates.csv'
+        df = pd.read_csv(infile, sep=';', decimal=',', 
+                         # names=['date', 'rate'], header=None
+                         )
+
+        date_index(df, '1980/1/1', freq='MS')
+    
+    elif dataset == 'cleveland_fed':
 
         infile = data_dir + 'cleveland_fed_inflation_expectations.xlsx'
         df = pd.read_excel(
@@ -83,5 +114,9 @@ def load(dataset, master_dirs={}, **kwargs):
 
         freq_code = freq_name[0] + 'S'
         df = date_index(df, '1871-01-01', freq=freq_code)
+
+    else:
+
+        raise Exception
 
     return df
