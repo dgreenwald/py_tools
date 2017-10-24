@@ -85,6 +85,16 @@ def load(dataset, master_dirs={}, **kwargs):
         del df['date']
         date_index(df, '1947/1/1', freq='QS')
 
+    elif dataset == 'nber_dates':
+
+        infile = data_dir + 'nber_dates.csv'
+        df = pd.read_csv(infile)
+
+        df['peak_yr'] = 1800 + (df['Peak month number'].astype(np.int) - 1) // 12
+        df['peak_cal_mo'] = (df['Peak month number'].astype(np.int) - 1) % 12
+        df['trough_yr'] = 1800 + (df['Trough month number'].astype(np.int) - 1) // 12
+        df['trough_cal_mo'] = (df['Trough month number'].astype(np.int) - 1) % 12
+
     elif dataset == 'price_rent':
 
         # infile = data_dir + 'price_rent.pkl'
