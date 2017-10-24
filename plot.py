@@ -5,6 +5,7 @@ import pandas as pd
 
 # from py_tools.data import clean
 import py_tools.data as dt
+from py_tools.datasets import misc
 
 def save_hist(vals, path, **kwargs):
 
@@ -342,3 +343,25 @@ def plot_series(df_in, var_names, directory, title=None, labels={},
 
     plt.close(fig)
 
+# From TomAugsburger
+
+#def add_rec_bars(ax, dates=None, alpha=0.25, color='k'):
+#
+#    if dates is None:
+#        dates = misc.load('nber_dates')
+#        # dates = pd.read_csv('/Users/tom/bin/rec_dates.csv',
+#                            # parse_dates=['Peak', 'Trough'])
+#
+#    xbar = ax.get_xlim()
+#    y1, y2 = ax.get_ylim()
+#    
+#    # First convert to pandas Period
+#    foo = matplotlib.dates.num2date(ax.get_xlim()[0])
+#    
+#    for row in dates.iterrows():
+#        x = row[1]
+##        y1, y2 = ax.get_ylim()
+#        if x[0] > xbar[0] or x[1] < xbar[1]:
+#            ax.fill_between([x[0], x[1]], y1=y1, y2=y2, alpha=alpha, color=color)
+#
+#    return ax

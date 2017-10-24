@@ -15,6 +15,8 @@ def load():
         'TMNOMPRC' : 'price',
     })
 
+    df['price'] *= 0.01
+
     df['date'] = pd.to_datetime(df['date'])
     df['term'] = df['term'] - 5000
     df['term'] = df['term'].astype(str)
@@ -26,6 +28,6 @@ def load():
 
     for ii in range(1, 6):
         df_stack['p' + str(ii)] = np.log(df_stack['P' + str(ii)])
-        df_stack['y' + str(ii)] = df_stack['p' + str(ii)] / float(ii)
+        df_stack['y' + str(ii)] = -df_stack['p' + str(ii)] / float(ii)
 
     return df_stack
