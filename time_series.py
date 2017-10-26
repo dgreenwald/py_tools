@@ -512,38 +512,6 @@ def run_dls(df, lhs_var, rhs_vars, n_lags=8, display=False):
 
     return (coint_vec, const)
 
-def hc0(x, e):
-    "Homoskedastic Covariance"
-    cov_e, _, cov_x_inv, _, _, _ = init_cov(x, e)
-    cov_HC0 = np.kron(cov_x_inv, cov_e)
-    return (cov_HC0, cov_e)
-
-def hc1(x, e):
-    "Heteroskedastic Covariance"
-    cov_e, cov_x, cov_x_inv, T, nz, k = init_cov(x, e)
-    cov_xeex = np.zeros((nz*k, nz*k))
-    for tt in range(T):
-        x_t = x[tt, :][:, np.newaxis]
-        e_t = e[tt, :][:, np.newaxis]
-        cov_xeex += np.kron(np.dot(x_t, x_t.T), np.dot(e_t, e_t.T))
-    cov_xeex /= T
-
-    cov_X_inv = np.kron(cov_x_inv, np.eye(nz))
-    cov_HC1 = np.dot(cov_X_inv, np.dot(cov_xeex, cov_X_inv))
-    return (cov_HC1, cov_e)
-
-def init_cov(x, e):
-
-    T, k = x.shape
-    Te, nz = e.shape
-    assert(T == Te)
-
-    cov_e = np.dot(e.T, e) / T
-    cov_x = np.dot(x.T, x) / T
-    cov_x_inv = np.linalg.inv(cov_x)
-
-    return (cov_e, cov_x, cov_x_inv, T, nz, k)
-
 def lagged_reg(df_in, lhs, rhs_list, n_lags, use_const=True, copy_df=True):
     """Regression of lhs on 1 through n_lags lags of rhs_list."""
 

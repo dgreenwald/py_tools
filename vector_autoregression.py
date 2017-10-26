@@ -129,7 +129,7 @@ class VAR:
         self.use_const = use_const
 
         # Initial estimation
-        self.fit()
+        # self.fit()
 
         # IRFs
         self.irfs = None
