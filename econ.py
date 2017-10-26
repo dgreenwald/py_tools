@@ -114,32 +114,40 @@ def sim_life_cycle(index_lists, z_ix_sim, i0=0):
 
     return ix
 
-def sim_ar1(rho, sig, mu=0.0, Nsim=100, e=None):
+def sim_ar1(rho, sig, mu=0.0, Nsim=100, e=None, x0=None):
 
     x = np.zeros(Nsim)
     if e is None:
         e = np.random.randn(Nsim)
 
-    sig0 = sig / np.sqrt(1.0 - rho ** 2)
-    x[0] = sig0 * e[0] 
+    if x0 is None:
+        sig0 = sig / np.sqrt(1.0 - rho ** 2)
+        x[0] = sig0 * e[0] 
+    else:
+        x[0] = x0
+
     for jj in range(1, Nsim):
         x[jj] = rho * x[jj-1] + sig * e[jj]
 
     x += mu
     return x
 
-def sim_cir(rho, sig, mu=0.0, Nsim=100, e=None):
+def sim_cir(rho, sig, mu=0.0, Nsim=100, e=None, x0=None):
+    """Cox-Ingersoll-Ross Process"""
 
     x = np.zeros(Nsim)
     if e is None:
         e = np.random.randn(Nsim)
 
-    sig0 = sig / np.sqrt(1.0 - rho ** 2)
-    x[0] = mu * sig0 * e[0] 
-    for jj in range(1, Nsim):
-        x[jj] = rho * x[jj-1] + np.sqrt(np.abs(x[jj-1])) * sig * e[jj]
+    if x0 is None:
+        sig0 = sig / np.sqrt(1.0 - rho ** 2)
+        x[0] = mu + mu * sig0 * e[0] 
+    else:
+        x[0] = x0
 
-    x += mu
+    for jj in range(1, Nsim):
+        x[jj] = (1.0 - rho) * mu + rho * x[jj-1] + np.sqrt(np.abs(x[jj-1])) * sig * e[jj]
+
     return x
 
 # Rouwenhorst approximation
