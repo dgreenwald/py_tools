@@ -91,9 +91,17 @@ def load(dataset, master_dirs={}, **kwargs):
         df = pd.read_csv(infile)
 
         df['peak_yr'] = 1800 + (df['Peak month number'].astype(np.int) - 1) // 12
-        df['peak_cal_mo'] = (df['Peak month number'].astype(np.int) - 1) % 12
+        df['peak_cal_mo'] = ((df['Peak month number'].astype(np.int) - 1) % 12) + 1
         df['trough_yr'] = 1800 + (df['Trough month number'].astype(np.int) - 1) // 12
-        df['trough_cal_mo'] = (df['Trough month number'].astype(np.int) - 1) % 12
+        df['trough_cal_mo'] = ((df['Trough month number'].astype(np.int) - 1) % 12) + 1
+
+        df['peak_date'] = df['peak_yr'].astype(str) + '-' + df['peak_cal_mo'].astype(str) + '-' + '01'
+        df['peak_date'] = pd.to_datetime(df['peak_date'])
+
+        df['trough_date'] = df['trough_yr'].astype(str) + '-' + df['trough_cal_mo'].astype(str) + '-' + '01'
+        df['trough_date'] = pd.to_datetime(df['trough_date'])
+
+        df = df[['peak_date', 'trough_date']]
 
     elif dataset == 'price_rent':
 
