@@ -187,6 +187,10 @@ class VAR:
         # if self.irfs is None:
             # compute_irfs(self, kwargs)
 
+    def get_companion_form(self):
+
+        return companion_form(self.A)
+
     def add_series_recursive(self, new_series_in):
         """Add additional series to the VAR using a recursive structure. 
         The new series can be affected by the previous series, but cannot 
