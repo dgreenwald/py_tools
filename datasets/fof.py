@@ -77,4 +77,4 @@ def load_csv():
             df[col] = pd.to_numeric(df[col])
 
     return df.rename(columns={'FA_income' : 'income', 'FA_gross_income' : 'gross_income', 
-                              'FL_debt' : 'debt', 'FL_value' : 'value'})[['income', 'gross_income', 'debt', 'value']]
+                              'FL_debt' : 'debt', 'FL_value' : 'value'})[['income', 'debt', 'value']]

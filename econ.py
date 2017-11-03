@@ -114,6 +114,34 @@ def sim_life_cycle(index_lists, z_ix_sim, i0=0):
 
     return ix
 
+def sim_ar1(rho, sig, mu=0.0, Nsim=100, e=None):
+
+    x = np.zeros(Nsim)
+    if e is None:
+        e = np.random.randn(Nsim)
+
+    sig0 = sig / np.sqrt(1.0 - rho ** 2)
+    x[0] = sig0 * e[0] 
+    for jj in range(1, Nsim):
+        x[jj] = rho * x[jj-1] + sig * e[jj]
+
+    x += mu
+    return x
+
+def sim_cir(rho, sig, mu=0.0, Nsim=100, e=None):
+
+    x = np.zeros(Nsim)
+    if e is None:
+        e = np.random.randn(Nsim)
+
+    sig0 = sig / np.sqrt(1.0 - rho ** 2)
+    x[0] = mu * sig0 * e[0] 
+    for jj in range(1, Nsim):
+        x[jj] = rho * x[jj-1] + np.sqrt(np.abs(x[jj-1])) * sig * e[jj]
+
+    x += mu
+    return x
+
 # Rouwenhorst approximation
 def discrete_approx(rho, sig_e, N, cons=0.0):
 
