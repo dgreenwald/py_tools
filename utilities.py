@@ -1,6 +1,7 @@
 from collections import Mapping
 import itertools
 import numpy as np
+from time import time
 
 def as_list(x):
 
@@ -75,3 +76,12 @@ def swap_all_axes(a, target_axes, count=0):
         
         return swap_all_axes(a_new, new_axes, count=(count+1))
 
+def tic():
+
+    return time()
+
+def toc(start, display=True):
+
+    elapsed = time() - start
+    print("Time elapsed: {:4.3g} seconds".format(elapsed))
+    return elapsed

@@ -66,6 +66,9 @@ def tensor(X, n_vec):
     """Each row of X should be one observation
     n_vec should contain the levels for each variable"""
     
+    if len(X.shape) == 1:
+        X = X[np.newaxis, :]
+
     k = X.shape[1]
     TX = poly(X[:, -1], n_vec[-1])
     return recurse_tensor(X, TX, n_vec, k - 2)
@@ -111,27 +114,43 @@ class ChebFcn:
     
 class TensorChebFcn:
     
-    def __init__(self, n_vec):
+    def __init__(self, n_vec, lb=-1.0, ub=1.0):
         
         self.k = len(n_vec)
         self.n_vec = n_vec
         self.grid = cartesian((grid(n_vec[ii]) for ii in range(self.k)))
         self.basis = tensor(self.grid, self.n_vec)
-        
-    def grid(self):
-        
-        return self.grid.copy()
-    
+
+        self.lb = lb
+        self.ub = ub
+
+        self.a_to_grid = -(self.ub + self.lb) / (self.ub - self.lb)
+        self.b_to_grid = 2.0 / (self.ub - self.lb)
+
+        self.a_from_grid = 0.5 * (self.ub + self.lb)
+        self.b_from_grid = (self.ub - self.lb) / 2.0
+
+        self.scaled_grid = self.scale_from_grid(self.grid)
+
     def fit_vals(self, vals):
         
         self.coeffs = np.linalg.solve(self.basis, vals)
         
     def fit_fcn(self, fcn):
         
-        vals = fcn(self.grid)
+        vals = fcn(self.scaled_grid)
         self.fit_vals(vals)
         
     def evaluate(self, x):
         
-        Tx = tensor(x, self.n_vec)
+        x_grid = self.scale_to_grid(x)
+        Tx = tensor(x_grid, self.n_vec)
         return np.dot(Tx, self.coeffs)
+
+    def scale_to_grid(self, vals):
+
+        return self.a_to_grid + (self.b_to_grid * vals)
+
+    def scale_from_grid(self, vals):
+
+        return self.a_from_grid + (self.b_from_grid * vals)
