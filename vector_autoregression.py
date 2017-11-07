@@ -129,7 +129,7 @@ class VAR:
         self.use_const = use_const
 
         # Initial estimation
-        self.fit()
+        # self.fit()
 
         # IRFs
         self.irfs = None
@@ -186,6 +186,10 @@ class VAR:
     # def irfs(self, **kwargs):
         # if self.irfs is None:
             # compute_irfs(self, kwargs)
+
+    def get_companion_form(self):
+
+        return companion_form(self.A)
 
     def add_series_recursive(self, new_series_in):
         """Add additional series to the VAR using a recursive structure. 

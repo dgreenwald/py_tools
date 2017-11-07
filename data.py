@@ -215,7 +215,7 @@ class MVOLSResults:
         # z = df.ix[:, lhs].values
 
         # self.match=match
-        # self.ix, self.Xs, self.zs = dt.match_xy(X, z, how=self.match, ix=ix)
+        # self.ix, self.Xs, self.zs = match_xy(X, z, how=self.match, ix=ix)
 
         # self.nobs = X.shape[0]
         # self.params = least_sq(self.Xs, self.zs)
@@ -236,7 +236,7 @@ def mv_ols(df, lhs, rhs, match='inner', ix=None, nw_lags=0):
     z = df.ix[:, lhs].values
 
     match=match
-    ix, Xs, zs = dt.match_xy(X, z, how=match, ix=ix)
+    ix, Xs, zs = match_xy(X, z, how=match, ix=ix)
 
     # Get sizes
     T, k = Xs.shape
@@ -285,7 +285,39 @@ def mv_ols(df, lhs, rhs, match='inner', ix=None, nw_lags=0):
                            cov_HC1, HC1_se, HC1_tstat,
                            llf, aic, bic, hqc)
 
-    return dt.FullResults(results, ix, Xs, zs)
+    return FullResults(results, ix, Xs, zs)
+
+def hc0(x, e):
+    "Homoskedastic Covariance"
+    cov_e, _, cov_x_inv, _, _, _ = init_cov(x, e)
+    cov_HC0 = np.kron(cov_x_inv, cov_e)
+    return (cov_HC0, cov_e)
+
+def hc1(x, e):
+    "Heteroskedastic Covariance"
+    cov_e, cov_x, cov_x_inv, T, nz, k = init_cov(x, e)
+    cov_xeex = np.zeros((nz*k, nz*k))
+    for tt in range(T):
+        x_t = x[tt, :][:, np.newaxis]
+        e_t = e[tt, :][:, np.newaxis]
+        cov_xeex += np.kron(np.dot(x_t, x_t.T), np.dot(e_t, e_t.T))
+    cov_xeex /= T
+
+    cov_X_inv = np.kron(cov_x_inv, np.eye(nz))
+    cov_HC1 = np.dot(cov_X_inv, np.dot(cov_xeex, cov_X_inv))
+    return (cov_HC1, cov_e)
+
+def init_cov(x, e):
+
+    T, k = x.shape
+    Te, nz = e.shape
+    assert(T == Te)
+
+    cov_e = np.dot(e.T, e) / T
+    cov_x = np.dot(x.T, x) / T
+    cov_x_inv = np.linalg.inv(cov_x)
+
+    return (cov_e, cov_x, cov_x_inv, T, nz, k)
 
 def standard_errors(V, T):
 
