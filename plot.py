@@ -12,14 +12,13 @@ def save_hist(vals, path, **kwargs):
     h = np.histogram(vals, **kwargs)
     dt.to_pickle(h, path)
 
-def two_axis(df_in, var1, var2, filepath=None, 
-                  label1=None, label2=None, 
-                  loc1='upper left', loc2='upper right',
-                  legend_font=10, label_font=12, normalize=False, 
-                  color1='#1f77b4', color2='#ff7f0e', 
-                  flip1=False, flip2=False,
-                  markevery=4, legend=True):
+def two_axis(df_in, var1, var2, filepath=None, label1=None, label2=None,
+             loc1='upper left', loc2='upper right', legend_font=10,
+             label_font=12, normalize=False, color1='#1f77b4',
+             color2='#ff7f0e', flip1=False, flip2=False, markevery=4,
+             legend=True):
 
+    matplotlib.rcParams.update({'font.size' : label_font})
     df = df_in[[var1, var2]].dropna()
 
     fig, ax1 = plt.subplots()
