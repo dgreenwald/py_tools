@@ -20,7 +20,7 @@ def load(nipa_table=None, nipa_vintage='1706', nipa_quarterly=True, master_dirs=
     else:
         freq_str = ' Ann'
 
-    sheetname = nipa_table + freq_str
+    sheet_name = nipa_table + freq_str
 
     ################################################################################
     # LOAD FILES
@@ -34,7 +34,7 @@ def load(nipa_table=None, nipa_vintage='1706', nipa_quarterly=True, master_dirs=
     # Load current file
     df_t = pd.read_excel(
         curr_file_path,
-        sheetname=sheetname,
+        sheet_name=sheet_name,
         skiprows=7,
         # header=[0, 1],
         index_col=2,
@@ -46,7 +46,7 @@ def load(nipa_table=None, nipa_vintage='1706', nipa_quarterly=True, master_dirs=
     # Load historical file
     df_t = pd.read_excel(
         hist_file_path,
-        sheetname=sheetname,
+        sheet_name=sheet_name,
         skiprows=7,
         # header=[0, 1],
         index_col=2,

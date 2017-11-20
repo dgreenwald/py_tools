@@ -132,7 +132,7 @@ def sim_ar1(rho, sig, mu=0.0, Nsim=100, e=None, x0=None):
     x += mu
     return x
 
-def sim_cir(rho, sig, mu=0.0, Nsim=100, e=None, x0=None):
+def sim_cir(rho, sig, mu=0.0, Nsim=100, e=None, x0=None, bound=False):
     """Cox-Ingersoll-Ross Process"""
 
     x = np.zeros(Nsim)
@@ -145,8 +145,13 @@ def sim_cir(rho, sig, mu=0.0, Nsim=100, e=None, x0=None):
     else:
         x[0] = x0
 
+    if bound:
+        x[0] = np.abs(x[0])
+
     for jj in range(1, Nsim):
         x[jj] = (1.0 - rho) * mu + rho * x[jj-1] + np.sqrt(np.abs(x[jj-1])) * sig * e[jj]
+        if bound:
+            x[jj] = np.abs(x[jj])
 
     return x
 
