@@ -1,7 +1,9 @@
 import numpy as np
 import os
 import pandas as pd
-from py_tools.time_series import date_index
+from scipy.io import loadmat
+
+import py_tools.time_series as ts
 
 def load(dataset, master_dirs={}, **kwargs):
     """Load data from one-off file"""
@@ -33,7 +35,7 @@ def load(dataset, master_dirs={}, **kwargs):
 
         df['value'] = df['structures'] + df['land']
 
-        date_index(df, '1990/1/1', freq='QS')
+        ts.date_index(df, '1990/1/1', freq='QS')
 
     elif dataset == 'canada_rates':
 
@@ -42,7 +44,7 @@ def load(dataset, master_dirs={}, **kwargs):
                          # names=['date', 'rate'], header=None
                          )
 
-        date_index(df, '1980/1/1', freq='MS')
+        ts.date_index(df, '1980/1/1', freq='MS')
     
     elif dataset == 'cleveland_fed':
 
@@ -55,7 +57,16 @@ def load(dataset, master_dirs={}, **kwargs):
         )
 
         del df['Date']
-        date_index(df, '1982/1/1', freq='MS')
+        ts.date_index(df, '1982/1/1', freq='MS')
+
+    elif dataset == 'crsp_bianchi':
+
+        infile = data_dir + 'crsp_bianchi.mat'
+        mat = loadmat(infile)
+        df = pd.DataFrame(data={
+            'DP_yogo' : np.squeeze(mat['Adiv_me_yogo']), 
+            'payout_to_equity_yogo' : np.squeeze(mat['payout_equity_ratio_Yogo']),
+        }, index=ts.get_date_index('1954-10-01', len(mat['dates_l']), 'QS'))
 
     elif dataset == 'gertler_karadi':
 
@@ -69,7 +80,7 @@ def load(dataset, master_dirs={}, **kwargs):
 
         infile = data_dir + 'gz.csv'
         df = pd.read_csv(infile)
-        df = date_index(df, '1973-01-01', freq='MS')
+        df = ts.date_index(df, '1973-01-01', freq='MS')
         df.drop(['date'], axis=1, inplace=True)
 
     elif dataset == 'fernald':
@@ -83,7 +94,7 @@ def load(dataset, master_dirs={}, **kwargs):
         )
 
         del df['date']
-        date_index(df, '1947/1/1', freq='QS')
+        ts.date_index(df, '1947/1/1', freq='QS')
 
     elif dataset == 'nber_dates':
 
@@ -114,7 +125,7 @@ def load(dataset, master_dirs={}, **kwargs):
         infile = data_dir + 'shiller.csv'
         df = pd.read_csv(infile)
         df = df.loc[pd.notnull(df['Date']), :]
-        df = date_index(df, '1871-01-01', 'MS')
+        df = ts.date_index(df, '1871-01-01', 'MS')
         del df['Date']
         del df['date_frac']
 
@@ -131,7 +142,7 @@ def load(dataset, master_dirs={}, **kwargs):
         )
 
         freq_code = freq_name[0] + 'S'
-        df = date_index(df, '1871-01-01', freq=freq_code)
+        df = ts.date_index(df, '1871-01-01', freq=freq_code)
 
     else:
 

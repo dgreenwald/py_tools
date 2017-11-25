@@ -23,8 +23,11 @@ def merge_date_many(df_list, how='outer', **kwargs):
 
     return df
 
+def get_date_index(startdate, periods, freq='QS'):
+    return pd.date_range(startdate, periods=periods, freq=freq)
+
 def date_index(df, startdate, freq='QS'):
-    df.set_index(pd.date_range(startdate, periods=len(df), freq=freq), inplace=True)
+    df.set_index(get_date_index(startdate, len(df), freq=freq), inplace=True)
     return df
 
 def resample(df, methods_vars, freq='QS'):
