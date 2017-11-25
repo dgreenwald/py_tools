@@ -164,6 +164,29 @@ def load(nipa_table=None, nipa_vintage='1706', nipa_quarterly=True, master_dirs=
             'consumption_fixed_govt' : 'A264RC1',
         }
 
+    elif nipa_table == '11200':
+
+        var_index = {
+            'income' : 'A032RC1',
+            'comp' : 'A033RC1',
+            'comp_wage_sal' : 'A034RC1',
+            'comp_wage_sal_gov' : 'B202RC1',
+            'comp_wage_sal_other' : 'A132RC1',
+            'comp_supp' : 'A038RC1',
+            'proprietors' : 'A041RC1',
+            'rental' : 'A048RC1',
+            'corp_profits' : 'A051RC1',
+            'corp_taxes' : 'A054RC1',
+            'corp_after_tax_profits' : 'A551RC1',
+            'corp_net_dividends' : 'B056RC1',
+            'corp_undistributed_profits' : 'A127RC1',
+            'net_interest_misc' : 'W255RC1',
+            'prod_taxes' : 'W056RC1',
+            'prod_subsidies' : 'A107RC1',
+            'business_transfer' : 'B029RC1',
+            'gov_surplus' : 'A108RC1',
+        }
+
     elif nipa_table == '11400':
 
         # Corporate nonfinancial
