@@ -297,15 +297,15 @@ def var_irfs(irfs, var_list, shock_list=None, titles={}, filepath=None,
 
     return None 
 
-def plot_series(df_in, var_names, directory, title=None, labels={},
+def plot_series(df_in, var_names, directory, filename=None, labels={},
                 linestyles={}, markers={}, colors={}, markevery=8,
                 markersize=5, mew=2, fillstyle='none', fontsize=12,
-                plot_type='pdf', ylabel=None, sample='outer'):
+                plot_type='pdf', ylabel=None, sample='outer', title=None):
 
     matplotlib.rcParams.update({'font.size' : fontsize})
 
-    if title is None:
-        title = '_'.join(var_names)
+    if filename is None:
+        filename = '_'.join(var_names)
 
     fig = plt.figure()
 
@@ -337,8 +337,11 @@ def plot_series(df_in, var_names, directory, title=None, labels={},
     if ylabel is not None:
         plt.ylabel(ylabel)
 
+    if title is not None:
+        plt.title(title)
+
     plt.tight_layout()
-    plt.savefig('{0}{1}.{2}'.format(directory, title, plot_type))
+    plt.savefig('{0}{1}.{2}'.format(directory, filename, plot_type))
 
     plt.close(fig)
 
