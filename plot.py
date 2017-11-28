@@ -325,14 +325,18 @@ def plot_series(df_in, var_names, directory, filename=None, labels={},
         color = colors.get(var, None)
 
         marker = markers.get(var, None)
-        plt.plot(df.index, df[var], linewidth=2, linestyle=linestyle,
-                 label=label, marker=marker, markevery=markevery,
-                 markersize=markersize, mew=mew, color=color)
+        df.loc[ix, var].plot(
+            linewidth=2, linestyle=linestyle, label=label, marker=marker,
+            markevery=markevery, markersize=markersize, mew=mew, color=color
+        )
+        # plt.plot(df.index, df[var], linewidth=2, linestyle=linestyle,
+                 # label=label, marker=marker, markevery=markevery,
+                 # markersize=markersize, mew=mew, color=color)
 
     if len(var_names) > 1:
         plt.legend(fontsize=fontsize)
 
-    plt.xlim(df.index[[0, -1]])
+    plt.xlim(np.array(df.index)[[0, -1]])
 
     if ylabel is not None:
         plt.ylabel(ylabel)
