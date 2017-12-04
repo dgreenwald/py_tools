@@ -28,7 +28,7 @@ def winsorize(df_in, var_list, p_val=0.98):
 
     df = df_in[var_list].copy()
     for var in var_list:
-        lb, ub = df[var].quantile([p_lo, p_hi]).values
+        lb, ub = df_in[var].quantile([p_lo, p_hi]).values
         df.loc[df[var] < lb, var] = lb
         df.loc[df[var] > ub, var] = ub
 
