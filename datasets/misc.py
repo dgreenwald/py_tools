@@ -15,7 +15,13 @@ def load(dataset, master_dirs={}, **kwargs):
 
     data_dir = dirs['base'] + 'misc/'
 
-    if dataset == 'canada_fof':
+    if dataset == 'bls_labor_share':
+
+        infile = data_dir + 'bls_labor_share.csv'
+        df = pd.read_csv(infile, usecols=['Labor Share'])
+        ts.date_index(df, '1947/1/1', freq='QS')
+
+    elif dataset == 'canada_fof':
         
         # outsheet qdate cltv clti mortgages residentialstructures land income
 
