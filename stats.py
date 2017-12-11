@@ -13,6 +13,13 @@ def weighted_quantile(values_in, weights_in, quantiles, sort=True):
 
     return np.interp(quantiles, cumulative_weights, values)
 
+def weighted_mean(values_in, weights_in):
+
+    num = np.dot(values_in, weights_in)
+    denom = np.sum(weights_in)
+
+    return (num / denom)
+
 def std_norm_z_star(p_val, two_sided=True):
 
     if two_sided:
