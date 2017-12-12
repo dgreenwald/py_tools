@@ -6,6 +6,8 @@ import pickle
 import statsmodels.api as sm
 import statsmodels.formula.api as smf
 
+from . import stats
+
 class FullResults:
     """Regression results with index and samples"""
     def __init__(self, results, ix, Xs, zs):
@@ -14,7 +16,7 @@ class FullResults:
         self.Xs = Xs
         self.zs = zs
 
-def winsorize(df_in, var_list, p_val=0.98):
+def winsorize(df_in, var_list, wvar=None, p_val=0.98):
     """Replace values of var_list outside the center p_val quantile mass with
     values at the edge of the mass"""
 
@@ -26,9 +28,21 @@ def winsorize(df_in, var_list, p_val=0.98):
     # else:
         # assert (p_lo is not None) and (p_hi is not None)
 
-    df = df_in[var_list].copy()
+    keep_vars = var_list
+    if wvar is not None:
+        keep_vars += [wvar]
+
+    df = df_in[keep_vars].copy()
     for var in var_list:
-        lb, ub = df_in[var].quantile([p_lo, p_hi]).values
+
+        if wvar is None:
+            lb, ub = df_in[var].quantile([p_lo, p_hi]).values
+        else:
+            lb, ub = stats.weighted_quantile(
+                df[var].values, df[wvar].values,
+                [p_lo, p_hi],
+            )
+
         df.loc[df[var] < lb, var] = lb
         df.loc[df[var] > ub, var] = ub
 

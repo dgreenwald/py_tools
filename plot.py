@@ -131,10 +131,7 @@ def normalized(df, var_list, filepath=None, invert_list=[]):
 
 def hist(df_in, var, label=None, xlabel=None, ylabel=None, wvar=None, 
          bins=None, xlim=None, ylim=None, filepath=None,
-         legend_font=10, label_font=12, copy_path=None, color=None):
-
-    # if color is None:
-        # color = 'blue'
+         legend_font=10, label_font=12, copy_path=None, **kwargs):
 
     df = dt.clean(df_in, [var, wvar])
 
@@ -150,7 +147,7 @@ def hist(df_in, var, label=None, xlabel=None, ylabel=None, wvar=None,
     fig = plt.figure()
     matplotlib.rcParams.update({'font.size' : label_font})
     plt.hist(df[var].values, normed=True, bins=bins, alpha=0.5,
-             weights=w, label=label, color=color)
+             weights=w, label=label, **kwargs)
 
     if xlabel is not None:
         plt.xlabel(xlabel)
@@ -175,12 +172,15 @@ def hist(df_in, var, label=None, xlabel=None, ylabel=None, wvar=None,
 
     return True
 
-def double_hist(df_in1, df_in2, label1='Var 1', label2='Var 2', var=None,
+def double_hist(df_in1, df_in2=None, label1='Var 1', label2='Var 2', var=None,
                 var1=None, var2=None, bins=None, wvar=None, wvar1=None,
                 wvar2=None, filepath=None, xlabel=None, ylabel=None, xlim=None,
-                ylim=None, legend_font=10, label_font=12, 
-                copy_path1=None, copy_path2=None, color1=None, color2=None):
+                ylim=None, legend_font=10, label_font=12, copy_path1=None,
+                copy_path2=None, color1=None, color2=None):
     """Plots double histogram overlaying var1 from df_in1 and var2 from df_in2"""
+
+    if df_in2 is None:
+        df_in2 = df_in1
 
     if var is not None:
         assert var1 is None and var2 is None
