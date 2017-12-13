@@ -297,12 +297,16 @@ def var_irfs(irfs, var_list, shock_list=None, titles={}, filepath=None,
 
     return None 
 
-def plot_series(df_in, var_names, directory, filename=None, labels={},
+def plot_series(df_in, var_names, directory='', filename=None, labels={},
                 linestyles={}, markers={}, colors={}, markevery=8,
                 markersize=5, mew=2, fillstyle='none', fontsize=12,
-                plot_type='pdf', ylabel=None, sample='outer', title=None):
+                plot_type='pdf', ylabel=None, sample='outer', title=None,
+                save=True, single_legend=True):
 
     matplotlib.rcParams.update({'font.size' : fontsize})
+
+    if directory != '' and directory[-1] != '/':
+        directory += '/'
 
     if filename is None:
         filename = '_'.join(var_names)
@@ -333,10 +337,10 @@ def plot_series(df_in, var_names, directory, filename=None, labels={},
                  # label=label, marker=marker, markevery=markevery,
                  # markersize=markersize, mew=mew, color=color)
 
-    if len(var_names) > 1:
+    if len(var_names) > 1 or single_legend:
         plt.legend(fontsize=fontsize)
 
-    plt.xlim(np.array(df.index)[[0, -1]])
+    plt.xlim(df.index[[0, -1]])
 
     if ylabel is not None:
         plt.ylabel(ylabel)
@@ -345,7 +349,10 @@ def plot_series(df_in, var_names, directory, filename=None, labels={},
         plt.title(title)
 
     plt.tight_layout()
-    plt.savefig('{0}{1}.{2}'.format(directory, filename, plot_type))
+    if save:
+        plt.savefig('{0}{1}.{2}'.format(directory, filename, plot_type))
+    else:
+        plt.show()
 
     plt.close(fig)
 
