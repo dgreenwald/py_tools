@@ -16,7 +16,7 @@ def two_axis(df_in, var1, var2, filepath=None, label1=None, label2=None,
              loc1='upper left', loc2='upper right', legend_font=10,
              label_font=12, normalize=False, color1='#1f77b4',
              color2='#ff7f0e', flip1=False, flip2=False, markevery=4,
-             legend=True):
+             legend=True, print_legend_axis=True):
 
     matplotlib.rcParams.update({'font.size' : label_font})
     df = df_in[[var1, var2]].dropna()
@@ -29,8 +29,11 @@ def two_axis(df_in, var1, var2, filepath=None, label1=None, label2=None,
     if label2 is None:
         label2 = var2
 
-    leglabel1 = label1 + ' (left axis)'
-    leglabel2 = label2 + ' (right axis)'
+    leglabel1 = label1
+    leglabel2 = label2
+    if print_legend_axis:
+        leglabel1 = label1 + ' (left axis)'
+        leglabel2 = label2 + ' (right axis)'
 
     if flip1:
         (-df[var1]).plot(ax=ax1, linewidth=2, label=('(-1) x ' + leglabel1), color=color1)
