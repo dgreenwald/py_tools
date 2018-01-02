@@ -203,6 +203,11 @@ def load_dataset(dataset, **kwargs):
 
         df = ts.resample(df_m, methods_vars)
 
+    else:
+
+        print("Invalid dataset specified")
+        raise Exception
+
     return df
 
 def clean_nipa(df_t, nipa_quarterly=True):

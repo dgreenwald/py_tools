@@ -134,10 +134,7 @@ def normalized(df, var_list, filepath=None, invert_list=[]):
 
 def hist(df_in, var, label=None, xlabel=None, ylabel=None, wvar=None, 
          bins=None, xlim=None, ylim=None, filepath=None,
-         legend_font=10, label_font=12, copy_path=None, color=None):
-
-    # if color is None:
-        # color = 'blue'
+         legend_font=10, label_font=12, copy_path=None, **kwargs):
 
     df = dt.clean(df_in, [var, wvar])
 
@@ -153,7 +150,7 @@ def hist(df_in, var, label=None, xlabel=None, ylabel=None, wvar=None,
     fig = plt.figure()
     matplotlib.rcParams.update({'font.size' : label_font})
     plt.hist(df[var].values, normed=True, bins=bins, alpha=0.5,
-             weights=w, label=label, color=color)
+             weights=w, label=label, **kwargs)
 
     if xlabel is not None:
         plt.xlabel(xlabel)
@@ -178,12 +175,15 @@ def hist(df_in, var, label=None, xlabel=None, ylabel=None, wvar=None,
 
     return True
 
-def double_hist(df_in1, df_in2, label1='Var 1', label2='Var 2', var=None,
+def double_hist(df_in1, df_in2=None, label1='Var 1', label2='Var 2', var=None,
                 var1=None, var2=None, bins=None, wvar=None, wvar1=None,
                 wvar2=None, filepath=None, xlabel=None, ylabel=None, xlim=None,
-                ylim=None, legend_font=10, label_font=12, 
-                copy_path1=None, copy_path2=None, color1=None, color2=None):
+                ylim=None, legend_font=10, label_font=12, copy_path1=None,
+                copy_path2=None, color1=None, color2=None):
     """Plots double histogram overlaying var1 from df_in1 and var2 from df_in2"""
+
+    if df_in2 is None:
+        df_in2 = df_in1
 
     if var is not None:
         assert var1 is None and var2 is None
@@ -300,12 +300,16 @@ def var_irfs(irfs, var_list, shock_list=None, titles={}, filepath=None,
 
     return None 
 
-def plot_series(df_in, var_names, directory, filename=None, labels={},
+def plot_series(df_in, var_names, directory='', filename=None, labels={},
                 linestyles={}, markers={}, colors={}, markevery=8,
                 markersize=5, mew=2, fillstyle='none', fontsize=12,
-                plot_type='pdf', ylabel=None, sample='outer', title=None):
+                plot_type='pdf', ylabel=None, sample='outer', title=None,
+                save=True, single_legend=True):
 
     matplotlib.rcParams.update({'font.size' : fontsize})
+
+    if directory != '' and directory[-1] != '/':
+        directory += '/'
 
     if filename is None:
         filename = '_'.join(var_names)
@@ -336,10 +340,10 @@ def plot_series(df_in, var_names, directory, filename=None, labels={},
                  # label=label, marker=marker, markevery=markevery,
                  # markersize=markersize, mew=mew, color=color)
 
-    if len(var_names) > 1:
+    if len(var_names) > 1 or single_legend:
         plt.legend(fontsize=fontsize)
 
-    plt.xlim(np.array(df.index)[[0, -1]])
+    plt.xlim(df.index[[0, -1]])
 
     if ylabel is not None:
         plt.ylabel(ylabel)
@@ -348,7 +352,10 @@ def plot_series(df_in, var_names, directory, filename=None, labels={},
         plt.title(title)
 
     plt.tight_layout()
-    plt.savefig('{0}{1}.{2}'.format(directory, filename, plot_type))
+    if save:
+        plt.savefig('{0}{1}.{2}'.format(directory, filename, plot_type))
+    else:
+        plt.show()
 
     plt.close(fig)
 
