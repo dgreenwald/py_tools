@@ -1,3 +1,4 @@
+import ipdb
 import numpy as np
 from scipy.misc import logsumexp
 
@@ -78,7 +79,7 @@ class HiddenMarkov:
     def smooth(self):
 
         self.px_smooth = np.zeros((self.Nx, self.Nt))
-        # self.px_joint = np.zeros((self.Nx, self.Nx, self.Nt))
+        self.px_joint = np.zeros((self.Nx, self.Nx, self.Nt))
 
         for tt in range(self.Nt - 1, -1, -1):
 
@@ -86,7 +87,7 @@ class HiddenMarkov:
                 px_joint_t = (self.P * self.px_filt[:, tt][:, np.newaxis]
                               * (px_smooth_old / self.px_pred[:, tt])[np.newaxis, :])
                 px_smooth_t = np.sum(px_joint_t, axis=1)
-                # self.px_joint[:, :, tt] = px_joint_t.copy()
+                self.px_joint[:, :, tt] = px_joint_t.copy()
             else:
                 px_smooth_t = self.px_filt[:, -1]
 
@@ -95,14 +96,52 @@ class HiddenMarkov:
 
         return None
 
-    def smoothed_vals(self, x_grid):
+    def smoothed_vals(self, grid):
 
-        x_grid_2d = make_2d(x_grid.copy())
-        return np.dot(x_grid_2d, self.px_smooth)
+        grid_2d = make_2d(grid.copy())
+        return np.dot(grid_2d, self.px_smooth)
 
-    # def draw_smoothed(self, Nsim):
+    def sample(self, Nsim):
 
-        # self.Nsim = Nsim
-        # self.x_draws = np.zeros((self.Nx, self.Nt, self.Nsim)) 
+        self.Nsim = Nsim
+        self.ix_sample = np.zeros((self.Nt, self.Nsim), dtype=np.int) 
+
+        # Last period: draw from marginal
+        self.ix_sample[-1, :] = np.random.choice(self.Nx, size=self.Nsim,
+                                                p=self.px_smooth[:, -1])
         
-        
+        # Now iterate backwards
+        for tt in range(self.Nt - 2, -1, -1):
+            new_probs = (self.px_joint[:, self.ix_sample[tt+1, :], tt] / 
+                         self.px_smooth[self.ix_sample[tt+1, :], tt+1])
+
+            self.ix_sample[tt, :] = econ.multi_choice(new_probs.T)
+
+        return None
+
+    def sampled_vals(self, grid):
+
+        grid_2d = make_2d(grid.copy())
+
+        Nvars = grid_2d.shape[0]
+        vals = np.zeros((self.Nt, Nvars, self.Nsim))
+
+        for tt in range(self.Nt):
+            vals[tt, :, :] = grid_2d[:, self.ix_sample[tt, :]]
+
+        return vals
+
+    def smoothed_quantiles(self, grid, q):
+
+        # ipdb.set_trace()
+
+        grid_2d = make_2d(grid.copy())
+        Nvars = grid_2d.shape[0]
+
+        Fx_smooth = np.cumsum(self.px_smooth, axis=0)
+        vals = np.zeros((len(q), Nvars, self.Nt))
+        for ii in range(Nvars):
+            for tt in range(self.Nt):
+                vals[:, ii, tt] = np.interp(q, Fx_smooth[:, tt], grid_2d[ii, :])
+
+        return vals 

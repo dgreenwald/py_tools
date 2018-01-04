@@ -82,6 +82,16 @@ def sim_discrete_from_ergodic(P, N):
     i0 = np.random.choice(len(pi_star), p=pi_star.ravel())
 
     return sim_discrete(P, N, i0)
+
+def multi_choice(p):
+    """Draw from many probability vectors in parallel.  Each row of the p
+    matrix should be one vector."""
+
+    c = p.cumsum(axis=1)
+    u = np.random.rand(len(c), 1)
+    choices = (u < c).argmax(axis=1)
+
+    return choices
     
 def sim_policy(index_list, z_ix_sim, i0=0):
     
