@@ -332,7 +332,7 @@ def plot_series(df_in, var_names, directory='', filename=None, labels={},
         color = colors.get(var, None)
 
         marker = markers.get(var, None)
-        df.loc[ix, var].plot(
+        df[var].plot(
             linewidth=2, linestyle=linestyle, label=label, marker=marker,
             markevery=markevery, markersize=markersize, mew=mew, color=color
         )
