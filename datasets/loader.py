@@ -62,7 +62,7 @@ def load_dataset(dataset, **kwargs):
 
     elif dataset == 'fof':
 
-        data_dir = dirs['base'] + 'fof/'
+        data_dir = dirs['base'] + 'fof/all_prn/'
 
         var_index = {
             'liabilities_book' : ('b103', 'FL104190005'),
