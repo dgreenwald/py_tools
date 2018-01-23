@@ -30,6 +30,10 @@ def date_index(df, startdate, freq='QS'):
     df.set_index(get_date_index(startdate, len(df), freq=freq), inplace=True)
     return df
 
+def quarter_index(df, yr, q):
+    mon = 3 * (int(q) - 1) + 1
+    return date_index(df, '{0}/1/{1}'.format(mon, yr))
+
 def resample(df, methods_vars, freq='QS'):
     df_resamp = None
 

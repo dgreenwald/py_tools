@@ -1,3 +1,4 @@
+# import ipdb
 import numpy as np
 import os
 import pandas as pd
@@ -60,62 +61,124 @@ def load_dataset(dataset, **kwargs):
 
         df = df['net_payouts'].to_frame() 
 
-    elif dataset == 'fof':
+    elif dataset in ['fof', 'fof_csv']:
 
-        data_dir = dirs['base'] + 'fof/all_prn/'
-
-        var_index = {
-            'liabilities_book' : ('b103', 'FL104190005'),
-            'net_worth_book' : ('b103', 'FL102090005'),
-            'net_worth_market' : ('b103', 'FL102090005'),
-            'equities_outstanding_market' : ('b103', 'LM103164103'),
-            # 'net_dividends' : ('u103', 'FU106121075'),
-            # 'net_new_equity' : ('u103', 'FU103164103'),
-            # 'net_new_paper' : ('u103', 'FU103169100'),
-            # 'net_new_bonds' : ('u103', 'FU103163003')
-            'net_dividends' : ('a103', 'FA106121075'),
-            'net_new_equity' : ('a103', 'FA103164103'),
-            'net_new_paper' : ('a103', 'FA103169100'),
-            'net_new_bonds' : ('a103', 'FA103163003')
-        }
+        if dataset == 'fof':
+            var_index = {
+                'liabilities_book' : ('b103', 'FL104190005'),
+                'net_worth_book' : ('b103', 'FL102090005'),
+                'net_worth_market' : ('b103', 'FL102090005'),
+                'equities_outstanding_market' : ('b103', 'LM103164103'),
+                # 'net_dividends' : ('u103', 'FU106121075'),
+                # 'net_new_equity' : ('u103', 'FU103164103'),
+                # 'net_new_paper' : ('u103', 'FU103169100'),
+                # 'net_new_bonds' : ('u103', 'FU103163003')
+                'net_dividends' : ('a103', 'FA106121075'),
+                'net_new_equity' : ('a103', 'FA103164103'),
+                'net_new_paper' : ('a103', 'FA103169100'),
+                'net_new_bonds' : ('a103', 'FA103163003'),
+                'stock_wealth' : ('b101', 'LM153064105'),
+    #            'noncorp_business_wealth' : ('b101', 'LM152090205'),
+            }
+        elif dataset == 'fof_csv':
+        
+            var_index = {
+                'liabilities_book' : ('b103', 'FL104190005'),
+                'net_worth_book' : ('b103', 'FL102090005'),
+                'net_worth_market' : ('b103', 'FL102090005'),
+                'equities_outstanding_market' : ('b103', 'LM103164103'),
+                # 'net_dividends' : ('u103', 'FU106121075'),
+                # 'net_new_equity' : ('u103', 'FU103164103'),
+                # 'net_new_paper' : ('u103', 'FU103169100'),
+                # 'net_new_bonds' : ('u103', 'FU103163003')
+                'net_dividends' : ('f103', 'FA106121075'),
+                'net_new_equity' : ('f103', 'FA103164103'),
+                'net_new_paper' : ('f103', 'FA103169100'),
+                'net_new_bonds' : ('f103', 'FA103163003'),
+                'corp_equities_wealth' : ('b101', 'LM153064105'),
+                'noncorp_business_wealth' : ('b101', 'LM152090205'),
+                'mutual_fund_wealth' : ('b101', 'LM153064205'),
+            }
 
         full_list = sorted(list(var_index.keys()))
 
         tables, codes = zip(*[var_index[var] for var in full_list])
         codes = [code + '.Q' for code in codes]
+        
+        code_index = {code : var for var, code in zip(full_list, codes)}
 
         df = None
 
         unique_tables = sorted(list(set(tables)))
-        for table in unique_tables:
-            prefix, suffix = ut.split_str(table, 1)
-            infile = prefix + 'tab' + suffix + 'd.prn'
 
-            these_codes = [this_code for this_table, this_code in zip(tables, codes) if this_table == table]
-            usecols = ['DATES'] + these_codes
+        if dataset == 'fof':
 
-            df_new = pd.read_table(
-                data_dir + infile,
-                delimiter=' ',
-                usecols=usecols,
-            )
-            df_new.rename(columns = {code : var for var, code in zip(full_list, codes)}, inplace=True)
+            data_dir = dirs['base'] + 'fof/all_prn/'
 
-            yr, q = (int(string) for string in ut.split_str(df_new.ix[0, 'DATES'], 4))
-            mon = 3 * (q - 1) + 1
-            ts.date_index(df_new, '{0}/1/{1}'.format(mon, yr))
-            del df_new['DATES']
+            for table in unique_tables:
+                prefix, suffix = ut.split_str(table, 1)
+                infile = prefix + 'tab' + suffix + 'd.prn'
 
-            df_new = df_new.apply(pd.to_numeric, errors='coerce')
-            # df_new = df_new.convert_objects(convert_dates=False, convert_numeric=True)
+                these_codes = [this_code for this_table, this_code in
+                               zip(tables, codes) if this_table == table]
+                usecols = ['DATES'] + these_codes
 
-            if df is not None:
-                df = pd.merge(df, df_new, left_index=True, right_index=True)
-            else:
-                df = df_new
+                df_new = pd.read_table(
+                    data_dir + infile,
+                    delimiter=' ',
+                    usecols=usecols,
+                )
+                df_new.rename(columns=code_index, inplace=True)
+
+                yr, q = (int(string) for string in ut.split_str(df_new.ix[0, 'DATES'], 4))
+                df_new = ts.quarter_index(df_new, yr, q)
+                # mon = 3 * (q - 1) + 1
+                # ts.date_index(df_new, '{0}/1/{1}'.format(mon, yr))
+                del df_new['DATES']
+
+                df_new = df_new.apply(pd.to_numeric, errors='coerce')
+                # df_new = df_new.convert_objects(convert_dates=False, convert_numeric=True)
+
+                if df is not None:
+                    df = pd.merge(df, df_new, left_index=True, right_index=True)
+                else:
+                    df = df_new
+
+        elif dataset == 'fof_csv':
+
+            data_dir = dirs['base'] + 'fof/all_csv/csv/'
+
+            for table  in unique_tables:
+
+                these_codes = [this_code for this_table, this_code in
+                               zip(tables, codes) if this_table == table]
+
+                usecols = ['date'] + these_codes
+
+                infile = table + '.csv'
+                df_new = pd.read_csv(data_dir + infile, usecols=usecols)
+                df_new.rename(columns=code_index, inplace=True)
+
+                yr_q_str = df_new.ix[0, 'date']
+                yr = yr_q_str[:4]
+                q = yr_q_str[-1]
+                df_new = ts.quarter_index(df_new, yr, q)
+                # mon = 3 * (q - 1) + 1
+                # ts.date_index(df_new, '{0}/1/{1}'.format(mon, yr))
+
+                df_new.drop(['date'], axis=1, inplace=True)
+
+                if df is not None:
+                    df = pd.merge(df, df_new, left_index=True, right_index=True)
+                else:
+                    df = df_new
 
         # Drop missing observations
-        df = df.ix['1951-10-01':, :]
+        df = df.ix['1952-01-01':, :]
+
+        # Ensure 
+        for var in df.columns:
+            df[var] = pd.to_numeric(df[var], errors='coerce').astype(np.float64)
 
         # Convert to billions
         df /= 1000.0
@@ -177,7 +240,7 @@ def load_dataset(dataset, **kwargs):
 
         df_m = pd.read_excel(
             dirs['base'] + 'shiller/ie_data.xls',
-            sheetname='Data',
+            sheet_name='Data',
             skiprows=7,
             # colnames=colnames,
             # usecols=usecols,
