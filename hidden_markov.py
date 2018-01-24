@@ -86,7 +86,12 @@ class HiddenMarkov:
     def smoothed_vals(self, grid):
 
         grid_2d = make_2d(grid.copy())
-        return np.dot(grid_2d, self.px_smooth)
+        return np.dot(self.px_smooth, grid_2d.T)
+    
+    def filtered_vals(self, grid):
+
+        grid_2d = make_2d(grid.copy())
+        return np.dot(self.px_filt, grid_2d.T)
 
     def sample(self, Nsim):
 

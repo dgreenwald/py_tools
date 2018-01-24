@@ -27,7 +27,6 @@ def load():
             usecols=[income_var, gross_income_var],
             )
     df_a.rename(columns={income_var : 'income', gross_income_var : 'gross_income'}, inplace=True)
-#ipdb.set_trace()
     df_a.set_index(pd.date_range('10/1/1945', periods=len(df_a), freq='QS'), inplace=True)
 
     df = pd.merge(df, df_a, left_index=True, right_index=True).loc['1951-10-01':, :]
