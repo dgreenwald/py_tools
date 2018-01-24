@@ -9,8 +9,9 @@ def load():
     value_var = 'LM155035015.Q'
     debt_var = 'FL153165105.Q'
 
+    this_dir = data_dir + 'all_prn/'
     df = pd.read_table(
-            data_dir + 'btab101d.prn',
+            this_dir + 'btab101d.prn',
             delimiter=' ',
             usecols=[value_var, debt_var],
             )
@@ -21,7 +22,7 @@ def load():
     income_var = 'FA156012005.Q' # Disposable Personal Income
     gross_income_var = 'FA156010001.Q' # Disposable Personal Income
     df_a = pd.read_table(
-            data_dir + 'atab101d.prn',
+            this_dir + 'atab101d.prn',
             delimiter=' ',
             usecols=[income_var, gross_income_var],
             )
