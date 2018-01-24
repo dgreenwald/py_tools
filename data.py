@@ -113,8 +113,15 @@ def regression(df_in, lhs, rhs, intercept=True, formula_extra=None, ix=None,
 
     df = df_in[[lhs] + rhs].copy()
 
+    ix_samp, _ = match_sample(df.values, how='inner')
     if ix is None:
-        ix, _ = match_sample(df.values, how='inner')
+#        ix, _ = match_sample(df.values, how='inner')
+        ix = ix_samp.copy()
+    
+    ix_both = np.logical_and(ix, ix_samp)
+        
+    Xs = df.loc[ix_both, rhs].values
+    zs = df.loc[ix_both, lhs].values
 
     if trend is not None:
         if trend in ['linear', 'quadratic']:
@@ -129,8 +136,15 @@ def regression(df_in, lhs, rhs, intercept=True, formula_extra=None, ix=None,
 
     if not intercept:
         formula += ' -1'
+    else:
+        Xs = np.hstack((np.ones((Xs.shape[0], 1)), Xs))
 
-    return formula_regression(df, formula, ix=ix, **kwargs)
+    fr = formula_regression(df, formula, ix=ix, **kwargs)
+    fr.ix = ix_both
+    fr.Xs = Xs
+    fr.zs = zs
+    
+    return fr
 
 def formula_regression(df, formula, var_list=None, match='inner', ix=None, 
                        nw_lags=0, display=False, trend=None):
