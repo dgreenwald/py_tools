@@ -2,9 +2,11 @@ import pandas as pd
 from . import fred
 from py_tools import time_series as ts
 
-data_dir = '/home/dan/Dropbox/data/fof/'
+from . import defaults
+default_dir = defaults.base_dir() + 'fof/'
+# data_dir = '/home/dan/Dropbox/data/fof/'
 
-def load():
+def load(data_dir=default_dir):
 
     value_var = 'LM155035015.Q'
     debt_var = 'FL153165105.Q'
@@ -50,7 +52,7 @@ def load_fred():
 
     return df
 
-def load_csv():
+def load_csv(data_dir=default_dir):
     """Load from CSV files"""
 
     infile = data_dir + 'csv/fof.csv'

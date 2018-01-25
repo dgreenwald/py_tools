@@ -11,15 +11,26 @@ import py_tools.time_series as ts
 # drop_dir = home_dir + '/Dropbox/'
 # base_dir = drop_dir + 'data/'
 # pkl_dir = base_dir + 'pkl/'
+
+from . import defaults
+default_base = defaults.base_dir() + 'origins/'
+defaults = {
+    var : default_base + var + '/'
+    for var in ['gll', 'gll_pred', 'cay_source']
+}
+
 def load(dataset, master_dirs={}, **kwargs):
 
     dirs = master_dirs.copy()
-    if 'drop' not in dirs:
-        home_dir = os.environ['HOME']
-        dirs['drop'] = home_dir + '/Dropbox/'
+    for var, val in defaults.items():
+        if var not in dirs:
+            dirs[var] = val
+    # if 'drop' not in dirs:
+        # home_dir = os.environ['HOME']
+        # dirs['drop'] = home_dir + '/Dropbox/'
 
-    dirs['gll'] = dirs['drop'] + 'gll/Dan/data/'
-    dirs['gll_pred'] = dirs['drop'] + 'gll/Predictability/data/'
+    # dirs['gll'] = dirs['drop'] + 'gll/Dan/data/'
+    # dirs['gll_pred'] = dirs['drop'] + 'gll/Predictability/data/'
 
     if dataset == 'stockw':
 
@@ -134,8 +145,12 @@ def load(dataset, master_dirs={}, **kwargs):
 
     elif dataset == 'cay_source':
 
+        print("Need up update directory")
+        raise Exception
+
         cay_source_vintage = kwargs.get('cay_source_vintage', '1302')
-        data_dir = dirs['drop'] + 'Dan Greenwald Files/CreateCAY/data_{}/'.format(cay_source_vintage)
+        # data_dir = dirs['drop'] + 'Dan Greenwald Files/CreateCAY/data_{}/'.format(cay_source_vintage)
+        data_dir = dirs['cay_source'] + 'data_{}/'.format(cay_source_vintage)
 
         df = pd.read_excel(
             data_dir + 'source_{0}_{1}_rats.xlsx'.format(cay_source_vintage[:2], cay_source_vintage[2:]),

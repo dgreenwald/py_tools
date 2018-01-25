@@ -2,9 +2,11 @@ import numpy as np
 import pandas as pd
 import py_tools.time_series as ts
 
-data_dir = '/home/dan/Dropbox/data/crsp/'
+from . import defaults
+default_dir = defaults.base_dir() + 'crsp/'
+# data_dir = '/home/dan/Dropbox/data/crsp/'
 
-def load():
+def load(data_dir=default_dir):
 
     infile = 'crsp_2016.csv'
     df = pd.read_csv(data_dir + infile)

@@ -1,10 +1,13 @@
 import numpy as np
 import pandas as pd
 
-data_dir = '/home/dan/Dropbox/data/frm/'
-embs_dir = data_dir + 'embs/by_coupon/'
+from . import defaults
+default_dir = defaults.base_dir() + 'frm/embs/by_coupon/'
 
-def load():
+# data_dir = '/home/dan/Dropbox/data/frm/'
+# embs_dir = data_dir + 'embs/by_coupon/'
+
+def load(embs_dir=default_dir):
 
     var_list = ['CPR', 'RPB', 'Issuance', 'Wac', 'Wam', 'Wala']
 

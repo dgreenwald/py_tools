@@ -1,9 +1,11 @@
 import pandas as pd
 from py_tools.data import date_index
 
-data_dir = '/home/dan/Dropbox/data/frm/datastream/'
+from . import defaults
+default_dir = defaults.base_dir() + 'datastream/'
+# data_dir = '/home/dan/Dropbox/data/frm/datastream/'
 
-def load():
+def load(data_dir=default_dir):
     
     col_names = {
         'Code': 'date',

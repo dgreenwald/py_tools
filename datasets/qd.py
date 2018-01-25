@@ -2,9 +2,11 @@ import numpy as np
 import pandas as pd
 import py_tools.data as dt
 
-data_dir = '/home/dan/Dropbox/data/qd/'
+from . import defaults
+default_dir = defaults.base_dir() + 'qd/'
+# data_dir = '/home/dan/Dropbox/data/qd/'
 
-def load(vintage='2015-11'):
+def load(vintage='2015-11', data_dir=default_dir):
 
     infile = data_dir + vintage + '.csv'
     df_all = pd.read_csv(infile)

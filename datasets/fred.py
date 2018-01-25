@@ -4,12 +4,14 @@ import pandas as pd
 import pandas_datareader.data as web
 import pickle
 
-data_dir = '/home/dan/Dropbox/data/fred/'
+from . import defaults
+default_dir = defaults.base_dir() + 'fred/'
+# data_dir = '/home/dan/Dropbox/data/fred/'
 
 def load(codes=None, code_names={}, 
          start=datetime.datetime(1900, 1, 1),
          end = datetime.datetime.today(),
-         reimport=False):
+         reimport=False, data_dir=default_dir):
     """Load data from FRED, will replace codes with names if code_names is passed as a dict"""
 
     if codes is None:

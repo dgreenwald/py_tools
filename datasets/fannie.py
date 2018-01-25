@@ -3,9 +3,10 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import pickle
-import os
 
-data_dir = '/data/fannie/'
+import os
+default_dir = '/data/fannie/'
+# data_dir = '/data/fannie/'
 
 def load(year, q, reimport=False, **kwargs):
 

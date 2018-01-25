@@ -3,15 +3,20 @@ import os
 import pandas as pd
 import py_tools.time_series as ts
 
-def load(nipa_table=None, nipa_vintage='1706', nipa_quarterly=True, master_dirs={}, **kwargs):
+from . import defaults
+default_dir = defaults.base_dir()
+
+def load(nipa_table=None, nipa_vintage='1706', nipa_quarterly=True,
+         master_dirs={}, **kwargs):
     """Load NIPA table, specify table (e.g., 20100) vintage (when downloaded) and whether quarterly data"""
 
     assert(nipa_table is not None) # Need to pick a table
 
     dirs = master_dirs.copy()
     if 'base' not in dirs:
-        home_dir = os.environ['HOME']
-        dirs['base'] = home_dir + '/Dropbox/data/'
+        dirs['base'] = default_dir
+        # home_dir = os.environ['HOME']
+        # dirs['base'] = home_dir + '/Dropbox/data/'
 
     data_dir = dirs['base'] + 'nipa/' + nipa_vintage + '/'
 

@@ -2,9 +2,11 @@ import numpy as np
 import pandas as pd
 import py_tools.time_series as ts
 
-data_dir = '/home/dan/Dropbox/data/fama_bliss/'
+from . import defaults
+default_dir = defaults.base_dir() + 'fama_bliss/'
+# data_dir = '/home/dan/Dropbox/data/fama_bliss/'
 
-def load():
+def load(data_dir=default_dir):
 
     infile = data_dir + 'fbdata.csv'
     df = pd.read_csv(infile)

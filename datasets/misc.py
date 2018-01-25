@@ -5,13 +5,17 @@ from scipy.io import loadmat
 
 import py_tools.time_series as ts
 
+from . import defaults
+default_dir = defaults.base_dir()
+
 def load(dataset, master_dirs={}, **kwargs):
     """Load data from one-off file"""
 
     dirs = master_dirs.copy()
     if 'base' not in dirs:
-        home_dir = os.environ['HOME']
-        dirs['base'] = home_dir + '/Dropbox/data/'
+        dirs['base'] = default_dir
+        # home_dir = os.environ['HOME']
+        # dirs['base'] = home_dir + '/Dropbox/data/'
 
     data_dir = dirs['base'] + 'misc/'
 

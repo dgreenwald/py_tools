@@ -1,8 +1,10 @@
 import pandas as pd
 
-data_dir = '/home/dan/data/irs/'
+from . import defaults
+default_dir = defaults.base_dir() + 'irs/'
+# data_dir = '/home/dan/data/irs/'
 
-def load(year, **kwargs):
+def load(year, data_dir=default_dir, **kwargs):
 
     if year >= 2009:
 

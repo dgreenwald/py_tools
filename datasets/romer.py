@@ -1,9 +1,12 @@
 import pandas as pd
 from py_tools.time_series import date_index
 
-def load():
+from . import defaults
+default_dir = defaults.base_dir() + 'ahs/'
 
-    data_dir = '/home/dan/Dropbox/data/romer/'
+def load(data_dir=default_dir):
+
+    # data_dir = '/home/dan/Dropbox/data/romer/'
 
     df = pd.read_excel(
         data_dir + 'romer_romer_original.xls',

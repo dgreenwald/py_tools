@@ -1,11 +1,10 @@
 import pandas as pd
 from py_tools import time_series as ts
+
 import os
+default_dir = os.environ['PY_TOOLS_DATA_DIR'] + 'cfpb/'
 
-data_dir = '/home/dan/Dropbox/data/cfpb/'
-raw_dir = '/data/cfpb/'
-
-def process_data():
+def process_data(raw_dir='/data/cfpb', data_dir=default_dir):
 
     df = pd.read_csv(raw_dir + 'mortgage_complaints.csv')
 
@@ -27,7 +26,7 @@ def process_data():
 
     return None
 
-def load(reimport=False):
+def load(reimport=False, data_dir=default_dir):
 
     pkl_file = data_dir + 'mortgage_complaints.pkl'
 

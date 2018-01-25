@@ -8,13 +8,15 @@ import py_tools.utilities as ut
 
 from py_tools.datasets import fred, nipa, origins
 
-dirs = {}
-dirs['home'] = os.environ['HOME']
-dirs['drop'] = dirs['home'] + '/Dropbox/'
-dirs['base'] = dirs['drop'] + 'data/'
-dirs['pkl'] = dirs['base'] + 'pkl/'
+from . import defaults
 
-def load(dataset_list, reimport=False, no_prefix=True, **kwargs):
+def load(dataset_list, reimport=False, no_prefix=True, master_dirs={}, **kwargs):
+
+    dirs = master_dirs.copy()
+    if 'base' not in dirs:
+        dirs['base'] = defaults.base_dir()
+    if 'pkl' not in dirs:
+        dirs['pkl'] = dirs['base'] + 'pkl/'
 
     df = None
     for dataset in dataset_list:
@@ -42,7 +44,13 @@ def load(dataset_list, reimport=False, no_prefix=True, **kwargs):
 
     return df
 
-def load_dataset(dataset, **kwargs):
+def load_dataset(dataset, master_dirs={}, **kwargs):
+
+    dirs = master_dirs.copy()
+    if 'base' not in dirs:
+        dirs['base'] = defaults.base_dir()
+    if 'pkl' not in dirs:
+        dirs['pkl'] = dirs['base'] + 'pkl/'
 
     if dataset in ['stockw', 'crsp', 'crsp_q', 'cay', 'cay_current', 'cay_source', 'bls_ls',
                    'fernald', 'tb3ms', 'uc']:

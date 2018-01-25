@@ -1,15 +1,10 @@
-import os
 import pandas as pd
-# import urllib.request as ur
-# import zipfile
 
-# from colloc import in_out
+from . import defaults
+default_dir = defaults.base_dir() + 'ahs/'
 
-# data_dir = "/home/dan/data/ahs/"
-raw_data_dir = "/data/ahs/"
-data_dir = "/home/dan/Dropbox/data/ahs/"
-
-def load(year, reimport=False, **kwargs):
+def load(year, reimport=False, raw_dir='/data/ahs/', data_dir=default_dir,
+         **kwargs):
 
     year_str = str(year)
     year_dir = raw_data_dir + year_str + '/'

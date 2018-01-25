@@ -3,6 +3,9 @@ import numpy as np
 import pandas as pd
 import py_tools.time_series as ts
 
+from . import defaults
+default_dir = defaults.base_dir() + 'saez/'
+
 def update_names(df, usecols):
 
     mapping = {
@@ -17,9 +20,9 @@ def update_names(df, usecols):
 
     return df.rename(columns=mapping)[usecols]
 
-data_dir = '/home/dan/Dropbox/data/saez/'
+# data_dir = '/home/dan/Dropbox/data/saez/'
 
-def load(table='shares', reimport=False):
+def load(table='shares', reimport=False, data_dir=default_dir):
 
     pkl_file = table + '.pkl'
 
