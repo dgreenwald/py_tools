@@ -99,7 +99,7 @@ def load(dataset, master_dirs={}, **kwargs):
         df = pd.read_excel(
             infile,
             skiprows=1,
-            sheetname='quarterly',
+            sheet_name='quarterly',
             skip_footer=6,
         )
 
@@ -148,7 +148,7 @@ def load(dataset, master_dirs={}, **kwargs):
         infile = data_dir + 'welch_goyal_2016.xlsx'
         freq_name = kwargs.get('frequency', 'Monthly')
         df = pd.read_excel(
-            infile, sheetname=freq_name,
+            infile, sheet_name=freq_name,
         )
 
         freq_code = freq_name[0] + 'S'

@@ -47,7 +47,7 @@ def load(table='shares', reimport=False, data_dir=default_dir):
                 full_table = 'Table ' + table
                 prefix = 'share_{}_cg_'.format(label)
                 df_list.append(pd.read_excel(
-                    xls_file, sheetname=full_table, skiprows=5,
+                    xls_file, sheet_name=full_table, skiprows=5,
                     skip_footer=4, header=None,
                     names=[prefix + name for name in base_names],
                 ))
@@ -76,7 +76,7 @@ def load(table='shares', reimport=False, data_dir=default_dir):
                 ] 
 
             df = pd.read_excel(
-                xls_file, sheetname='Table A7', skiprows=6,
+                xls_file, sheet_name='Table A7', skiprows=6,
                 skip_footer=6, header=None,
                 names=names,
             )
@@ -108,7 +108,7 @@ def load(table='shares', reimport=False, data_dir=default_dir):
             # names = ['year'] + usecols + ['blank_{}'.format(ii) for ii in range(6)]
 
             df = pd.read_excel(
-                xls_file, sheetname='TableA1', skiprows=9, header=None,
+                xls_file, sheet_name='TableA1', skiprows=9, header=None,
                 skipfooter=9, 
                 # names=names, 
             )
@@ -137,7 +137,7 @@ def load(table='shares', reimport=False, data_dir=default_dir):
                 usecols = ['year'] + ['{0}_{1}'.format(asset, pct) for pct in pcts]
 
                 df_list[ii] = pd.read_excel(
-                    xls_file, sheetname=table, skiprows=8, header=None,
+                    xls_file, sheet_name=table, skiprows=8, header=None,
                      skipfooter=4, 
                 )
 

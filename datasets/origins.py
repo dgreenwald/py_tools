@@ -154,7 +154,7 @@ def load(dataset, master_dirs={}, **kwargs):
 
         df = pd.read_excel(
             data_dir + 'source_{0}_{1}_rats.xlsx'.format(cay_source_vintage[:2], cay_source_vintage[2:]),
-            sheetname='Sheet1',
+            sheet_name='Sheet1',
         )
 
         df = ts.date_index(df, '1/1/1947')
@@ -179,7 +179,7 @@ def load(dataset, master_dirs={}, **kwargs):
 
         df = pd.read_excel(
             dirs['gll'] + 'quarterly_tfp.xls',
-            sheetname='quarterly',
+            sheet_name='quarterly',
             skiprows=1,
         )
 
@@ -211,7 +211,7 @@ def load(dataset, master_dirs={}, **kwargs):
 
         # df_m = pd.read_excel(
             # dirs['gll_pred'] + 'macro_uncertainty.xlsx',
-            # sheetname='data',
+            # sheet_name='data',
             # usecols=usecols,
         # )
 
@@ -221,7 +221,7 @@ def load(dataset, master_dirs={}, **kwargs):
 
         df_m = pd.read_excel(
             dirs['gll_pred'] + 'ut_cons.xls',
-            # sheetname='All',
+            # sheet_name='All',
             # skiprows=1,
             names=(['Dates'] + usecols),
             # usecols=usecols,

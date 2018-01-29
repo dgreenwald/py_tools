@@ -16,16 +16,18 @@ def two_axis(df_in, var1, var2, filepath=None, label1=None, label2=None,
              loc1='upper left', loc2='upper right', legend_font=10,
              label_font=12, normalize=False, color1='#1f77b4',
              color2='#ff7f0e', flip1=False, flip2=False, markevery=4,
-             legend=True, print_legend_axis=True):
+             legend=True, print_legend_axis=True, label_dict={}):
 
     matplotlib.rcParams.update({'font.size' : label_font})
     df = df_in[[var1, var2]].dropna()
 
     fig, ax1 = plt.subplots()
 
+    label1 = label_dict.get(var1, None)
     if label1 is None:
         label1 = var1
 
+    label2 = label_dict.get(var2, None)
     if label2 is None:
         label2 = var2
 

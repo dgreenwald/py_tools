@@ -21,7 +21,7 @@ def load(dataset, master_dirs={}):
         infile = data_dir + 'technology/Technology_data.xlsx'
         df = pd.read_excel(
             infile,
-            sheetname='techdat',
+            sheet_name='techdat',
         )
 
         df = date_index(df, '1947-01-01', freq='QS')
