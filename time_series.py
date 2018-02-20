@@ -567,7 +567,10 @@ def detrend_hamilton(df_full, varlist, p=4, h=8):
 
 def detrend_time(df_full, varlist):
     """Remove a linear time trend from the variables in var_list.  
-    Returns a dataframe including detrended variables with suffix '_detrend'
+
+    Returns (df_full, varlist_detrend), where df_full is a dataframe including
+    detrended variables with suffix '_detrend', and varlist_detrend is the list
+    of detrended variables.
     """
 
     for var in varlist:

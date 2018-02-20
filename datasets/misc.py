@@ -46,6 +46,23 @@ def load(dataset, master_dirs={}, **kwargs):
         df['value'] = df['structures'] + df['land']
 
         ts.date_index(df, '1990/1/1', freq='QS')
+        
+    elif dataset == 'canada_inflation_expectations':
+        
+        infile = data_dir + 'canada_inflation_expectations.csv'
+        names = ['date', 'date2', 'prior_year_infl', 'current_infl', '1y_infl',
+                 '2y_infl', '3y_infl', '4y_infl', '5y_infl', '6y_infl']
+        
+        df = pd.read_csv(infile, skiprows=1, names=names)
+        
+        df['date'] = pd.to_datetime(df['date'])
+        
+        df = df.set_index('date').drop(['date2'], axis=1)
+        
+        for var in df.columns:
+            df[var] = pd.to_numeric(df[var], errors='coerce')
+        
+        return df
 
     elif dataset == 'canada_rates':
 

@@ -23,13 +23,11 @@ def two_axis(df_in, var1, var2, filepath=None, label1=None, label2=None,
 
     fig, ax1 = plt.subplots()
 
-    label1 = label_dict.get(var1, None)
     if label1 is None:
-        label1 = var1
+        label1 = label_dict.get(var1, var1)
 
-    label2 = label_dict.get(var2, None)
     if label2 is None:
-        label2 = var2
+        label2 = label_dict.get(var2, var2)
 
     leglabel1 = label1
     leglabel2 = label2
