@@ -92,7 +92,7 @@ def estimate(df_in, y_var, shock_var, control_vars=[], fe_vars=[],
         formula = get_formula(jj, y_var, shock_var, control_vars, fe_vars,
                               shock_lags, y_lags, control_lags)
 
-        fr_list.append(formula_regression(df, formula, nw_lags=jj))
+        fr_list.append(dt.formula_regression(df, formula, nw_lags=jj))
 
     for jj in range(periods):
 
