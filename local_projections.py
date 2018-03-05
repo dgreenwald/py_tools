@@ -68,6 +68,17 @@ def get_formula(horizon, y_var, shock_var, control_vars, fe_vars, shock_lags,
 
 def estimate(df_in, y_var, shock_var, control_vars=[], fe_vars=[],
              shock_lags=2, y_lags=1, periods=20, control_lags={})
+    """
+    df_in: pandas dataframe
+    y_var: LHS variable
+    shock_var: shock of interest
+    control_vars: list of linear control variable names
+    fe_vars: fixed effect variables
+    shock_lags: how many lags of the shock to include (beyond shock_t)
+    y_lags: how many lags of the LHS to include (1 means y_{t-1} only)
+    periods: maximum horizon
+    control_lags: dict containing number of lags for each linear control
+    """
 
     # Copy relevant dataframe columns
     all_vars = list(set([y_var] + [shock_var] + control_vars + fe_vars))
