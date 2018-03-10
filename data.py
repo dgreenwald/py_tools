@@ -146,8 +146,7 @@ def regression(df_in, lhs, rhs, intercept=True, formula_extra=None, ix=None,
     
     return fr
 
-def formula_regression(df, formula, var_list=None, match='inner', ix=None, 
-                       nw_lags=0, display=False, trend=None):
+def formula_regression(df, formula, ix=None, nw_lags=0, display=False):
 
     # if var_list is not None:
         # ix, Xs, zs = match_sample(df[var_list].values, how=match, ix=ix)
