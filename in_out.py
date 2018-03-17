@@ -35,14 +35,12 @@ def save_eigen(vals, filename, dtype='float64'):
     return None
 
 def save_pickle(obj, filename):
-    fullname = '/home/dan/research/frm/save/' + filename + '.pkl'
-    with open(fullname, 'wb') as fid:
+    with open(filename, 'wb') as fid:
         pickle.dump(obj, fid)
     return None
 
 def load_pickle(obj, filename):
-    fullname = '/home/dan/research/frm/save/' + filename + '.pkl'
-    with open(fullname, 'rb') as fid:
+    with open(filename, 'wb') as fid:
         pickle.load(obj, fid)
     return None
 
