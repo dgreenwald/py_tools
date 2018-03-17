@@ -9,16 +9,16 @@ Created on Fri Mar 16 20:26:03 2018
 ##Code for merging compustat with fincov stuff
 
 
-import matplotlib.pyplot as plt
+# import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import os
 from time import time
-import statsmodels.api as sm
-import statsmodels.formula.api as smf
-from py_tools import local_projections as lp
-from py_tools import data as dt
-from py_tools.datasets import misc
+# import statsmodels.api as sm
+# import statsmodels.formula.api as smf
+# from py_tools import local_projections as lp
+# from py_tools import data as dt
+# from py_tools.datasets import misc
 
 
 
@@ -34,7 +34,7 @@ from py_tools.datasets import misc
 
 
 # Name of data directory
-data_dir = '/Users/MaryGong/Dropbox (MIT)/firm_credit/'
+# data_dir = '/Users/MaryGong/Dropbox (MIT)/firm_credit/'
 #data_dir = '/home/dan/Dropbox/firm_credit/'
 #data_dir = '/nobackup1/dlg/firm_credit/'
 
