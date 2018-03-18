@@ -50,7 +50,7 @@ def get_formula(horizon, y_var, shock_var, control_vars, fe_vars, shock_lags,
     ############################################################################
 
     if horizon > 0:
-        formula = 'F{0}_{1} ~'.format(y_var, horizon)
+        formula = 'F{1}_{0} ~'.format(y_var, horizon)
     else:
         formula = '{0} ~'.format(y_var)
 
@@ -103,7 +103,7 @@ def estimate(df_in, y_var, shock_var, control_vars,groupvars, sortvars, timevar,
                               shock_lags, y_lags, control_lags)
 
         fr_list.append(dt.formula_regression(df, formula, nw_lags=jj))
-
+        print(jj)
     for jj in range(periods):
 
         x[jj] = fr_list[jj].results.params[1]
