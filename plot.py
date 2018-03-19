@@ -2,6 +2,7 @@ import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from scipy.stats import norm
 
 # from py_tools.data import clean
 import py_tools.data as dt
@@ -358,6 +359,67 @@ def plot_series(df_in, var_names, directory='', filename=None, labels={},
         plt.show()
 
     plt.close(fig)
+
+def projection(x, se, var_titles, shock_title, p=0.9, n_per_row=4, plot_size=3.0,
+               out_dir=None, label=None, shock_name=None): 
+    """Plot impulse responses from a local projection estimation.
+
+    x: Ny x Nt vector of coefficients (one per LHS variable)
+    se: Ny x Nt vector of standard errors (one per LHS variable)
+    var_titles: Ny x 1 list of names of LHS variables (one per LHS variable)
+    shock_title: name of shock
+    p: probability span of confidence bands (i.e., 0.9 = 90%)
+    n_per_row: number of plots per row
+    plot_size: inches per side of each plot
+    out_dir: directory to save plots in (will display to screen if not provided)
+    label: additional title to put in plot name
+    shock_name: optional shorter name for file
+    """
+
+    Ny, Nt = x.shape
+    n_rows = (Ny - 1) // n_per_row + 1 # number of rows needed
+
+    # Get z-score for p-value
+    z_star = -norm.ppf(0.5 * (1.0 - p))
+
+    # Plot
+    fig = plt.figure()
+    for iy in range(Ny):
+
+        plt.subplot(n_rows, n_per_row, iy + 1)
+
+        plt.plot(np.arange(Nt), np.zeros(x[iy, :].shape), linestyle=':', color='gray') 
+        plt.plot(np.arange(Nt), x[iy, :], linestyle='-', color='blue') 
+        plt.plot(np.arange(Nt), x[iy, :] + z_star * se[iy, :], linestyle='--', color='black') 
+        plt.plot(np.arange(Nt), x[iy, :] - z_star * se[iy, :], linestyle='--', color='black')
+
+        plt.title('{0} to {1}'.format(var_titles[iy], shock_title))
+
+        plt.xlim((0, Nt - 1))
+        plt.xlabel('Quarters')
+
+    fig.set_size_inches((plot_size * n_per_row, plot_size * n_rows))
+    plt.tight_layout()
+
+    if out_dir is None:
+
+        plt.show()
+
+    else:
+
+        if label is None:
+            prefix = ''
+        else:
+            prefix = label + '_'
+
+        if shock_name is None:
+            shock_name = shock_title
+
+        plt.savefig('{0}/{1}{2}_projections.pdf'.format(out_dir, prefix, shock_name))
+
+    plt.close(fig)
+
+    return None
 
 # From TomAugsburger
 

@@ -1,3 +1,4 @@
+import numpy as np
 from . import data as dt
 
 def lag_var(df, var, lag):
@@ -67,7 +68,7 @@ def get_formula(horizon, y_var, shock_var, control_vars, fe_vars, shock_lags,
     return formula
 
 def estimate(df_in, y_var, shock_var, control_vars=[], fe_vars=[],
-             shock_lags=2, y_lags=1, periods=20, control_lags={})
+             shock_lags=2, y_lags=1, periods=20, control_lags={}):
     """
     df_in: pandas dataframe
     y_var: LHS variable
