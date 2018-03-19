@@ -260,7 +260,7 @@ def MA(df, lhs_var, rhs_vars, init_lag=1, default_lags=16,
     ix, _, _ = dt.match_xy(df[rhs_vars].values, df[lhs_var].values)
 
     # Run dt.regression
-    return dt.regression(df, lhs, rhs, match='custom', ix=ix, **kwargs)
+    return dt.regression(df, lhs, rhs, ix=ix, **kwargs)
 
 def VAR(df_in, var_list, n_var_lags=1, use_const=True):
     """Estimate VAR using OLS"""
