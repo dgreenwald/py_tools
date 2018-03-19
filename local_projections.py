@@ -1,12 +1,13 @@
+from py_tools import data as dt
 import numpy as np
-from . import data as dt
+
 
 def lag_var(df, var, lag):
 
     if lag > 0:
-        df['L{0}_{1}'.format(lag, y_var)] = df[var].shift(lag)
+        df['L{0}_{1}'.format(lag, var)] = df[var].shift(lag)
     elif lag < 0:
-        df['F{0}_{1}'.format(-lag, y_var)] = df[var].shift(lag)
+        df['F{0}_{1}'.format(-lag, var)] = df[var].shift(lag)
     else:
         raise Exception
 
@@ -30,7 +31,7 @@ def formula_lags(var, max_lags):
 
     formula = ''
     for lag in range(1, max_lags + 1):
-        formula += ' L{0}_{1}'.format(lag, var)
+        formula += '+ L{0}_{1}'.format(lag, var)
 
     return formula
 
@@ -67,8 +68,7 @@ def get_formula(horizon, y_var, shock_var, control_vars, fe_vars, shock_lags,
 
     return formula
 
-def estimate(df_in, y_var, shock_var, control_vars=[], fe_vars=[],
-             shock_lags=2, y_lags=1, periods=20, control_lags={}):
+def estimate(df_in, y_var, shock_var, control_vars=[], fe_vars=[], shock_lags=2, y_lags=1, periods=20, control_lags={}):
     """
     df_in: pandas dataframe
     y_var: LHS variable
@@ -111,4 +111,4 @@ def estimate(df_in, y_var, shock_var, control_vars=[], fe_vars=[],
         x[jj] = fr_list[jj].results.params[1]
         se[jj] = fr_list[jj].results.HC0_se[1]
         
-    return x, se, fr_list
+    return 
