@@ -7,11 +7,11 @@ from scipy.io import loadmat
 import py_tools.time_series as ts
 
 from . import defaults
-default_dir = defaults.base_dir()
+default_dir = defaults.base_dir('DAN')
 
-def load(dataset, master_dirs={}, **kwargs):
+def load(dataset, user='DAN', master_dirs={}, **kwargs):
     """Load data from one-off file"""
-
+    default_dir = defaults.base_dir(user)
     dirs = master_dirs.copy()
     if 'base' not in dirs:
         dirs['base'] = default_dir

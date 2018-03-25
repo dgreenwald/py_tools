@@ -5,7 +5,7 @@ import pandas_datareader.data as web
 import pickle
 
 from . import defaults
-default_dir = defaults.base_dir() + 'fred/'
+default_dir = defaults.base_dir('DAN') + 'fred/'
 # data_dir = '/home/dan/Dropbox/data/fred/'
 
 def load(codes=None, code_names={}, 

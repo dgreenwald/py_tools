@@ -34,7 +34,7 @@ from py_tools.datasets import misc
 
 
 # Name of data directory
-data_dir = '/Users/MaryGong/Dropbox (MIT)/firm_credit/'
+#data_dir = '/Users/MaryGong/Dropbox (MIT)/firm_credit/'
 #data_dir = '/home/dan/Dropbox/firm_credit/'
 #data_dir = '/nobackup1/dlg/firm_credit/'
 
@@ -136,18 +136,28 @@ def merge_compustat(keep_cols, annualize_vars, file, data_dir, companies, ds_lin
         return
         #convert to date-time
     
+
     if datetime==1:
         compustat['datadate'] = pd.to_datetime(compustat['datadate'].astype(np.int64), unit='D', origin=pd.Timestamp('1960-01-01'))
     
+
     group=compustat.groupby(['gvkey','indfmt', 'datafmt', 'consol' ])
     
+    #LAG ALL VARIABLES JUST IN CASE I NEED THEM LATER
+
     
+
     compustat = clean(compustat)
     #Create lagged and annualized variables, and relevant ratios
     if file=='quarterly':
-        compustat['ones']=1
-        if 'dlcq' in keep_cols:
-            compustat['dlcq1'] = group['dlcq'].shift(1)
+        qvars=['oibdpq', 'xintq', 'dlcq', 'dlttq', 'atq','intanq', 'ltq', 
+               'actq','lctq', 'rectq', 'cheq', 'saleq', 'revtq', 'xoprq', 
+               'ivstq', 'ivltq' ]
+        
+        for var in qvars:
+            if var in keep_cols:
+                compustat[var+'1']=group[var].shift(1)
+
         if 'oibdpq' in keep_cols:
             compustat['oibdpq']=compustat['oibdpq']*1000000
         annualize(annualize_vars, compustat, group)
@@ -262,7 +272,7 @@ def clean_companies(covenants, data):
     return(finalcompanies_comp_ds)
 
 
-def final_merge(data_dir, datetime, avars, qvars, annualizevars, interp_list):
+def final_merge(data_dir, datetime, avars, qvars, annualizevars, interp_list, changevars):
     
     # Read in file
     print("Loading dealscan data...")
@@ -395,6 +405,7 @@ def final_merge(data_dir, datetime, avars, qvars, annualizevars, interp_list):
     keep_cols_q=qvars
     annualize_variables=annualizevars
     comp_ds_q=merge_compustat(keep_cols_q,annualize_variables, 'quarterly' , data_dir, companies, ds_linked, covenant_list, datetime)
+    print("finished loading quarterly")
     comp_ds_q = comp_ds_q.groupby(['gvkey','indfmt', 'datafmt', 'consol']).apply(lambda x: x.set_index('datadate').resample('Q',convention='end').mean())
 
     comp_ds_q['gvkey']=comp_ds_q.index.get_level_values(0)
@@ -407,8 +418,9 @@ def final_merge(data_dir, datetime, avars, qvars, annualizevars, interp_list):
     comp_ds_q=comp_ds_q.sort_values(by=['gvkey', 'datadate'])    
     
     keep_cols_a=avars
-    comp_ds_a=merge_compustat(keep_cols_a,annualize_variables, 'annual' , data_dir, companies, ds_linked, covenant_list, datetime)
     
+    comp_ds_a=merge_compustat(keep_cols_a,annualize_variables, 'annual' , data_dir, companies, ds_linked, covenant_list, datetime)
+    print("finished loading annual")
     comp_ds_a = comp_ds_a.groupby(['gvkey','indfmt', 'datafmt', 'consol']).apply(lambda x: x.set_index('datadate').resample('Q',convention='end').mean())
 
     comp_ds_a['gvkey']=comp_ds_a.index.get_level_values(0)
@@ -454,6 +466,7 @@ def final_merge(data_dir, datetime, avars, qvars, annualizevars, interp_list):
 
     #Merge quarterly and annual datasets
     comp_ds_q=pd.merge(comp_ds_q, comp_ds_a,how='outer', on=['gvkey', 'datadate', 'indfmt', 'datafmt', 'consol'])
+    comp_ds_q['ones']=1
     
     #Create relevant ratios for financial covenants
     ratio(comp_ds_q, comp_ds_q['dlttq']+comp_ds_q['dlcq'], comp_ds_q['oibdpq'], 'Max. Debt to EBITDA_compustat')
@@ -472,7 +485,7 @@ def final_merge(data_dir, datetime, avars, qvars, annualizevars, interp_list):
     ratio(comp_ds_q, comp_ds_q['dlttq']+comp_ds_q['dlcq'], comp_ds_q['oibdpq'], 'Max. Senior Debt to EBITDA_compustat')
     ratio(comp_ds_q, comp_ds_q['dlttq']+comp_ds_q['dlcq']-comp_ds_q['ds_ann'], comp_ds_q['atq'], 'Max. Senior Leverage_compustat')
 
- 
+    comp_ds_q['totdebtq']=comp_ds_q['dlttq']+comp_ds_q['dlcq']
     #### make dataset of percentage of violations for each covenant
     covenants_q=['Min. Current Ratio', 'Min. Interest Coverage', 'Max. Debt to EBITDA', 
            'Max. Senior Debt to EBITDA', 'Min. Fixed Charge Coverage',
@@ -483,7 +496,21 @@ def final_merge(data_dir, datetime, avars, qvars, annualizevars, interp_list):
     
 
     
+    #Define other interesting LHS variables
+    group=comp_ds_q.groupby(['gvkey','indfmt', 'datafmt', 'consol'])
+    
+
+    for var in changevars:
+        comp_ds_q['change'+var]=group[var].shift(0)-group[var].shift(1)
+    
+
+    
+    
+    
+    
+    
+    
     final_comp_ds_q=clean_companies(covenants_q, comp_ds_q)
  
 
-    return (final_comp_ds_q)
+    return (final_comp_ds_q, comp_ds_q)
