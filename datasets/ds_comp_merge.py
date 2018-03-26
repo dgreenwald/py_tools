@@ -8,7 +8,7 @@ Created on Fri Mar 16 20:26:03 2018
 
 ##Code for merging compustat with fincov stuff
 
-
+import ipdb
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -68,7 +68,7 @@ def keep_ds_companies_only(df, companies, keep_cols):
     df = clean(df)
     cols = pd.Index.intersection(df.columns, keep_cols)
     ix = df['gvkey'].isin(companies)
-    return df.loc[ix, cols]
+    return df.loc[ix, cols].copy()
     
 def read_ds_companies_only(file, companies, keep_cols, filetype,chunksize=10000):
     
@@ -120,24 +120,38 @@ def annualize(varlist, file, group):
     return 
 
 
-def merge_compustat(keep_cols, annualize_vars, file, data_dir, companies, ds_linked, covenant_list, datetime):
+def merge_compustat(keep_cols, annualize_vars, file, data_dir, companies, ds_linked, covenant_list, datetime, reload_compustat=False):
     chunksize = 10000
     print("Loading compustat data, {} observations at a time...".format(chunksize))
     start = time()
     #Load the relevant datasets
     if file=='quarterly':
-        compustat = read_ds_companies_only(data_dir+'compustat/co_ifndq.csv',companies, keep_cols, 'csv', chunksize)
+        feather_file = data_dir + 'compustat/comp_ds_companies_q.feather'
+        if reload_compustat or not os.path.exists(feather_file):
+            compustat = read_ds_companies_only(data_dir+'compustat/co_ifndq.csv',companies, keep_cols, 'csv', chunksize)
+
+            compustat.reset_index(inplace=True)
+            compustat.to_feather(feather_file)
+        else:
+            compustat = pd.read_feather(feather_file)
     elif file=='annual':
-        compustat1 = read_ds_companies_only(data_dir+'compustat/co_afnd1.sas7bdat',companies, keep_cols,'sas', chunksize)
-        compustat2 = read_ds_companies_only(data_dir+'compustat/co_afnd2.sas7bdat',companies, keep_cols,'sas', chunksize)
-        compustat =pd.merge(compustat1, compustat2, how='outer', on=['gvkey', 'datadate', 'indfmt', 'datafmt', 'consol'])
+        feather_file = data_dir + 'compustat/comp_ds_companies_a.feather'
+        if reload_compustat or not os.path.exists(feather_file):
+            compustat1 = read_ds_companies_only(data_dir+'compustat/co_afnd1.sas7bdat',companies, keep_cols,'sas', chunksize)
+            compustat2 = read_ds_companies_only(data_dir+'compustat/co_afnd2.sas7bdat',companies, keep_cols,'sas', chunksize)
+            compustat =pd.merge(compustat1, compustat2, how='outer', on=['gvkey', 'datadate', 'indfmt', 'datafmt', 'consol'])
+
+            compustat.reset_index(inplace=True)
+            compustat.to_feather(feather_file)
+        else:
+            compustat = pd.read_feather(feather_file)
     else:
         print('error')
         return
         #convert to date-time
     
 
-    if datetime==1:
+    if datetime==1 and not isinstance(compustat['datadate'].iloc[0], pd.Timestamp):
         compustat['datadate'] = pd.to_datetime(compustat['datadate'].astype(np.int64), unit='D', origin=pd.Timestamp('1960-01-01'))
     
 
