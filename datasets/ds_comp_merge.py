@@ -8,7 +8,6 @@ Created on Fri Mar 16 20:26:03 2018
 
 ##Code for merging compustat with fincov stuff
 
-import ipdb
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -120,7 +119,8 @@ def annualize(varlist, file, group):
     return 
 
 
-def merge_compustat(keep_cols, annualize_vars, file, data_dir, companies, ds_linked, covenant_list, datetime, reload_compustat=False):
+def merge_compustat(keep_cols, annualize_vars, file, data_dir, companies, 
+                    ds_linked, covenant_list, datetime, reload_compustat=False):
     chunksize = 10000
     print("Loading compustat data, {} observations at a time...".format(chunksize))
     start = time()
@@ -286,7 +286,7 @@ def clean_companies(covenants, data):
     return(finalcompanies_comp_ds)
 
 
-def final_merge(data_dir, datetime, avars, qvars, annualizevars, interp_list, changevars):
+def final_merge(data_dir, datetime, avars, qvars, annualizevars, interp_list, changevars, reload_compustat=False):
     
     # Read in file
     print("Loading dealscan data...")
@@ -418,7 +418,10 @@ def final_merge(data_dir, datetime, avars, qvars, annualizevars, interp_list, ch
     ################################################################################
     keep_cols_q=qvars
     annualize_variables=annualizevars
-    comp_ds_q=merge_compustat(keep_cols_q,annualize_variables, 'quarterly' , data_dir, companies, ds_linked, covenant_list, datetime)
+    comp_ds_q=merge_compustat(
+            keep_cols_q,annualize_variables, 'quarterly' , data_dir, companies, 
+            ds_linked, covenant_list, datetime, reload_compustat=reload_compustat,
+            )
     print("finished loading quarterly")
     comp_ds_q = comp_ds_q.groupby(['gvkey','indfmt', 'datafmt', 'consol']).apply(lambda x: x.set_index('datadate').resample('Q',convention='end').mean())
 
@@ -433,7 +436,10 @@ def final_merge(data_dir, datetime, avars, qvars, annualizevars, interp_list, ch
     
     keep_cols_a=avars
     
-    comp_ds_a=merge_compustat(keep_cols_a,annualize_variables, 'annual' , data_dir, companies, ds_linked, covenant_list, datetime)
+    comp_ds_a=merge_compustat(
+            keep_cols_a,annualize_variables, 'annual' , data_dir, companies, 
+            ds_linked, covenant_list, datetime, reload_compustat=reload_compustat,
+            )
     print("finished loading annual")
     comp_ds_a = comp_ds_a.groupby(['gvkey','indfmt', 'datafmt', 'consol']).apply(lambda x: x.set_index('datadate').resample('Q',convention='end').mean())
 

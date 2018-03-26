@@ -42,7 +42,10 @@ def formula_lags(var, max_lags):
 
     return formula
 
-def get_formula(horizon, y_var, shock_var, control_vars, fe_vars, shock_lags,
+def var_lags(var, max_lags):
+    return ['L{0}_{1}'.format(lag, var) for lag in range(1, max_lags + 1)]
+
+def get_formula(df, horizon, y_var, shock_var, control_vars, fe_vars, shock_lags,
                 y_lags, control_lags):
 
     ############################################################################
@@ -50,9 +53,12 @@ def get_formula(horizon, y_var, shock_var, control_vars, fe_vars, shock_lags,
     ############################################################################
 
     if horizon > 0:
-        formula = 'F{1}_{0} ~'.format(y_var, horizon)
+        lhs_var = 'F{1}_{0}'.format(y_var, horizon)
     else:
-        formula = '{0} ~'.format(y_var)
+        lhs_var = y_var
+        
+    formula = lhs_var + ' ~ '
+    var_list = [lhs_var]
 
     ############################################################################
     # RHS
@@ -60,22 +66,32 @@ def get_formula(horizon, y_var, shock_var, control_vars, fe_vars, shock_lags,
 
     # shocks
     formula += ' ' + shock_var
+    var_list += [shock_var]
+    
     formula += formula_lags(shock_var, shock_lags)
+    var_list += var_lags(shock_var, shock_lags)
 
     # y_var
     formula += formula_lags(y_var, y_lags)
+    var_list += var_lags(y_var, y_lags)
 
     # controls
     for var in control_vars:
         max_lags = control_lags.get(var, 1)
         formula += formula_lags(var, max_lags)
+        var_list += var_lags(var, max_lags)
 
     for var in fe_vars:
-        formula += ' C({0})'.format(var)
+        formula += '+ C({0})'.format(var)
+    var_list += fe_vars
 
-    return formula   
+#    print(formula)
 
-def estimate(df_in, y_var, shock_var, control_vars,groupvars, sortvars, timevar, fe_vars=[], shock_lags=2, y_lags=1,periods=20, control_lags={}):
+    return formula, var_list 
+
+def estimate(df_in, y_var, shock_var, control_vars,groupvars, sortvars,
+             timevar, fe_vars=[], shock_lags=2, y_lags=1,periods=20,
+             control_lags={}):
     
     #copy in relevant variables 
     df={}
@@ -99,10 +115,12 @@ def estimate(df_in, y_var, shock_var, control_vars,groupvars, sortvars, timevar,
     
     for jj in range(periods):
 
-        formula = get_formula(jj, y_var, shock_var, control_vars, fe_vars,
+        formula, formula_var_list = get_formula(df, jj, y_var, shock_var, control_vars, fe_vars,
                               shock_lags, y_lags, control_lags)
 
-        fr_list.append(dt.formula_regression(df, formula, nw_lags=jj))
+        ix = np.all(np.isfinite(df[formula_var_list]), axis=1)
+        fr_list.append(dt.formula_regression(df, formula, nw_lags=jj, ix=ix))
+        
     for jj in range(periods):
 
         x[jj] = fr_list[jj].results.params[1]
