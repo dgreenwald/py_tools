@@ -372,6 +372,11 @@ def demean(df, var_list, group_list, prefix=None):
     else:
         full_prefix = prefix + '_'
 
+    # Precautionarily drop means
+    for var in var_list:
+        if 'MEAN_' + var in df:
+            df = df.drop(['MEAN_' + var], axis=1)
+
     df_mean = df.groupby(group_list)[var_list].mean()
     df_mean = df_mean.rename(columns={var : 'MEAN_' + var for var in var_list})
     df = pd.merge(df, df_mean, left_on=group_list, right_index=True)
