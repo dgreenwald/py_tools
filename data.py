@@ -362,3 +362,23 @@ def to_pickle(x, path):
 def read_pickle(path):
 
     return pickle.load(open(path, "rb"))
+
+def demean(df, var_list, group_list, prefix=None):
+    """Set prefix to None to overwrite existing variables with demeaned
+    versions, otherwise demeaned versions will have specified prefix"""
+
+    if prefix is None:
+        full_prefix = ''
+    else:
+        full_prefix = prefix + '_'
+
+    df_mean = df.groupby(group_list)[var_list].mean()
+    df_mean = df_mean.rename(columns={var : 'MEAN_' + var for var in var_list})
+    df = pd.merge(df, df_mean, left_on=group_list, right_index=True)
+
+    for var in var_list:
+        df[full_prefix + var] = df[var] - df['MEAN_' + var]
+
+    df = df.drop(['MEAN_' + var for var in var_list], axis=1)
+        
+    return df
