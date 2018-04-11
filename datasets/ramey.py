@@ -26,4 +26,14 @@ def load(dataset, master_dirs={}):
 
         df = date_index(df, '1947-01-01', freq='QS')
 
+    elif dataset == 'monetary':
+
+        infile = data_dir + 'monetary/Monetarydat.xlsx'
+        df = pd.read_excel(
+            infile,
+            sheet_name='Monthly',
+        )
+
+        df = date_index(df, '1959-01-01', freq='MS')
+
     return df

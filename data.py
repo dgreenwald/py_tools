@@ -105,13 +105,15 @@ def match_xy(X, z, how='inner', ix=None):
     return (ix, Xs, zs)
 
 
-def regression(df_in, lhs, rhs, intercept=True, formula_extra=None, ix=None, 
+def regression(df_in, lhs, rhs, fes=[], intercept=True, formula_extra=None, ix=None, 
                trend=None, **kwargs):
     """Run regression from pandas dataframe"""
 
     formula = '{0} ~ {1}'.format(lhs, ' + '.join(rhs))
+    if fes:
+        formula += ' + '.join([''] + ['C({})'.format(fe) for fe in fes])
 
-    df = df_in[[lhs] + rhs].copy()
+    df = df_in[[lhs] + rhs + fes].copy()
 
     ix_samp, _ = match_sample(df.values, how='inner')
     if ix is None:
