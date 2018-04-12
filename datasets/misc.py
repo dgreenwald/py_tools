@@ -73,6 +73,18 @@ def load(dataset, user='DAN', master_dirs={}, **kwargs):
                          )
 
         ts.date_index(df, '1980/1/1', freq='MS')
+
+    elif dataset == 'cieslak':
+
+        infile = data_dir + 'factors_CieslakPovala_RFS2015.xlsx'
+        df = pd.read_excel(infile)
+        df = df.drop(['date', 'year', 'month'], axis=1).rename(columns={
+            'trend inflation (tau_cpi)' : 'trend_infl',
+            'real rate factor (cyc1)' : 'real_rate',
+            'term premium factor (cf_hat)' : 'term_premium',
+        })
+        ts.date_index(df, '1971/11/1', freq='MS')
+        return df
     
     elif dataset == 'cleveland_fed':
 
@@ -103,6 +115,14 @@ def load(dataset, user='DAN', master_dirs={}, **kwargs):
         datestr = df['year'].astype(str) + '/' + df['month'].astype(str) + '/1'
         df.set_index(pd.to_datetime(datestr), inplace=True)
         df.drop(['year', 'month'], axis=1, inplace=True)
+
+    elif dataset == 'gsw':
+
+        infile = data_dir + 'gsw_feds200628_downloadAug2017.xlsx'
+        names = ['date'] + ['y{:d}'.format(yr) for yr in range(1, 31)]
+        df = pd.read_excel(infile, skiprows=10, header=None, names=names)
+        df['date'] = pd.to_datetime(df['date'])
+        df = df.set_index('date').sort_index()
 
     elif dataset == 'gz':
 
