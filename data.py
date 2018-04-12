@@ -28,9 +28,9 @@ def winsorize(df_in, var_list, wvar=None, p_val=0.98):
     # else:
         # assert (p_lo is not None) and (p_hi is not None)
 
-    keep_vars = var_list
+    keep_vars = df_in.columns.values
     if wvar is not None:
-        keep_vars += [wvar]
+        keep_vars += wvar
 
     df = df_in[keep_vars].copy()
     for var in var_list:
@@ -105,13 +105,15 @@ def match_xy(X, z, how='inner', ix=None):
     return (ix, Xs, zs)
 
 
-def regression(df_in, lhs, rhs, intercept=True, formula_extra=None, ix=None, 
+def regression(df_in, lhs, rhs, fes=[], intercept=True, formula_extra=None, ix=None, 
                trend=None, **kwargs):
     """Run regression from pandas dataframe"""
 
     formula = '{0} ~ {1}'.format(lhs, ' + '.join(rhs))
+    if fes:
+        formula += ' + '.join([''] + ['C({})'.format(fe) for fe in fes])
 
-    df = df_in[[lhs] + rhs].copy()
+    df = df_in[[lhs] + rhs + fes].copy()
 
     ix_samp, _ = match_sample(df.values, how='inner')
     if ix is None:
@@ -363,7 +365,7 @@ def read_pickle(path):
 
     return pickle.load(open(path, "rb"))
 
-def demean(df, var_list, group_list, prefix=None):
+def demean2(group_list,  var_list,df,  prefix=None):
     """Set prefix to None to overwrite existing variables with demeaned
     versions, otherwise demeaned versions will have specified prefix"""
 

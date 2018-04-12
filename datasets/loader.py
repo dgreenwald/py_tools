@@ -99,6 +99,7 @@ def load_dataset(dataset, master_dirs={}, **kwargs):
                 # 'net_new_equity' : ('u103', 'FU103164103'),
                 # 'net_new_paper' : ('u103', 'FU103169100'),
                 # 'net_new_bonds' : ('u103', 'FU103163003')
+                'gross_investment' : ('f103', 'FA105090005'),
                 'net_dividends' : ('f103', 'FA106121075'),
                 'net_new_equity' : ('f103', 'FA103164103'),
                 'net_new_paper' : ('f103', 'FA103169100'),
