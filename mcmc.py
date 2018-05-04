@@ -113,12 +113,17 @@ class MCMC:
 
         return trans_vals
 
-    def compute_hessian(self, x0=None, **kwargs):
+    def compute_hessian(self, x0=None, first_order=True, **kwargs):
 
         if x0 is None:
             x0 = self.params_hat.copy()
-        self.H = -nm.hessian(self.log_like_args, x0)
-        # self.H_inv = svd_inv(self.H, **kwargs)
+
+        if first_order:
+            grad = nm.gradient(self.log_like_args, x0)
+            self.H = np.dot(grad, grad.T)
+        else:
+            self.H = -nm.hessian(self.log_like_args, x0)
+
         self.H_inv = np.linalg.pinv(self.H)
         self.CH_inv = np.linalg.cholesky(self.H_inv)
 
@@ -180,7 +185,7 @@ class MCMC:
                 if n_recov is not None:
                     if (ii // stride + 1) % n_recov == 0:
                         print("Recomputing covariance")
-                        C = np.cov(self.draws[:(ii // stride) + 1, :], rowvar=False)
+                        C = np.linalg.cholesky(np.cov(self.draws[:(ii // stride) + 1, :], rowvar=False))
 
         self.acc_rate /= Ntot
 
