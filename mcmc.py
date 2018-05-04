@@ -19,18 +19,6 @@ def check_bounds(x, bounds):
 
     return True
 
-def svd_inv(A, sv_tol=1e-8, **kwargs):
-    
-    u, s, vh = np.linalg.svd(A)
-    s_inv = np.zeros(s.shape)
-    
-    ix = np.abs(s) > sv_tol
-    s_inv[ix] = 1.0 / s[ix]
-    
-    S_inv = np.diag(s_inv)
-    A_inv = np.dot(vh.T, np.dot(S_inv, u.T))
-    return A_inv
-
 def save_file(x, out_dir, name, suffix=None):
 
     if out_dir[-1] != '/':
@@ -130,7 +118,8 @@ class MCMC:
         if x0 is None:
             x0 = self.params_hat.copy()
         self.H = -nm.hessian(self.log_like_args, x0)
-        self.H_inv = svd_inv(self.H, **kwargs)
+        # self.H_inv = svd_inv(self.H, **kwargs)
+        self.H_inv = np.linalg.pinv(self.H)
         self.CH_inv = np.linalg.cholesky(self.H_inv)
 
         return None
