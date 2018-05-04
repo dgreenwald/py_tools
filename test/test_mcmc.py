@@ -22,11 +22,16 @@ data = mu + sig * np.random.randn(N)
 mc = MCMC(log_like, args=(data,), bounds_dict=bounds_dict, names=names)
 
 x0 = np.array((0.0, 0.1))
-mc.find_mode(x0)
-mc.compute_hessian()
-mc.sample(10000, jump_scale=2.0)
 
-print(np.mean(mc.acc))
+Nsim = 1000
+mc.run_all(x0, Nsim, out_dir='/home/dan/Downloads',
+           jump_scale=2.0, stride=10)
+#mc.find_mode(x0)
+#mc.compute_hessian()
+#mc.sample(1000, jump_scale=2.0, stride=10)
+#mc.save('/home/dan/Downloads')
+
+print(mc.acc_rate)
 fig = plt.figure()
 plt.hist(mc.draws[:, 0])
 plt.show()

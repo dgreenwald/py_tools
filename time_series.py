@@ -6,7 +6,8 @@ from scipy.linalg import solve_discrete_lyapunov
 from tabulate import tabulate
 
 # from py_tools.debug import disp 
-import py_tools.data as dt
+# import py_tools.data as dt
+import py_tools.data as dt, py_tools.numerical as nm
 # from py_tools.datasets import loader
 # import py_tools.utilities as ut
 
@@ -413,7 +414,7 @@ class LongHorizonVAR:
 
         # OLS
         bet_lh = np.linalg.solve(cov_xx, cov_xy)
-        R2 = quad_form(bet_lh, cov_xx) / var_y
+        R2 = nm.quad_form(bet_lh, cov_xx) / var_y
 
         if display:
             # Print first table
