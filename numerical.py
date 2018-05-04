@@ -63,3 +63,16 @@ def hessian(f, x, eps=1e-4):
             H[ii, jj] = H[jj, ii]
         
     return H / (4.0 * (eps ** 2))
+
+def svd_inv(A, sv_tol=1e-8, **kwargs):
+    
+    u, s, vh = np.linalg.svd(A)
+    s_inv = np.zeros(s.shape)
+    
+    ix = np.abs(s) > sv_tol
+    s_inv[ix] = 1.0 / s[ix]
+    
+    S_inv = np.diag(s_inv)
+    A_inv = np.dot(vh.T, np.dot(S_inv, u.T))
+    return A_inv
+
