@@ -14,7 +14,7 @@ def check_bounds(x, bounds):
         lb, ub = bounds[ii]
         if lb is not None and x[ii] < lb:
             return False
-        if ub is not None and x[ii] > lb:
+        if ub is not None and x[ii] > ub:
             return False
 
     return True
