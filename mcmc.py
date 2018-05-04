@@ -151,13 +151,15 @@ class MCMC:
         else:
             return (x, L, False)
 
-    def sample(self, Nsim, jump_scale=1.0, stride=1, x0=None, **kwargs):
+    def sample(self, Nsim, jump_scale=1.0, stride=1, x0=None, C=None,
+               n_print=None, n_recov=None, **kwargs):
 
         self.Nsim = Nsim
         self.jump_scale = jump_scale
 
         Ntot = Nsim * stride
         self.draws = np.zeros((self.Nsim, self.Npar))
+        self.L_sim = np.zeros(self.Nsim)
         self.acc_rate = 0.0
         
         e = np.random.randn(Ntot, self.Npar)
@@ -170,12 +172,26 @@ class MCMC:
             x = self.params_hat.copy()
             L = self.L_hat
 
+        if C is None:
+            C = self.CH_inv
+
         for ii in range(Ntot):
-            x_try = x + self.jump_scale * np.dot(self.CH_inv, e[ii, :])
+            x_try = x + self.jump_scale * np.dot(C, e[ii, :])
             x, L, acc = self.metropolis_hastings(x, L, x_try, log_u=log_u[ii])
+
             self.acc_rate += acc
-            if ii % stride == 0:
+            if (ii + 1) % stride == 0:
                 self.draws[ii // stride, :] = x
+                self.L_sim[ii // stride] = L
+
+                if n_print is not None:
+                    if (ii // stride + 1) % n_print == 0:
+                        print("Draw {0:d}. Acceptance rate: {1:4.3f}".format((ii + 1) // stride, self.acc_rate / ii))
+
+                if n_recov is not None:
+                    if (ii // stride + 1) % n_recov == 0:
+                        print("Recomputing covariance")
+                        C = np.cov(self.draws[:(ii // stride) + 1, :], rowvar=False)
 
         self.acc_rate /= Ntot
 
@@ -183,7 +199,7 @@ class MCMC:
 
     def save_all(self, out_dir, suffix=None, **kwargs):
 
-        for name in ['params_hat', 'L_hat', 'CH_inv', 'draws', 'acc_rate']:
+        for name in ['params_hat', 'L_hat', 'CH_inv', 'draws', 'L_sim', 'acc_rate']:
             self.save_item(name, out_dir, suffix=suffix)
 
         return None
