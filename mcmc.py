@@ -49,7 +49,7 @@ class MCMC:
     """Class for Markov Chain Monte Carlo sampler"""
 
     def __init__(self, log_like, args=(), bounds=None, names=None,
-                 bounds_dict={}):
+                 bounds_dict={}, out_dir=None, suffix=None):
         """Constructor -- need to finish"""
 
         self.log_like = log_like
@@ -70,6 +70,9 @@ class MCMC:
         self.CH_inv = None
         self.draws = None
         self.acc_rate = None
+
+        self.out_dir = out_dir
+        self.suffix = suffix
 
     def log_like_args(self, params):
 
@@ -113,16 +116,16 @@ class MCMC:
 
         return trans_vals
 
-    def compute_hessian(self, x0=None, first_order=True, **kwargs):
+    def compute_hessian(self, x0=None, **kwargs):
 
         if x0 is None:
             x0 = self.params_hat.copy()
 
-        if first_order:
-            grad = nm.gradient(self.log_like_args, x0)
-            self.H = np.dot(grad, grad.T)
-        else:
-            self.H = -nm.hessian(self.log_like_args, x0)
+        # if first_order:
+            # grad = nm.gradient(self.log_like_args, x0)
+            # self.H = np.dot(grad, grad.T)
+        # else:
+        self.H = -nm.hessian(self.log_like_args, x0)
 
         self.H_inv = np.linalg.pinv(self.H)
         self.CH_inv = np.linalg.cholesky(self.H_inv)
@@ -146,7 +149,8 @@ class MCMC:
             return (x, L, False)
 
     def sample(self, Nsim, jump_scale=None, stride=1, x0=None, C=None,
-               n_print=None, n_recov=None, **kwargs):
+               n_print=None, n_recov=None, n_save=None, out_dir=None,
+               suffix=None, **kwargs):
 
         self.Nsim = Nsim
 
@@ -165,11 +169,14 @@ class MCMC:
             x = self.params_hat.copy()
             L = self.L_hat
 
+        self.max_x = 1.0 * x
+        self.max_L = 1.0 * L
+
         if jump_scale is None:
             self.jump_scale = 2.4 / np.sqrt(len(x))
         else:
             self.jump_scale = jump_scale
-        print("Jump scale is {}".format(jump_scale))
+        print("Jump scale is {}".format(self.jump_scale))
 
         if C is None:
             C = self.CH_inv
@@ -178,6 +185,10 @@ class MCMC:
             x_try = x + self.jump_scale * np.dot(C, e[ii, :])
             x, L, acc = self.metropolis_hastings(x, L, x_try, log_u=log_u[ii])
 
+            if L > self.max_L:
+                self.max_L = 1.0 * L
+                self.max_x = 1.0 * x
+
             self.acc_rate += acc
             if (ii + 1) % stride == 0:
                 self.draws[ii // stride, :] = x
@@ -185,34 +196,51 @@ class MCMC:
 
                 if n_print is not None:
                     if (ii // stride + 1) % n_print == 0:
-                        print("Draw {0:d}. Acceptance rate: {1:4.3f}".format((ii + 1) // stride, self.acc_rate / ii))
+                        print("Draw {0:d}. Acceptance rate: {1:4.3f}. Max L = {2:4.3f}".format((ii + 1) // stride, self.acc_rate / ii, self.max_L))
 
                 if n_recov is not None:
                     if (ii // stride + 1) % n_recov == 0:
                         print("Recomputing covariance")
                         C = np.linalg.cholesky(np.cov(self.draws[:(ii // stride) + 1, :], rowvar=False))
 
+                if n_save is not None:
+                    if ((ii // stride + 1) % n_save == 0) and ii < Ntot - 1:
+                        print("Saving intermediate output")
+                        self.save_all(out_dir=out_dir, suffix=suffix)
+
         self.acc_rate /= Ntot
 
         return None
 
-    def save_all(self, out_dir, suffix=None, **kwargs):
+    def save_all(self, out_dir=None, suffix=None, **kwargs):
 
         for name in ['params_hat', 'L_hat', 'CH_inv', 'draws', 'L_sim', 'acc_rate']:
             self.save_item(name, out_dir, suffix=suffix)
 
         return None
 
-    def save_item(self, name, out_dir, suffix=None):
+    def save_item(self, name, out_dir=None, suffix=None):
 
+        if out_dir is None:
+            out_dir = self.out_dir
+        if suffix is None:
+            suffix = self.suffix
+
+        assert(out_dir is not None)
         obj = getattr(self, name)
         if obj is not None:
             save_file(obj, out_dir, name, suffix)
 
         return None
 
-    def load_item(self, name, out_dir, suffix=None):
+    def load_item(self, name, out_dir=None, suffix=None):
 
+        if out_dir is None:
+            out_dir = self.out_dir
+        if suffix is None:
+            suffix = self.suffix
+
+        assert(out_dir is not None)
         setattr(self, name, load_file(out_dir, name, suffix))
 
         return None
