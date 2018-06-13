@@ -145,11 +145,10 @@ class MCMC:
         else:
             return (x, L, False)
 
-    def sample(self, Nsim, jump_scale=1.0, stride=1, x0=None, C=None,
+    def sample(self, Nsim, jump_scale=None, stride=1, x0=None, C=None,
                n_print=None, n_recov=None, **kwargs):
 
         self.Nsim = Nsim
-        self.jump_scale = jump_scale
 
         Ntot = Nsim * stride
         self.draws = np.zeros((self.Nsim, self.Npar))
@@ -165,6 +164,11 @@ class MCMC:
         else:
             x = self.params_hat.copy()
             L = self.L_hat
+
+        if jump_scale is None:
+            self.jump_scale = 2.4 / np.sqrt(len(x))
+        else:
+            self.jump_scale = jump_scale
 
         if C is None:
             C = self.CH_inv
