@@ -169,6 +169,7 @@ class MCMC:
             self.jump_scale = 2.4 / np.sqrt(len(x))
         else:
             self.jump_scale = jump_scale
+        print("Jump scale is {}".format(jump_scale))
 
         if C is None:
             C = self.CH_inv
