@@ -40,7 +40,7 @@ def save_pickle(obj, filename):
     return None
 
 def load_pickle(filename):
-    with open(filename, 'wb') as fid:
+    with open(filename, 'rb') as fid:
         obj = pickle.load(fid)
     return obj 
 

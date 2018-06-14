@@ -62,12 +62,13 @@ class MCMC:
         self.log_like = log_like
         self.args = args
         self.bounds = bounds 
+        self.names = names
 #        self.tol = tol
 #        self.jump_scale = jump_scale
 
-        if self.bounds is None and names is not None:
+        if self.bounds is None and self.names is not None:
             self.bounds = []
-            for name in names:
+            for name in self.names:
                 self.bounds.append(bounds_dict.get(name, (None, None)))
 
         if bounds is not None:
