@@ -72,6 +72,8 @@ class MCMC:
 
         if bounds is not None:
             self.Npar = len(self.bounds)
+        else:
+            self.Npar = None
 
         self.params_hat = None
         self.L_hat = None
@@ -162,6 +164,16 @@ class MCMC:
 
         self.Nsim = Nsim
 
+        if x0 is not None:
+            x = x0.copy()
+            L = self.log_like_args(x)
+        else:
+            x = self.params_hat.copy()
+            L = self.L_hat
+
+        if self.Npar is None:
+            self.Npar = len(x)
+
         Ntot = Nsim * stride
         self.draws = np.zeros((self.Nsim, self.Npar))
         self.L_sim = np.zeros(self.Nsim)
@@ -169,13 +181,6 @@ class MCMC:
         
         e = np.random.randn(Ntot, self.Npar)
         log_u = np.log(np.random.rand(Ntot))
-
-        if x0 is not None:
-            x = x0.copy()
-            L = self.log_like_args(x)
-        else:
-            x = self.params_hat.copy()
-            L = self.L_hat
 
         self.max_x = 1.0 * x
         self.max_L = 1.0 * L
