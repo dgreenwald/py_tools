@@ -1,6 +1,7 @@
 import numpy as np
 from scipy.optimize import minimize
-import py_tools.numerical as nm
+# import py_tools.numerical as nm
+from py_tools import in_out as io, numerical as nm
 
 def logit(x, lb=0.0, ub=1.0):
     return np.log(x - lb) - np.log(ub - x)
@@ -19,7 +20,7 @@ def check_bounds(x, bounds):
 
     return True
 
-def save_file(x, out_dir, name, suffix=None):
+def save_file(x, out_dir, name, suffix=None, pickle=False):
 
     if out_dir[-1] != '/':
         out_dir += '/'
@@ -28,11 +29,14 @@ def save_file(x, out_dir, name, suffix=None):
     if suffix is not None:
         outfile += '_' + suffix
 
-    outfile += '.npy'
+    if pickle:
+        outfile += '.pkl'
+        io.save_pickle(x, outfile)
+    else:
+        outfile += '.npy'
+        np.save(outfile, x)
 
-    np.save(outfile, x)
-
-def load_file(out_dir, name, suffix=None):
+def load_file(out_dir, name, suffix=None, pickle=False):
 
     if out_dir[-1] != '/':
         out_dir += '/'
@@ -41,14 +45,17 @@ def load_file(out_dir, name, suffix=None):
     if suffix is not None:
         outfile += '_' + suffix
 
-    outfile += '.npy'
-
-    return np.load(outfile)
+    if pickle:
+        outfile += '.pkl'
+        return io.load_pickle(outfile)  
+    else:
+        outfile += '.npy'
+        return np.load(outfile)
 
 class MCMC:
     """Class for Markov Chain Monte Carlo sampler"""
 
-    def __init__(self, log_like, args=(), bounds=None, names=None,
+    def __init__(self, log_like=None, args=(), bounds=None, names=None,
                  bounds_dict={}, out_dir=None, suffix=None):
         """Constructor -- need to finish"""
 
@@ -63,7 +70,8 @@ class MCMC:
             for name in names:
                 self.bounds.append(bounds_dict.get(name, (None, None)))
 
-        self.Npar = len(self.bounds)
+        if bounds is not None:
+            self.Npar = len(self.bounds)
 
         self.params_hat = None
         self.L_hat = None
@@ -148,8 +156,8 @@ class MCMC:
         else:
             return (x, L, False)
 
-    def sample(self, Nsim, jump_scale=None, stride=1, x0=None, C=None,
-               n_print=None, n_recov=None, n_save=None, out_dir=None,
+    def sample(self, Nsim, jump_scale=None, jump_mult=1.0, stride=1, x0=None,
+               C=None, n_print=None, n_recov=None, n_save=None, out_dir=None,
                suffix=None, **kwargs):
 
         self.Nsim = Nsim
@@ -173,7 +181,7 @@ class MCMC:
         self.max_L = 1.0 * L
 
         if jump_scale is None:
-            self.jump_scale = 2.4 / np.sqrt(len(x))
+            self.jump_scale = jump_mult * 2.4 / np.sqrt(len(x))
         else:
             self.jump_scale = jump_scale
         print("Jump scale is {}".format(self.jump_scale))
@@ -217,9 +225,24 @@ class MCMC:
         for name in ['params_hat', 'L_hat', 'CH_inv', 'draws', 'L_sim', 'acc_rate']:
             self.save_item(name, out_dir, suffix=suffix)
 
+        # Pickled items
+        for name in ['names']:
+            self.save_item(name, out_dir, suffix=suffix, pickle=True)
+
         return None
 
-    def save_item(self, name, out_dir=None, suffix=None):
+    def load_all(self, out_dir=None, suffix=None, **kwargs):
+
+        for name in ['params_hat', 'L_hat', 'CH_inv', 'draws', 'L_sim', 'acc_rate']:
+            self.load_item(name, out_dir, suffix=suffix)
+
+        # Pickled items
+        for name in ['names']:
+            self.load_item(name, out_dir, suffix=suffix, pickle=True)
+
+        return None
+
+    def save_item(self, name, out_dir=None, suffix=None, **kwargs):
 
         if out_dir is None:
             out_dir = self.out_dir
@@ -229,11 +252,11 @@ class MCMC:
         assert(out_dir is not None)
         obj = getattr(self, name)
         if obj is not None:
-            save_file(obj, out_dir, name, suffix)
+            save_file(obj, out_dir, name, suffix, **kwargs)
 
         return None
 
-    def load_item(self, name, out_dir=None, suffix=None):
+    def load_item(self, name, out_dir=None, suffix=None, **kwargs):
 
         if out_dir is None:
             out_dir = self.out_dir
@@ -241,7 +264,7 @@ class MCMC:
             suffix = self.suffix
 
         assert(out_dir is not None)
-        setattr(self, name, load_file(out_dir, name, suffix))
+        setattr(self, name, load_file(out_dir, name, suffix, **kwargs))
 
         return None
 
