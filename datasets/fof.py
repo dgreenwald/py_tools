@@ -37,18 +37,19 @@ def load(data_dir=default_dir):
 
     return df
 
-def load_fred():
+def load_fred(**kwargs):
 
     var_titles = {
         'HMLBSHNO' : 'debt',
         'HNOREMV' : 'value',
         'HNODPI' : 'income',
+        'PI' : 'gross_income',
         'HHMSDODNS' : 'debt_sa',
         'DHUTRC1Q027SBEA' : 'housing_services',
     }
     
-    var_list = var_titles.keys()
-    df = fred.load(var_list).rename(columns=var_titles).loc['1952-01-01':, :]
+    # var_list = var_titles.keys()
+    df = fred.load(code_names=var_titles, **kwargs).resample('QS').mean().loc['1952-01-01':, :]
 
     return df
 
