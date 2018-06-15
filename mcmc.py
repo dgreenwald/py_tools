@@ -1,3 +1,4 @@
+import os
 import numpy as np
 from scipy.optimize import minimize
 # import py_tools.numerical as nm
@@ -44,12 +45,18 @@ def load_file(out_dir, name, suffix=None, pickle=False):
     outfile = out_dir + name
     if suffix is not None:
         outfile += '_' + suffix
-
+        
     if pickle:
         outfile += '.pkl'
-        return io.load_pickle(outfile)  
     else:
         outfile += '.npy'
+        
+    if not os.path.exists(outfile):
+        return None
+
+    if pickle:
+        return io.load_pickle(outfile)  
+    else:
         return np.load(outfile)
 
 class MCMC:
