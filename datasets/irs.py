@@ -4,16 +4,16 @@ from . import defaults
 default_dir = defaults.base_dir() + 'irs/'
 # data_dir = '/home/dan/data/irs/'
 
-def load(year, data_dir=default_dir, **kwargs):
+# def load(year, data_dir=default_dir, **kwargs):
 
-    if year >= 2009:
+    # if year >= 2009:
 
-        yy = year - 2000
-        infile = data_dir + '{:02d}zpallagi.csv'.format(yy)
-        df = pd.read_csv(infile)
+        # yy = year - 2000
+        # infile = data_dir + '{:02d}zpallagi.csv'.format(yy)
+        # df = pd.read_csv(infile)
         
-    else:
+    # else:
 
-        raise Exception
+        # raise Exception
 
-    return df
+    # return df

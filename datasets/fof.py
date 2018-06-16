@@ -37,7 +37,7 @@ def load(data_dir=default_dir):
 
     return df
 
-def load_fred():
+def load_fred(reimport=False):
 
     var_titles = {
         'HMLBSHNO' : 'debt',
@@ -46,9 +46,11 @@ def load_fred():
         'HHMSDODNS' : 'debt_sa',
         'DHUTRC1Q027SBEA' : 'housing_services',
     }
+
     
     var_list = var_titles.keys()
     df = fred.load(var_list).rename(columns=var_titles).loc['1952-01-01':, :]
+    df['price_rent'] = df['value'] / df['housing_services']
 
     return df
 
