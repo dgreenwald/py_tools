@@ -30,8 +30,9 @@ def gradient(f, x, args=(), step=1e-5):
 def quad_form(A, X):
     return np.dot(A.T, np.dot(X, A))
 
-def hessian(f, x, eps=1e-4):
+def hessian(f, x_in, eps=1e-4):
     
+    x = x_in.copy()
     n = len(x)
     H = np.zeros((n, n))
     for ii, jj in itertools.product(range(n), repeat=2):
@@ -61,7 +62,7 @@ def hessian(f, x, eps=1e-4):
         else:
 
             H[ii, jj] = H[jj, ii]
-        
+
     return H / (4.0 * (eps ** 2))
 
 def svd_inv(A, sv_tol=1e-8, **kwargs):

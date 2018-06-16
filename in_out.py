@@ -39,10 +39,10 @@ def save_pickle(obj, filename):
         pickle.dump(obj, fid)
     return None
 
-def load_pickle(obj, filename):
-    with open(filename, 'wb') as fid:
-        pickle.load(obj, fid)
-    return None
+def load_pickle(filename):
+    with open(filename, 'rb') as fid:
+        obj = pickle.load(fid)
+    return obj 
 
 def make_dir(path):
     if not os.path.exists(path):
