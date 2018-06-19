@@ -3,7 +3,7 @@ import numpy as np
 import pandas as pd
 import py_tools.time_series as ts
 
-from . import defaults
+from py_tools.datasets import defaults
 default_dir = defaults.base_dir() + 'saez/'
 
 def update_names(df, usecols):
@@ -123,16 +123,21 @@ def load(table='shares', reimport=False, data_dir=default_dir):
             xls_file = data_dir + 'AppendixTablesDistributions.xlsx'
 
             assets = ['equity', 'net_housing', 'business', 'fixed_income',
-                      'non_mortg_debt', 'total_debt']
+                      'non_mortg_debt', 'total_debt', 'total_wealth']
 
-            pcts = ['bottom_90', 'top_10', 'top_5', 'top_1', 'top_0_5', 'top_0_1', 'top_0_01',
+            base_pcts = ['bottom_90', 'top_10', 'top_5', 'top_1', 'top_0_5', 'top_0_1', 'top_0_01',
                     'top_10_to_1', 'top_10_to_5', 'top_5_to_1', 'top_1_to_0_1', 'top_1_to_0_5',
                     'top_0_5_to_0_1', 'top_0_1_to_0_01', 'share_of_tot']
 
             df_list = len(assets) * [None]
             for ii, asset in enumerate(assets):
 
-                table = 'TableB{}'.format(ii + 7) 
+                if asset == 'total_wealth':
+                    table = 'TableB1'
+                    pcts = base_pcts[:-1]
+                else:
+                    table = 'TableB{}'.format(ii + 7) 
+                    pcts = base_pcts
 
                 usecols = ['year'] + ['{0}_{1}'.format(asset, pct) for pct in pcts]
 
