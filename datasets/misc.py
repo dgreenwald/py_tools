@@ -108,6 +108,21 @@ def load(dataset, user='DAN', master_dirs={}, **kwargs):
             'payout_to_equity_yogo' : np.squeeze(mat['payout_equity_ratio_Yogo']),
         }, index=ts.get_date_index('1954-10-01', len(mat['dates_l']), 'QS'))
 
+    elif dataset == 'fhfa':
+
+        infile = data_dir + 'HPI_AT_metro.csv'
+        df = pd.read_csv(infile, header=None, 
+                         names=['MSA', 'code', 'year', 'q', 'hpi', 'unknown'])
+        
+        df['month'] = df['q'] * 3 - 2
+        df['day'] = 1
+        df['date'] = pd.to_datetime(df[['year', 'month', 'day']])
+
+        df['hpi'] = pd.to_numeric(df['hpi'], errors='coerce')
+
+        df = df.set_index(['date', 'MSA'])
+        df = df.drop(columns=['year', 'q', 'month', 'day', 'unknown'])
+
     elif dataset == 'gertler_karadi':
 
         infile = data_dir + 'gk_factors.csv'

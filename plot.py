@@ -155,7 +155,7 @@ def hist(df_in, var, label=None, xlabel=None, ylabel=None, wvar=None,
     # TODO: could use kwargs for some of these
     fig = plt.figure()
     matplotlib.rcParams.update({'font.size' : label_font})
-    plt.hist(df[var].values, normed=True, bins=bins, alpha=0.5,
+    plt.hist(df[var].values, density=True, bins=bins, alpha=0.5,
              weights=w, label=label, **kwargs)
 
     if xlabel is not None:
@@ -177,7 +177,7 @@ def hist(df_in, var, label=None, xlabel=None, ylabel=None, wvar=None,
     plt.close(fig)
 
     if copy_path is not None:
-        save_hist(df[var].values, copy_path, normed=True, bins=bins, weights=w)
+        save_hist(df[var].values, copy_path, density=True, bins=bins, weights=w)
 
     return True
 
@@ -233,9 +233,9 @@ def double_hist(df_in1, df_in2=None, label1='Var 1', label2='Var 2', var=None,
     fig = plt.figure()
     matplotlib.rcParams.update({'font.size' : label_font})
 
-    plt.hist(df1[var1].values, normed=True, bins=bins, alpha=0.5,
+    plt.hist(df1[var1].values, density=True, bins=bins, alpha=0.5,
              weights=w1, label=str(label1), color=color1)
-    plt.hist(df2[var2].values, normed=True, bins=bins, alpha=0.5,
+    plt.hist(df2[var2].values, density=True, bins=bins, alpha=0.5,
              weights=w2, label=str(label2), color=color2)
     plt.legend(fontsize=legend_font)
 
@@ -257,9 +257,9 @@ def double_hist(df_in1, df_in2=None, label1='Var 1', label2='Var 2', var=None,
     plt.close(fig)
 
     if copy_path1 is not None:
-        save_hist(df1[var1].values, copy_path1, normed=True, bins=bins, weights=w1)
+        save_hist(df1[var1].values, copy_path1, density=True, bins=bins, weights=w1)
     if copy_path2 is not None:
-        save_hist(df2[var2].values, copy_path1, normed=True, bins=bins, weights=w2)
+        save_hist(df2[var2].values, copy_path1, density=True, bins=bins, weights=w2)
 
     return True
 

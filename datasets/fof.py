@@ -47,9 +47,9 @@ def load_fred(**kwargs):
         'HHMSDODNS' : 'debt_sa',
         'DHUTRC1Q027SBEA' : 'housing_services',
     }
-    
-    # var_list = var_titles.keys()
+
     df = fred.load(code_names=var_titles, **kwargs).resample('QS').mean().loc['1952-01-01':, :]
+    df['price_rent'] = df['value'] / df['housing_services']
 
     return df
 
