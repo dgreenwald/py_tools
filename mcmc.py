@@ -21,6 +21,14 @@ def check_bounds(x, bounds):
 
     return True
 
+def print_mesg(mesg, fid=None):
+    
+    if fid is not None:
+        fid.write(mesg + '\n')
+        fid.flush()
+    else:
+        print(mesg)
+
 def save_file(x, out_dir, name, suffix=None, pickle=False):
 
     if out_dir[-1] != '/':
@@ -166,9 +174,23 @@ class MCMC:
         else:
             return (x, L, False)
 
+    def open_log(self, title='log'):
+
+        if self.out_dir[-1] != '/':
+            self.out_dir += '/'
+
+        log_file = self.out_dir + 'log'
+            
+        if self.suffix is not None:
+            log_file += '_' + self.suffix
+
+        log_file += '.txt'
+
+        self.fid = open(log_file, 'wt')
+
     def sample(self, Nsim, jump_scale=None, jump_mult=1.0, stride=1, x0=None,
-               C=None, n_print=None, n_recov=None, n_save=None, out_dir=None,
-               suffix=None, **kwargs):
+               C=None, n_print=None, n_recov=None, n_save=None, n_burn=0,
+               log=True, **kwargs):
 
         self.Nsim = Nsim
 
@@ -181,6 +203,11 @@ class MCMC:
 
         if self.Npar is None:
             self.Npar = len(x)
+
+        if log:
+            self.open_log()
+        else:
+            self.fid = None
 
         Ntot = Nsim * stride
         self.draws = np.zeros((self.Nsim, self.Npar))
@@ -197,7 +224,7 @@ class MCMC:
             self.jump_scale = jump_mult * 2.4 / np.sqrt(len(x))
         else:
             self.jump_scale = jump_scale
-        print("Jump scale is {}".format(self.jump_scale))
+        self.print_log("Jump scale is {}".format(self.jump_scale))
 
         if C is None:
             C = self.CH_inv
@@ -217,75 +244,71 @@ class MCMC:
 
                 if n_print is not None:
                     if (ii // stride + 1) % n_print == 0:
-                        print("Draw {0:d}. Acceptance rate: {1:4.3f}. Max L = {2:4.3f}".format((ii + 1) // stride, self.acc_rate / ii, self.max_L))
+                        self.print_log("Draw {0:d}. Acceptance rate: {1:4.3f}. Max L = {2:4.3f}".format((ii + 1) // stride, self.acc_rate / ii, self.max_L))
 
                 if n_recov is not None:
-                    if (ii // stride + 1) % n_recov == 0:
-                        print("Recomputing covariance")
-                        C = np.linalg.cholesky(np.cov(self.draws[:(ii // stride) + 1, :], rowvar=False))
+                    if ((ii // stride + 1) - n_burn) % n_recov == 0:
+                        self.print_log("Recomputing covariance")
+                        C = np.linalg.cholesky(np.cov(self.draws[n_burn : (ii // stride) + 1, :], rowvar=False))
 
                 if n_save is not None:
                     if ((ii // stride + 1) % n_save == 0) and ii < Ntot - 1:
-                        print("Saving intermediate output")
-                        self.save_all(out_dir=out_dir, suffix=suffix)
+                        self.print_log("Saving intermediate output")
+                        self.save_all()
 
         self.acc_rate /= Ntot
 
+        if self.fid is not None:
+            self.fid.close()
+
         return None
 
-    def save_all(self, out_dir=None, suffix=None, **kwargs):
+    def print_log(self, mesg):
+        print_mesg(mesg, fid=self.fid)
+
+    def save_all(self, **kwargs):
 
         for name in ['params_hat', 'L_hat', 'CH_inv', 'draws', 'L_sim', 'acc_rate']:
-            self.save_item(name, out_dir, suffix=suffix)
+            self.save_item(name)
 
         # Pickled items
         for name in ['names']:
-            self.save_item(name, out_dir, suffix=suffix, pickle=True)
+            self.save_item(name, pickle=True)
 
         return None
 
-    def load_all(self, out_dir=None, suffix=None, **kwargs):
+    def load_all(self, **kwargs):
 
         for name in ['params_hat', 'L_hat', 'CH_inv', 'draws', 'L_sim', 'acc_rate']:
-            self.load_item(name, out_dir, suffix=suffix)
+            self.load_item(name)
 
         # Pickled items
         for name in ['names']:
-            self.load_item(name, out_dir, suffix=suffix, pickle=True)
+            self.load_item(name, pickle=True)
 
         return None
 
-    def save_item(self, name, out_dir=None, suffix=None, **kwargs):
+    def save_item(self, name, **kwargs):
 
-        if out_dir is None:
-            out_dir = self.out_dir
-        if suffix is None:
-            suffix = self.suffix
-
-        assert(out_dir is not None)
+        assert(self.out_dir is not None)
         obj = getattr(self, name)
         if obj is not None:
-            save_file(obj, out_dir, name, suffix, **kwargs)
+            save_file(obj, self.out_dir, name, self.suffix, **kwargs)
 
         return None
 
-    def load_item(self, name, out_dir=None, suffix=None, **kwargs):
+    def load_item(self, name, **kwargs):
 
-        if out_dir is None:
-            out_dir = self.out_dir
-        if suffix is None:
-            suffix = self.suffix
-
-        assert(out_dir is not None)
-        setattr(self, name, load_file(out_dir, name, suffix, **kwargs))
+        assert(self.out_dir is not None)
+        setattr(self, name, load_file(self.out_dir, name, self.suffix, **kwargs))
 
         return None
 
-    def run_all(self, x0, Nsim, out_dir=None, **kwargs):
+    def run_all(self, x0, Nsim, **kwargs):
         """Find mode, run MCMC chain, and save"""
 
         self.find_mode(x0, **kwargs)
         self.compute_hessian(**kwargs)
         self.sample(Nsim, **kwargs)
-        if out_dir is not None:
-            self.save(out_dir, **kwargs)
+        if self.out_dir is not None:
+            self.save(self.out_dir, **kwargs)
