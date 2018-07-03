@@ -39,7 +39,7 @@ def load(dataset, user='DAN', master_dirs={}, **kwargs):
         }
 
         infile = data_dir + 'canada_accounts.csv'
-        df = pd.read_csv(infile, sep='\t').rename(columns=columns)
+        df = pd.read_csv(infile).rename(columns=columns)
 
         for var in ['debt', 'structures', 'land', 'income']:
             df[var] = df[var].astype(np.float64)
