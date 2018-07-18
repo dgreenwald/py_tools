@@ -6,67 +6,7 @@ import py_tools.time_series as ts
 from . import defaults
 default_dir = defaults.base_dir()
 
-def load(nipa_table=None, nipa_vintage='1706', nipa_quarterly=True,
-         master_dirs={}, **kwargs):
-    """Load NIPA table, specify table (e.g., 20100) vintage (when downloaded) and whether quarterly data"""
-
-    assert(nipa_table is not None) # Need to pick a table
-
-    dirs = master_dirs.copy()
-    if 'base' not in dirs:
-        dirs['base'] = default_dir
-        # home_dir = os.environ['HOME']
-        # dirs['base'] = home_dir + '/Dropbox/data/'
-
-    data_dir = dirs['base'] + 'nipa/' + nipa_vintage + '/'
-
-    if nipa_quarterly:
-        freq_str = ' Qtr'
-    else:
-        freq_str = ' Ann'
-
-    sheet_name = nipa_table + freq_str
-
-    ################################################################################
-    # LOAD FILES
-    ################################################################################
-
-    # File names
-    table_group = nipa_table[0]
-    curr_file_path = data_dir + 'Section{}All_xls.xls'.format(table_group)
-    hist_file_path = data_dir + 'Section{}All_Hist.xls'.format(table_group)
-
-    # Load current file
-    df_t = pd.read_excel(
-        curr_file_path,
-        sheet_name=sheet_name,
-        skiprows=7,
-        # header=[0, 1],
-        index_col=2,
-    )
-    df_curr = clean_nipa(df_t, nipa_quarterly=nipa_quarterly)
-    df_curr = df_curr.apply(pd.to_numeric, errors='coerce')
-    # df_curr = df_curr.convert_objects(convert_dates=False, convert_numeric=True)
-
-    # Load historical file
-    df_t = pd.read_excel(
-        hist_file_path,
-        sheet_name=sheet_name,
-        skiprows=7,
-        # header=[0, 1],
-        index_col=2,
-    )
-    df_hist = clean_nipa(df_t, nipa_quarterly=nipa_quarterly)
-    df_hist = df_hist.apply(pd.to_numeric, errors='coerce')
-
-    # Combine datasets
-    start_date = df_curr.index[0]
-    df_hist_sample = df_hist.ix[:start_date, :]
-    df = df_hist_sample.iloc[:-1, :].append(df_curr)
-
-    ################################################################################
-    # RENAME SERIES
-    ################################################################################
+def get_var_index(nipa_table, nipa_vintage='1706', add_prefix=False):
 
     if nipa_table == '10105':
         
@@ -286,6 +226,132 @@ def load(nipa_table=None, nipa_vintage='1706', nipa_quarterly=True,
             'net_interest' : 'B1037C1',
             'rental_income' : 'B1035C1',
         }
+
+    if add_prefix:
+        temp = var_index.copy()
+        var_index = {'NIPA_{0:d}_{1}'.format(nipa_table, name) : code for name, code in temp.items()}
+
+    return var_index
+
+def load(nipa_table=None, nipa_source='xls', **kwargs):
+
+    assert(nipa_table is not None) # Need to pick a table
+
+    if nipa_source == 'xls':
+        return load_xls(nipa_table, **kwargs)
+    elif nipa_source == 'flat':
+        return load_flat(nipa_table, **kwargs)
+    else:
+        raise Exception
+
+def load_flat(nipa_table, data_dir=default_dir+'nipa/', var_list=None,
+              reimport=False, billions=True, **kwargs):
+
+    idx = pd.IndexSlice
+
+    pkl_file = data_dir + 'NipaDataQ_20180717.pkl' 
+
+    if not os.path.exists(pkl_file) or reimport:
+        infile = 'NipaDataQ_20180717.txt'
+        df = pd.read_csv(data_dir + infile).rename(columns={'%SeriesCode' : 'Series'})
+        
+        # Convert numbers
+        df['Value'] = df['Value'].str.replace(',', '')
+        df['Value'] = pd.to_numeric(df['Value'], errors='coerce')
+
+        # Convert dates
+        df[['y', 'q']] = df['Period'].str.split(pat='Q', expand=True)
+        df['q'] = df['q'].astype(np.int64)
+        df['m'] = df['q'] * 3 - 2
+        df['Date'] = df['y'].astype(str) + '-' + df['m'].astype(str) + '-01'
+        df['Date'] = pd.to_datetime(df['Date'])
+
+        df['Series'] = df['Series'].astype(str)
+        df = df.set_index(['Series', 'Date']).drop(columns=['y', 'q', 'm', 'Period'])
+        df.to_pickle(pkl_file)
+    else:
+        df = pd.read_pickle(pkl_file)
+
+    var_index = get_var_index(nipa_table, **kwargs)
+    var_index = {key : val[:-1] for key, val in var_index.items()}
+
+    if var_list is None:
+        var_list = list(var_index.keys())
+
+    code_list = [var_index[var] for var in var_list]
+
+    df = df.loc[idx[code_list, :], :]
+    
+    if billions: 
+        df['Value'] /= 1000
+    df = df.reset_index().pivot(index='Date', columns='Series', values='Value')
+
+    reverse_index = {val : key for key, val in var_index.items()}
+    df = df.rename(columns=reverse_index)
+
+    return df
+
+def load_xls(nipa_table, nipa_vintage='1706', nipa_quarterly=True,
+         master_dirs={}, **kwargs):
+    """Load NIPA table, specify table (e.g., 20100) vintage (when downloaded) and whether quarterly data"""
+
+    dirs = master_dirs.copy()
+    if 'base' not in dirs:
+        dirs['base'] = default_dir
+        # home_dir = os.environ['HOME']
+        # dirs['base'] = home_dir + '/Dropbox/data/'
+
+    data_dir = dirs['base'] + 'nipa/' + nipa_vintage + '/'
+
+    if nipa_quarterly:
+        freq_str = ' Qtr'
+    else:
+        freq_str = ' Ann'
+
+    sheet_name = nipa_table + freq_str
+
+    ################################################################################
+    # LOAD FILES
+    ################################################################################
+
+    # File names
+    table_group = nipa_table[0]
+    curr_file_path = data_dir + 'Section{}All_xls.xls'.format(table_group)
+    hist_file_path = data_dir + 'Section{}All_Hist.xls'.format(table_group)
+
+    # Load current file
+    df_t = pd.read_excel(
+        curr_file_path,
+        sheet_name=sheet_name,
+        skiprows=7,
+        # header=[0, 1],
+        index_col=2,
+    )
+    df_curr = clean_nipa(df_t, nipa_quarterly=nipa_quarterly)
+    df_curr = df_curr.apply(pd.to_numeric, errors='coerce')
+    # df_curr = df_curr.convert_objects(convert_dates=False, convert_numeric=True)
+
+    # Load historical file
+    df_t = pd.read_excel(
+        hist_file_path,
+        sheet_name=sheet_name,
+        skiprows=7,
+        # header=[0, 1],
+        index_col=2,
+    )
+    df_hist = clean_nipa(df_t, nipa_quarterly=nipa_quarterly)
+    df_hist = df_hist.apply(pd.to_numeric, errors='coerce')
+
+    # Combine datasets
+    start_date = df_curr.index[0]
+    df_hist_sample = df_hist.ix[:start_date, :]
+    df = df_hist_sample.iloc[:-1, :].append(df_curr)
+
+    ################################################################################
+    # RENAME SERIES
+    ################################################################################
+
+    var_index = get_var_index(nipa_table)
 
     full_list = sorted(list(var_index.keys()))
     codes = [var_index[var] for var in full_list]

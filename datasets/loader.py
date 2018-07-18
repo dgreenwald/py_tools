@@ -52,10 +52,15 @@ def load_dataset(dataset, master_dirs={}, **kwargs):
     if 'pkl' not in dirs:
         dirs['pkl'] = dirs['base'] + 'pkl/'
 
-    if dataset in ['stockw', 'crsp', 'crsp_q', 'cay', 'cay_current', 'cay_source', 'bls_ls',
+    if dataset in ['stockw', 'cay', 'cay_current', 'cay_source', 'bls_ls',
                    'fernald', 'tb3ms', 'uc']:
 
         df = origins.load(dataset, dirs, **kwargs)
+        
+    elif dataset == 'crsp':
+        
+        from py_tools.datasets import crsp
+        df = crsp.load(**kwargs)
     
     elif dataset == 'payouts':
 
