@@ -1,7 +1,8 @@
 import datetime
 import os
 import pandas as pd
-import pandas_datareader.data as web
+
+from pandas_datareader import data as web
 import pickle
 
 from . import defaults

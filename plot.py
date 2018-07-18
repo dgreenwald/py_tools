@@ -322,7 +322,8 @@ def plot_series(df_in, var_names, directory='', filename=None, labels={},
                 linestyles={}, markers={}, colors={}, markevery=8,
                 markersize=5, mew=2, fillstyle='none', fontsize=12,
                 plot_type='pdf', ylabel=None, sample='outer', title=None,
-                save=True, single_legend=True):
+                save=True, single_legend=True, vertline_ix=None,
+                vertline_kwargs={}):
 
     matplotlib.rcParams.update({'font.size' : fontsize})
 
@@ -357,6 +358,9 @@ def plot_series(df_in, var_names, directory='', filename=None, labels={},
         # plt.plot(df.index, df[var], linewidth=2, linestyle=linestyle,
                  # label=label, marker=marker, markevery=markevery,
                  # markersize=markersize, mew=mew, color=color)
+
+    if vertline_ix is not None:
+        plt.axvline(x=df.index[vertline_ix], **vertline_kwargs)
 
     if len(var_names) > 1 or single_legend:
         plt.legend(fontsize=fontsize)

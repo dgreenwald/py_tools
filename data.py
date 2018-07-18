@@ -1,6 +1,6 @@
 import numpy as np
 import pandas as pd
-import pdb
+# import pdb
 import pickle
 
 import statsmodels.api as sm
@@ -28,9 +28,9 @@ def winsorize(df_in, var_list, wvar=None, p_val=0.98):
     # else:
         # assert (p_lo is not None) and (p_hi is not None)
 
-    keep_vars = df_in.columns.values
+    keep_vars = var_list
     if wvar is not None:
-        keep_vars += wvar
+        keep_vars += [wvar]
 
     df = df_in[keep_vars].copy()
     for var in var_list:
@@ -48,18 +48,54 @@ def winsorize(df_in, var_list, wvar=None, p_val=0.98):
 
     return df 
 
+def add_bin_dummies(df, var_list, n_bins):
+
+    print("NEED TO TEST")
+    raise Exception
+
+    cutoffs = np.linspace(0.0, 1.0, n_bins+1)
+    dummy_list = []
+
+    for var in var_list:
+        for ii in range(n_bins):
+
+            bin_var = var + '_bin{:d}'.format(ii+1)
+            dummy_list.append(bin_var)
+
+            df[bin_var] = 0.0
+
+            if ii == 0:
+                lb = -np.inf
+            else:
+                lb = df[var].quantile(cutoffs[ii])
+
+            if ii == n_bins - 1:
+                ub = np.inf
+            else:
+                ub = df[var].quantile(cutoffs[ii+1])
+
+            ix = (df[var] >= lb) & (df[var] < ub)
+            df.loc[ix, bin_var] = 1.0
+
+    return df, dummy_list
+
 def demean(df_in, var_list, by_var, weight_var=None):
 
-    df = df_in[var_list + [by_var, weight_var]].copy()
+    keep_list = var_list + [by_var]
+    if weight_var is not None:
+        keep_list += [weight_var]
+
+    df = df_in[keep_list].copy()
+
     if weight_var is None:
-        df_by = df[var_list].groupby(by_var).mean().rename(
+        df_by = df[keep_list].groupby(by_var).mean().rename(
             columns={var : var + '_mean' for var in var_list}
         )
     else:
         for var in var_list:
             df[var + '_wtd'] = df[var] * df[weight_var]
 
-        df_by = df.groupby(by_var).sum()
+        df_by = df[keep_list].groupby(by_var).sum()
         for var in var_list:
             df_by[var + '_mean'] = df_by[var + '_wtd'] / df_by[weight_var]
 

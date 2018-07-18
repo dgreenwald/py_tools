@@ -6,9 +6,9 @@ from . import defaults
 default_dir = defaults.base_dir() + 'crsp/'
 # data_dir = '/home/dan/Dropbox/data/crsp/'
 
-def load(data_dir=default_dir):
+def load(data_dir=default_dir, vintage='2017', **kwargs):
 
-    infile = 'crsp_2016.csv'
+    infile = 'crsp_{}.csv'.format(vintage)
     df = pd.read_csv(data_dir + infile)
     df = ts.date_index(df, '1/1/1926', freq='QS')
 
