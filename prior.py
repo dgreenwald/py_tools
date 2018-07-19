@@ -1,4 +1,4 @@
-import math
+# import math
 import numpy as np
 import scipy.stats as st
 
@@ -7,20 +7,7 @@ GAMMA = 2
 INV_GAMMA = 3
 NORM = 4
 
-# def set_beta(mean=None, mode=None, sd=None, var=None):
-
-    # assert (mean is None or mode is None)
-    # assert (sd is None or var is None)
-
-    # if var is None:
-        # var = sd ** 2
-
-    # if mean is not None:
-        # alp = ((1.0 - mean) * (mean ** 2) / var) - mean
-        # bet = (1.0 - mean) * alp / mean
-
-
-def set_prior(prior_type, params=None, mean=None, sd=None):
+def get_prior(prior_type, mean=None, sd=None, params=None):
 
     prior_num_dict = {
         'beta' : BETA,
@@ -42,36 +29,30 @@ def set_prior(prior_type, params=None, mean=None, sd=None):
         if prior_num == BETA:
             alp = (1.0 - mean) * ((mean / sd) ** 2) - mean
             bet = (1.0 - mean) * alp / mean
-            params = np.array((alp, bet))
+            return st.beta(alp, bet)
         elif prior_num == GAMMA:
             the = (sd ** 2) / mean
             k = mean / the
-            params = np.array((k, the))
+            return st.gamma(k, scale=the)
         elif prior_num == INV_GAMMA:
             alp = 2 + ((mean / sd) ** 2)  
             bet = mean * (alp - 1)
-            params = np.array((alp, bet))
+            return st.invgamma(alp, scale=bet)
         elif prior_num == NORM:
-            params = np.array((mean, sd))
+            return st.norm(loc=mean, scale=sd)
         else:
            raise Exception
 
     return (prior_num, params)
 
-# class Prior:
-    # """Bayesian prior"""
-    # def __init__(self):
+class Prior:
+    """Bayesian prior"""
 
-def eval_prior(params, prior_list):
+    def __init__(self):
+        self.dists = []
 
-    L = 0.0
+    def add(self, prior_type, *args, **kwargs):
+        self.dists.append(get_prior(prior_type, *args, **kwargs))
 
-    for ii, (prior_num, prior_params) in enumerate(prior_list):
-        if prior_num is not None:
-            if prior_num == BETA:
-                L += st.beta.logpdf(val, prior_params[0], prior_params[1])
-            elif prior_num == NORM:
-                L += st.norm.logpdf(val, prior_params[0], prior_params[1])
-
-    return L
-
+    def logpdf(self, vals):
+        return np.sum([dist.logpdf(val) for dist, val in zip(self.dists, vals)])
