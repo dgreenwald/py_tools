@@ -152,10 +152,16 @@ def hist(df_in, var, label=None, xlabel=None, ylabel=None, wvar=None,
     else:
         w = np.ones(len(df))
 
+    # Normalize
+    if matplotlib.__version__ == '2.0.2':
+        kwargs['normed'] = True
+    else:
+        kwargs['density'] = True
+
     # TODO: could use kwargs for some of these
     fig = plt.figure()
     matplotlib.rcParams.update({'font.size' : label_font})
-    plt.hist(df[var].values, density=True, bins=bins, alpha=0.5,
+    plt.hist(df[var].values, bins=bins, alpha=0.5,
              weights=w, label=label, **kwargs)
 
     if xlabel is not None:
@@ -185,7 +191,7 @@ def double_hist(df_in1, df_in2=None, label1='Var 1', label2='Var 2', var=None,
                 var1=None, var2=None, bins=None, wvar=None, wvar1=None,
                 wvar2=None, filepath=None, xlabel=None, ylabel=None, xlim=None,
                 ylim=None, legend_font=10, label_font=12, copy_path1=None,
-                copy_path2=None, color1=None, color2=None):
+                copy_path2=None, color1=None, color2=None, **kwargs):
     """Plots double histogram overlaying var1 from df_in1 and var2 from df_in2"""
 
     if df_in2 is None:
@@ -211,6 +217,12 @@ def double_hist(df_in1, df_in2=None, label1='Var 1', label2='Var 2', var=None,
         # copy_path1 = copy_str + '_' + var1 + '.pkl'
         # copy_path2 = copy_str + '_' + var2 + '.pkl'
 
+    # Normalize
+    if matplotlib.__version__ == '2.0.2':
+        kwargs['normed'] = True
+    else:
+        kwargs['density'] = True
+
     df1 = dt.clean(df_in1, [var1, wvar1])
     df2 = dt.clean(df_in2, [var2, wvar2])
 
@@ -233,10 +245,10 @@ def double_hist(df_in1, df_in2=None, label1='Var 1', label2='Var 2', var=None,
     fig = plt.figure()
     matplotlib.rcParams.update({'font.size' : label_font})
 
-    plt.hist(df1[var1].values, density=True, bins=bins, alpha=0.5,
-             weights=w1, label=str(label1), color=color1)
-    plt.hist(df2[var2].values, density=True, bins=bins, alpha=0.5,
-             weights=w2, label=str(label2), color=color2)
+    plt.hist(df1[var1].values, bins=bins, alpha=0.5,
+             weights=w1, label=str(label1), color=color1, **kwargs)
+    plt.hist(df2[var2].values, bins=bins, alpha=0.5,
+             weights=w2, label=str(label2), color=color2, **kwargs)
     plt.legend(fontsize=legend_font)
 
     if xlabel is not None:
