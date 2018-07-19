@@ -1,6 +1,6 @@
 import math
 import numpy as np
-import scipy.stats
+import scipy.stats as st
 
 BETA = 1
 GAMMA = 2
@@ -37,20 +37,30 @@ def set_prior(prior_type, params=None, mean=None, sd=None):
         print("Bad prior type")
         raise Exception
 
-   assert (not (params is None and (mean is None or sd is None)))
-
-   if params is None:
-       if prior_num == BETA:
-            alp = ((1.0 - mean) * (mean ** 2) / var) - mean
+    if params is None:
+        assert (mean is not None) or (sd is not None)
+        if prior_num == BETA:
+            alp = (1.0 - mean) * ((mean / sd) ** 2) - mean
             bet = (1.0 - mean) * alp / mean
+            params = np.array((alp, bet))
+        elif prior_num == GAMMA:
+            the = (sd ** 2) / mean
+            k = mean / the
+            params = np.array((k, the))
+        elif prior_num == INV_GAMMA:
+            alp = 2 + ((mean / sd) ** 2)  
+            bet = mean * (alp - 1)
             params = np.array((alp, bet))
         elif prior_num == NORM:
             params = np.array((mean, sd))
         else:
-            raise Exception
+           raise Exception
 
     return (prior_num, params)
 
+# class Prior:
+    # """Bayesian prior"""
+    # def __init__(self):
 
 def eval_prior(params, prior_list):
 
@@ -59,9 +69,9 @@ def eval_prior(params, prior_list):
     for ii, (prior_num, prior_params) in enumerate(prior_list):
         if prior_num is not None:
             if prior_num == BETA:
-                L += stats.beta.logpdf(val, prior_params[0], prior_params[1])
+                L += st.beta.logpdf(val, prior_params[0], prior_params[1])
             elif prior_num == NORM:
-                L += stats.norm.logpdf(val, prior_params[0], prior_params[1])
+                L += st.norm.logpdf(val, prior_params[0], prior_params[1])
 
     return L
 
