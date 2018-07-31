@@ -283,6 +283,13 @@ def VAR(df_in, var_list, n_var_lags=1, use_const=True):
     # Regression
     return dt.mv_ols(df, lhs, rhs)
 
+class VECMResults(dt.FullResults):
+    """VECM results object"""
+
+    def __init__(self, fr, alp):
+        dt.FullResults.__init__(self, fr.results, fr.ix, fr.Xs, fr.zs)
+        self.alp = alp
+
 def VECM(df, var_list, n_var_lags=1, n_dls_lags=8):
     """Estimate VECM using DLS"""
 
@@ -307,7 +314,56 @@ def VECM(df, var_list, n_var_lags=1, n_dls_lags=8):
             # rhs.append(add_lag(df, var, lag))
 
     # Regression
-    return dt.mv_ols(df, lhs, rhs)
+    return VECMResults(dt.mv_ols(df, lhs, rhs), alp)
+
+def VECM_companion_form(vr, H=None):
+
+    if len(vr.alp.shape) == 1:
+        n_coint = 1
+    else:
+        raise Exception
+        
+    n_var = vr.results.params.shape[1]
+    
+    At = vr.results.params[1:, :].T
+    gam = At[:, :n_coint]
+    Gam = At[:, n_coint:]
+    
+    nx, nz = At.shape
+
+    Phi = np.zeros((nz, nz))
+    Phi[:nx, :nx] = Gam
+    Phi[:nx, nx:] = gam
+    Phi[nx:, :nx] = np.dot(vr.alp, Gam)
+    Phi[nx:, nx:] = 1.0 + np.dot(vr.alp, gam)
+
+    if H is not None:
+        C = np.zeros((nz, n_var))
+        C[:nx, :] = H
+        C[nx:, :] = np.dot(vr.alp, H)
+    else:
+        C = None
+
+    return (Phi, C)
+
+def VECM_irfs(vr, H, nt):
+
+    # Update to companion form
+    Phi, C = VECM_companion_form(vr, H)
+
+    # Set sizes
+    ny = len(vr.alp)
+    nx = Phi.shape[0]
+    ne = C.shape[1]
+
+    # Run IRFs in companion form
+    irfs = np.zeros((nx, ne, nt))
+    irfs[:, :, 0] = C
+    for tt in range(1, nt):
+        irfs[:, :, tt] = np.dot(Phi, irfs[:, :, tt-1])
+
+    # Drop lagged terms
+    return np.cumsum(irfs[:ny, :, :], axis=2)
 
 class LongHorizonMA:
     """Long Horizon Moving Average Regression"""
