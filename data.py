@@ -142,7 +142,7 @@ def match_xy(X, z, how='inner', ix=None):
 
 
 def regression(df_in, lhs, rhs, fes=[], intercept=True, formula_extra=None, ix=None, 
-               trend=None, **kwargs):
+               trend=None, cluster_groups=None, **kwargs):
     """Run regression from pandas dataframe"""
 
     formula = '{0} ~ {1}'.format(lhs, ' + '.join(rhs))
@@ -177,14 +177,19 @@ def regression(df_in, lhs, rhs, fes=[], intercept=True, formula_extra=None, ix=N
     else:
         Xs = np.hstack((np.ones((Xs.shape[0], 1)), Xs))
 
-    fr = formula_regression(df, formula, ix=ix, **kwargs)
+    if cluster_groups is not None:
+        these_groups = cluster_groups[ix_both]
+    else:
+        these_groups = None
+
+    fr = formula_regression(df, formula, ix=ix, cluster_groups=these_groups, **kwargs)
     fr.ix = ix_both
     fr.Xs = Xs
     fr.zs = zs
     
     return fr
 
-def formula_regression(df, formula, ix=None, nw_lags=0, display=False):
+def formula_regression(df, formula, ix=None, nw_lags=0, cluster_groups=None, display=False):
 
     # if var_list is not None:
         # ix, Xs, zs = match_sample(df[var_list].values, how=match, ix=ix)
@@ -199,7 +204,10 @@ def formula_regression(df, formula, ix=None, nw_lags=0, display=False):
 
     results = model.fit()
 
-    if nw_lags > 0:
+    if cluster_groups is not None:
+        assert(nw_lags == 0)
+        results = results.get_robustcov_results('cluster', groups=cluster_groups)
+    elif nw_lags > 0:
         results = results.get_robustcov_results('HAC', maxlags=nw_lags)
     else:
         results = results.get_robustcov_results('HC0')

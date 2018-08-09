@@ -1,13 +1,13 @@
 # import math
 import numpy as np
-import scipy.stats as st
+from scipy import stats as st, optimize as opt
 
 BETA = 1
 GAMMA = 2
 INV_GAMMA = 3
 NORM = 4
 
-def get_prior(prior_type, mean=None, sd=None, mode=None, params=None):
+def get_prior(prior_type, mean=None, sd=None, params=None):
 
     prior_num_dict = {
         'beta' : BETA,
@@ -16,7 +16,9 @@ def get_prior(prior_type, mean=None, sd=None, mode=None, params=None):
         'norm' : NORM,
     }
 
-    if isinstance(prior_type, int):
+    if prior_type is None:
+        return None
+    elif isinstance(prior_type, int):
         prior_num = prior_type
     elif isinstance(prior_type, str):
         prior_num = prior_num_dict[prior_type]
@@ -27,8 +29,10 @@ def get_prior(prior_type, mean=None, sd=None, mode=None, params=None):
         raise Exception
 
     if params is None:
-        assert ((mean is not None) or (mode is not None)) and (sd is not None)
-        assert (mean is None) or (mode is None)
+        # assert ((mean is not None) or (mode is not None))
+        # assert ((mean is None) or (mode is None))
+        # assert (sd is not None)
+        assert (mean is not None and sd is not None)
 
         if prior_num == BETA:
             alp = (1.0 - mean) * ((mean / sd) ** 2) - mean
@@ -41,10 +45,7 @@ def get_prior(prior_type, mean=None, sd=None, mode=None, params=None):
         elif prior_num == INV_GAMMA:
             # raise Exception
             alp = 2 + ((mean / sd) ** 2)  
-            if mode is not None:
-                bet = mean * (alp + 1)
-            else:
-                bet = mean * (alp - 1)
+            bet = mean * (alp - 1)
             return st.invgamma(alp, scale=bet)
         elif prior_num == NORM:
             return st.norm(loc=mean, scale=sd)
