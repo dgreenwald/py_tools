@@ -137,7 +137,7 @@ def get_var_index(nipa_table, nipa_vintage='1706', add_prefix=False):
         # Corporate nonfinancial
         cnf_index = {
             # Nonfinancial
-            # 'gross_value_added' : 'A455RC1',
+            'gross_value_added' : 'A455RC1',
             'cons_fixed_cap' : 'B456RC1',
             'net_value_added' : 'A457RC1',
             'compensation' : 'A460RC1',

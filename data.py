@@ -401,7 +401,7 @@ def read_pickle(path):
 
     return pickle.load(open(path, "rb"))
 
-def demean2(group_list,  var_list,df,  prefix=None):
+def demean2(group_list, var_list, df, prefix=None):
     """Set prefix to None to overwrite existing variables with demeaned
     versions, otherwise demeaned versions will have specified prefix"""
 
