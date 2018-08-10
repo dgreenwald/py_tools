@@ -1,8 +1,9 @@
 # import ipdb
 import numpy as np
 from scipy.misc import logsumexp
+from scipy.sparse import csr_matrix
 
-from . import econ
+from . import econ, utilities as ut
 
 def make_2d(x):
 
@@ -13,10 +14,20 @@ def make_2d(x):
 
 class HiddenMarkov:
 
-    def __init__(self, P, log_err_density, y_vals):
+    def __init__(self, P, log_err_density, y_vals, sparse=False, tol=1e-8):
         """Initialize parameters of the HM model"""
 
-        self.P = P  # Transition matrix
+        self.P = P
+        
+        self.sparse = sparse
+        if self.sparse:
+            self.Ps = P.copy()
+            self.Ps[self.Ps < tol] = 0
+            self.Ps = self.Ps / np.sum(self.Ps, axis=1)[:, np.newaxis]
+            self.Ps = csr_matrix(self.Ps)
+        else:
+            self.Ps = self.P
+            
         self.log_err_density = log_err_density  # Measurement error density function
         self.y_vals = make_2d(y_vals.copy())    # Data values
 
@@ -25,6 +36,8 @@ class HiddenMarkov:
 
         self.px_filt = np.zeros((self.Nt, self.Nx))
         self.log_p_err = np.zeros((self.Nt, self.Nx))
+            
+#        self.Pt = self.P.T
 
     def set_px_init(self, px_init):
         """Setter function for initial distribution"""
@@ -55,8 +68,9 @@ class HiddenMarkov:
             
             px_filt_t = np.exp(log_py_all - log_py_marg)
             # px_pred_t = np.dot(px_filt_t, self.P.T)
-            px_pred_t = np.dot(px_filt_t, self.P)
-            
+#            px_pred_t = np.dot(px_filt_t, self.P)
+            px_pred_t = self.Ps.T.dot(px_filt_t)
+
             self.log_p_err[tt, :] = log_p_err_t
             self.px_filt[tt, :] = px_filt_t
             self.px_pred[tt, :] = px_pred_t
@@ -72,10 +86,12 @@ class HiddenMarkov:
         for tt in range(self.Nt - 1, -1, -1):
 
             if tt < self.Nt - 1:
-                px_joint_t = (self.P * self.px_filt[tt, :][:, np.newaxis]
-                              * (self.px_smooth[tt+1, :] / self.px_pred[tt, :])[np.newaxis, :])
-                px_smooth_t = np.sum(px_joint_t, axis=1)
+#                px_joint_t = (self.P * self.px_filt[tt, :][:, np.newaxis]
+#                              * (self.px_smooth[tt+1, :] / self.px_pred[tt, :])[np.newaxis, :])
+#                px_smooth_t = np.sum(px_joint_t, axis=1)
                 # self.px_joint[tt, :, :] = px_joint_t
+
+                px_smooth_t = self.px_filt[tt, :] * (self.Ps.dot(self.px_smooth[tt+1, :] / self.px_pred[tt, :]))
             else:
                 px_smooth_t = self.px_filt[-1, :]
 
