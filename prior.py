@@ -57,9 +57,23 @@ class Prior:
 
     def __init__(self):
         self.dists = []
+        self.names = []
+        self.non_flat_names = []
 
-    def add(self, prior_type, *args, **kwargs):
-        self.dists.append(get_prior(prior_type, *args, **kwargs))
+    def add(self, prior_type, name=None, *args, **kwargs):
+        this_prior = get_prior(prior_type, *args, **kwargs)
+        self.dists.append(this_prior)
+
+        # Add parameter name
+        if name is None:
+            name = 'param{:d}'.format(len(self.dists))
+        self.names.append(name)
+        
+        if this_prior is not None:
+            self.non_flat_names.append(name)
 
     def logpdf(self, vals):
         return np.sum([dist.logpdf(val) for dist, val in zip(self.dists, vals) if dist is not None])
+
+    def sample(self, n_samp):
+        return np.vstack((dist.rvs(n_samp) for dist in self.dists if dist is not None))
