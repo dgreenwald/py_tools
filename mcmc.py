@@ -10,6 +10,34 @@ def logit(x, lb=0.0, ub=1.0):
 def logistic(x, lb=0.0, ub=1.0):
     return lb + (ub - lb) / (1.0 + np.exp(-x))
 
+def randomize_blocks(nx, nblock):
+    """nx is number of entries, nblock is number of blocks"""
+    ix_all = np.random.permutation(nx)
+    block_size = int(np.ceil(nx / nblock))
+
+    blocks = []
+    cutoffs = np.arange(0, nx, block_size)
+
+    for ii in range(nblock):
+        start_ix = cutoffs[ii]
+        if ii < nblock - 1:
+            end_ix = cutoffs[ii + 1]
+        else:
+            end_ix = nx
+        blocks.append(ix_all[start_ix:end_ix])
+
+    return numerical_to_bool_blocks(blocks, nx)
+
+def numerical_to_bool_blocks(blocks, nx):
+    
+    bool_blocks = []
+    for block in blocks:
+        this_block = np.zeros(nx, dtype=bool)
+        this_block[block] = True
+        bool_blocks.append(this_block)
+        
+    return bool_blocks
+
 def check_bounds(x, bounds):
 
     for ii in range(len(x)):
@@ -67,6 +95,21 @@ def load_file(out_dir, name, suffix=None, pickle=False):
     else:
         return np.load(outfile)
 
+def metropolis_step(fcn, x, x_try, L=None, log_u=None, args=()):
+
+    if L is None:
+        L = fcn(x, *args)
+
+    L_try = fcn(x_try, *args)
+    
+    if log_u is None:
+        log_u = np.log(np.random.rand())
+
+    if log_u < L_try - L:
+        return (x_try, L_try, True)
+    else:
+        return (x, L, False)
+
 class MCMC:
     """Class for Markov Chain Monte Carlo sampler"""
 
@@ -87,11 +130,11 @@ class MCMC:
                 self.bounds.append(bounds_dict.get(name, (None, None)))
 
         if bounds is not None:
-            self.Npar = len(self.bounds)
+            self.Nx = len(self.bounds)
         else:
-            self.Npar = None
+            self.Nx = None
 
-        self.params_hat = None
+        self.x_hat = None
         self.L_hat = None
         self.CH_inv = None
         self.draws = None
@@ -115,7 +158,7 @@ class MCMC:
 
         x0_u = self.transform(x0, to_bdd=False)
         res = minimize(self.objfcn, x0_u, tol=self.tol)
-        self.params_hat = self.transform(res.x, to_bdd=True)
+        self.x_hat = self.transform(res.x, to_bdd=True)
         self.L_hat = -res.fun
         return res
 
@@ -145,7 +188,7 @@ class MCMC:
     def compute_hessian(self, x0=None, **kwargs):
 
         if x0 is None:
-            x0 = self.params_hat.copy()
+            x0 = self.x_hat.copy()
 
         # if first_order:
             # grad = nm.gradient(self.log_like_args, x0)
@@ -158,21 +201,23 @@ class MCMC:
 
         return None
 
-    def metropolis_hastings(self, x, L, x_try, log_u=None):
+    def metro(self, x, L, x_try, **kwargs):
 
-        # Keep old if trial is out of bounds
-        if not check_bounds(x_try, self.bounds):
-            return (x, L, False)
+        return metropolis_step(self.log_like_args, x, x_try, L=L, **kwargs)
 
-        L_try = self.log_like_args(x_try)
+        # # Keep old if trial is out of bounds
+        # if not check_bounds(x_try, self.bounds):
+            # return (x, L, False)
+
+        # L_try = self.log_like_args(x_try)
         
-        if log_u is None:
-            log_u = np.log(np.random.rand())
+        # if log_u is None:
+            # log_u = np.log(np.random.rand())
 
-        if log_u < L_try - L:
-            return (x_try, L_try, True)
-        else:
-            return (x, L, False)
+        # if log_u < L_try - L:
+            # return (x_try, L_try, True)
+        # else:
+            # return (x, L, False)
 
     def open_log(self, title='log'):
 
@@ -188,71 +233,112 @@ class MCMC:
 
         self.fid = open(log_file, 'wt')
 
-    def sample(self, Nsim, jump_scale=None, jump_mult=1.0, stride=1, x0=None,
-               C=None, n_print=None, n_recov=None, n_save=None, n_burn=0,
-               log=True, **kwargs):
+    def initialize(self, x0=None, jump_scale=None, jump_mult=1.0, stride=1, 
+                   C=None, blocks='none', bool_blocks=False, n_blocks=None):
+
+        self.stride = stride
+
+        if x0 is None:
+            self.x0 = self.x_hat
+        else:
+            self.x0 = x0
+            
+        if self.Nx is None:
+            self.Nx = len(self.x0)
+        else:
+            assert(self.Nx == len(self.x0))
+
+        if jump_scale is None:
+            self.jump_scale = jump_mult * 2.4 / np.sqrt(self.Nx)
+        else:
+            self.jump_scale = jump_scale
+
+        if blocks == 'none':
+            self.blocks = [np.ones(self.Nx, dtype=bool)]
+        elif blocks == 'random':
+            assert(n_blocks is not None)
+            self.blocks = randomize_blocks(self.Nx, n_blocks)
+        elif bool_blocks:
+            # Boolean blocks, i.e., [False, True, False, False, True, True]
+            self.blocks = blocks
+        else:
+            # Numerical blocks, i.e. [1, 4, 5]
+            self.blocks = numerical_to_bool_blocks(blocks, self.Nx)
+
+        # Make sure every parameter is in some block
+        assert (sum([np.sum(block) for block in self.blocks])) == len(self.x0)
+
+        if C is None:
+            self.C = []
+            for iblock, block in enumerate(self.blocks):
+                self.C += [self.CH_inv[block, :][:, block]]
+        else:
+            self.C = C
+
+        self.Nblock = len(self.blocks)
+
+    def sample(self, Nsim, n_print=None, n_recov=None, n_save=None, log=True,
+               **kwargs):
 
         self.Nsim = Nsim
 
-        if x0 is not None:
-            x = x0.copy()
-            L = self.log_like_args(x)
-        else:
-            x = self.params_hat.copy()
-            L = self.L_hat
+        x = self.x0.copy()
+        L = self.log_like_args(x)
 
-        if self.Npar is None:
-            self.Npar = len(x)
+        if self.Nx is None:
+            self.Nx = len(x)
 
         if log:
             self.open_log()
         else:
             self.fid = None
 
-        Ntot = Nsim * stride
-        self.draws = np.zeros((self.Nsim, self.Npar))
+        Nstep = Nsim * self.stride
+        Ntot = Nstep * self.Nblock
+
+        self.draws = np.zeros((self.Nsim, self.Nx))
         self.L_sim = np.zeros(self.Nsim)
         self.acc_rate = 0.0
         
-        e = np.random.randn(Ntot, self.Npar)
-        log_u = np.log(np.random.rand(Ntot))
+        e = [np.random.randn(Nstep, np.sum(block)) for block in self.blocks]
+        log_u = np.log(np.random.rand(Nstep, self.Nblock))
 
         self.max_x = 1.0 * x
         self.max_L = 1.0 * L
 
-        if jump_scale is None:
-            self.jump_scale = jump_mult * 2.4 / np.sqrt(len(x))
-        else:
-            self.jump_scale = jump_scale
         self.print_log("Jump scale is {}".format(self.jump_scale))
 
-        if C is None:
-            C = self.CH_inv
+        for istep in range(Nstep):
 
-        for ii in range(Ntot):
-            x_try = x + self.jump_scale * np.dot(C, e[ii, :])
-            x, L, acc = self.metropolis_hastings(x, L, x_try, log_u=log_u[ii])
+            for iblock, block in enumerate(self.blocks):
 
-            if L > self.max_L:
-                self.max_L = 1.0 * L
-                self.max_x = 1.0 * x
+                x_try = x.copy()
+                x_try[block] += self.jump_scale * np.dot(self.C[iblock], e[iblock][istep, :])
+                x, L, acc = self.metro(x, L, x_try, log_u=log_u[istep, iblock])
 
-            self.acc_rate += acc
-            if (ii + 1) % stride == 0:
-                self.draws[ii // stride, :] = x
-                self.L_sim[ii // stride] = L
+                if L > self.max_L:
+                    self.max_L = 1.0 * L
+                    self.max_x = 1.0 * x
+
+                self.acc_rate += acc
+
+            if (istep + 1) % self.stride == 0:
+                self.draws[istep // self.stride, :] = x
+                self.L_sim[istep // self.stride] = L
 
                 if n_print is not None:
-                    if (ii // stride + 1) % n_print == 0:
-                        self.print_log("Draw {0:d}. Acceptance rate: {1:4.3f}. Max L = {2:4.3f}".format((ii + 1) // stride, self.acc_rate / ii, self.max_L))
+                    if (istep // self.stride + 1) % n_print == 0:
+                        self.print_log("Draw {0:d}. Acceptance rate: {1:4.3f}. Max L = {2:4.3f}".format(
+                            (istep + 1) // self.stride, self.acc_rate / istep, self.max_L
+                        ))
 
-                if n_recov is not None:
-                    if ((ii // stride + 1) - n_burn) % n_recov == 0:
-                        self.print_log("Recomputing covariance")
-                        C = np.linalg.cholesky(np.cov(self.draws[n_burn : (ii // stride) + 1, :], rowvar=False))
+                # if n_recov is not None:
+                    # if ((istep // self.stride + 1) - n_burn) % n_recov == 0:
+                        # self.print_log("Recomputing covariance")
+                        # self.C = np.linalg.cholesky(np.cov(self.draws[n_burn : (istep // self.stride) + 1, :], rowvar=False))
 
                 if n_save is not None:
-                    if ((ii // stride + 1) % n_save == 0) and ii < Ntot - 1:
+                    if ((istep // self.stride + 1) % n_save == 0) and istep < Nstep - 1:
                         self.print_log("Saving intermediate output")
                         self.save_all()
 
@@ -268,7 +354,7 @@ class MCMC:
 
     def save_all(self, **kwargs):
 
-        for name in ['params_hat', 'L_hat', 'CH_inv', 'draws', 'L_sim', 'acc_rate']:
+        for name in ['x_hat', 'L_hat', 'CH_inv', 'draws', 'L_sim', 'acc_rate']:
             self.save_item(name)
 
         # Pickled items
@@ -279,7 +365,7 @@ class MCMC:
 
     def load_all(self, **kwargs):
 
-        for name in ['params_hat', 'L_hat', 'CH_inv', 'draws', 'L_sim', 'acc_rate']:
+        for name in ['x_hat', 'L_hat', 'CH_inv', 'draws', 'L_sim', 'acc_rate']:
             self.load_item(name)
 
         # Pickled items
