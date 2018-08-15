@@ -40,14 +40,7 @@ def numerical_to_bool_blocks(blocks, nx):
 
 def check_bounds(x, bounds):
 
-    for ii in range(len(x)):
-        lb, ub = bounds[ii]
-        if lb is not None and x[ii] < lb:
-            return False
-        if ub is not None and x[ii] > ub:
-            return False
-
-    return True
+    return (np.all(x >= lb) and np.all(x <= ub))
 
 def print_mesg(mesg, fid=None):
     
@@ -110,44 +103,59 @@ def metropolis_step(fcn, x, x_try, L=None, log_u=None, args=()):
     else:
         return (x, L, False)
 
-class MCMC:
-    """Class for Markov Chain Monte Carlo sampler"""
+class MonteCarlo:
+    """Master class for Monte Carlo samplers"""
 
-    def __init__(self, log_like=None, args=(), bounds=None, names=None,
-                 bounds_dict={}, out_dir=None, suffix=None):
-        """Constructor -- need to finish"""
+    def __init__(self, log_like=None, args=(), lb=None, ub=None, names=None,
+                 bounds_dict={}, out_dir=None, suffix=None, Nx=None):
 
         self.log_like = log_like
         self.args = args
-        self.bounds = bounds 
         self.names = names
-#        self.tol = tol
-#        self.jump_scale = jump_scale
-
-        if self.bounds is None and self.names is not None:
-            self.bounds = []
-            for name in self.names:
-                self.bounds.append(bounds_dict.get(name, (None, None)))
-
-        if bounds is not None:
-            self.Nx = len(self.bounds)
-        else:
-            self.Nx = None
-
-        self.x_hat = None
-        self.L_hat = None
+        self.x_mode = None
+        self.L_mode = None
         self.CH_inv = None
-        self.draws = None
-        self.acc_rate = None
+
+        if lb is not None:
+            self.Nx = len(lb)
+        elif ub is not None:
+            self.Nx = len(ub)
+        elif names is not None:
+            self.Nx = len(names)
+        elif Nx is not None:
+            self.Nx = Nx
+        else:
+            print("Length of parameter vector unknown")
+            raise Exception
+
+        if lb is None or ub is None:
+
+            if lb is None:
+                self.lb = np.inf * np.ones(self.Nx)
+            if ub is None:
+                self.ub = np.inf * np.ones(self.Nx)
+
+            if self.names is not None:
+                for ii, name in enumerate(self.names):
+                    lb_i, ub_i = bounds_dict.get(name, (-np.inf, np.inf))
+
+                    if lb_i is None: lb_i = -np.inf
+                    if ub_i is None: ub_i = np.inf
+
+                    if lb is None: self.lb[ii] = lb_i
+                    if ub is None: self.ub[ii] = ub_i
 
         self.out_dir = out_dir
         self.suffix = suffix
 
     def log_like_args(self, params):
 
-        return self.log_like(params, *self.args)
+        if check_bounds(params, self.bounds):
+            return self.log_like(params, *self.args)
+        else:
+            return -1e+10
 
-    def objfcn(self, unbdd_params):
+    def min_objfcn(self, unbdd_params):
 
         params = self.transform(unbdd_params, to_bdd=True)
         return -self.log_like(params, *self.args)
@@ -158,8 +166,8 @@ class MCMC:
 
         x0_u = self.transform(x0, to_bdd=False)
         res = minimize(self.objfcn, x0_u, tol=self.tol)
-        self.x_hat = self.transform(res.x, to_bdd=True)
-        self.L_hat = -res.fun
+        self.x_mode = self.transform(res.x, to_bdd=True)
+        self.L_mode = -res.fun
         return res
 
     def transform(self, vals, to_bdd=True):
@@ -188,12 +196,8 @@ class MCMC:
     def compute_hessian(self, x0=None, **kwargs):
 
         if x0 is None:
-            x0 = self.x_hat.copy()
+            x0 = self.x_mode.copy()
 
-        # if first_order:
-            # grad = nm.gradient(self.log_like_args, x0)
-            # self.H = np.dot(grad, grad.T)
-        # else:
         self.H = -nm.hessian(self.log_like_args, x0)
 
         self.H_inv = np.linalg.pinv(self.H)
@@ -204,20 +208,6 @@ class MCMC:
     def metro(self, x, L, x_try, **kwargs):
 
         return metropolis_step(self.log_like_args, x, x_try, L=L, **kwargs)
-
-        # # Keep old if trial is out of bounds
-        # if not check_bounds(x_try, self.bounds):
-            # return (x, L, False)
-
-        # L_try = self.log_like_args(x_try)
-        
-        # if log_u is None:
-            # log_u = np.log(np.random.rand())
-
-        # if log_u < L_try - L:
-            # return (x_try, L_try, True)
-        # else:
-            # return (x, L, False)
 
     def open_log(self, title='log'):
 
@@ -233,13 +223,49 @@ class MCMC:
 
         self.fid = open(log_file, 'wt')
 
+    def print_log(self, mesg):
+        print_mesg(mesg, fid=self.fid)
+
+    def close_log(self):
+        self.fid.close()
+
+    def save_item(self, name, **kwargs):
+
+        assert(self.out_dir is not None)
+        obj = getattr(self, name)
+        if obj is not None:
+            save_file(obj, self.out_dir, name, self.suffix, **kwargs)
+
+        return None
+
+    def load_item(self, name, **kwargs):
+
+        assert(self.out_dir is not None)
+        setattr(self, name, load_file(self.out_dir, name, self.suffix, **kwargs))
+
+        return None
+
+class RWMC(MonteCarlo):
+    """Class for Markov Chain Monte Carlo sampler"""
+
+    def __init__(self, *args, **kwargs):
+        """Constructor -- need to finish"""
+
+        MonteCarlo.__init__(self, *args, **kwargs)
+
+        self.draws = None
+        self.acc_rate = None
+
+        self.out_dir = out_dir
+        self.suffix = suffix
+
     def initialize(self, x0=None, jump_scale=None, jump_mult=1.0, stride=1, 
                    C=None, blocks='none', bool_blocks=False, n_blocks=None):
 
         self.stride = stride
 
         if x0 is None:
-            self.x0 = self.x_hat
+            self.x0 = self.x_mode
         else:
             self.x0 = x0
             
@@ -278,7 +304,7 @@ class MCMC:
         self.Nblock = len(self.blocks)
 
     def sample(self, Nsim, n_print=None, n_recov=None, n_save=None, log=True,
-               **kwargs):
+               *args, **kwargs):
 
         self.Nsim = Nsim
 
@@ -349,12 +375,9 @@ class MCMC:
 
         return None
 
-    def print_log(self, mesg):
-        print_mesg(mesg, fid=self.fid)
-
     def save_all(self, **kwargs):
 
-        for name in ['x_hat', 'L_hat', 'CH_inv', 'draws', 'L_sim', 'acc_rate']:
+        for name in ['x_mode', 'L_mode', 'CH_inv', 'draws', 'L_sim', 'acc_rate']:
             self.save_item(name)
 
         # Pickled items
@@ -365,28 +388,12 @@ class MCMC:
 
     def load_all(self, **kwargs):
 
-        for name in ['x_hat', 'L_hat', 'CH_inv', 'draws', 'L_sim', 'acc_rate']:
+        for name in ['x_mode', 'L_mode', 'CH_inv', 'draws', 'L_sim', 'acc_rate']:
             self.load_item(name)
 
         # Pickled items
         for name in ['names']:
             self.load_item(name, pickle=True)
-
-        return None
-
-    def save_item(self, name, **kwargs):
-
-        assert(self.out_dir is not None)
-        obj = getattr(self, name)
-        if obj is not None:
-            save_file(obj, self.out_dir, name, self.suffix, **kwargs)
-
-        return None
-
-    def load_item(self, name, **kwargs):
-
-        assert(self.out_dir is not None)
-        setattr(self, name, load_file(self.out_dir, name, self.suffix, **kwargs))
 
         return None
 
@@ -398,3 +405,37 @@ class MCMC:
         self.sample(Nsim, **kwargs)
         if self.out_dir is not None:
             self.save(self.out_dir, **kwargs)
+
+class SMC:
+    """Sequential Monte Carlo Sampler"""
+
+    def __init__(self, log_like, prior, args=()):
+
+        self.like = like
+        self.prior = prior
+        self.Nx = len(prior.dists)
+
+    def initialize(self, Npts, Nsteps, init_jump_scale=0.25):
+
+        self.Npts = Npts
+        self.Nsteps = Nsteps
+
+        self.jump_scales = np.zeros(self.Nsteps)
+        self.jump_scales[0] = init_jump_scale
+
+        self.draws = np.zeros((self.Nsteps, self.Npts, self.Nx))
+        self.draws[0, :, :] = self.prior.sample(self.Npts).T 
+
+        self.W = np.zeros((self.Nsteps, self.Npts))
+        self.W[0, :] = 1.0
+
+    def adapt(self, istep):
+
+        self.the_star = np.mean(self.draws[istep-1, :, :], axis=0)
+        self.Sig_star = np.cov(self.draws[istep-1, :, :], rowvar=False)
+        self.C_star = np.linalg.cholesky(self.Sig_star)
+
+        if istep > 1:
+            raise Exception
+        else:
+            self.jump_scales[istep] = self.jump_scales[istep-1]
