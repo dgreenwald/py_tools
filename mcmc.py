@@ -1,14 +1,39 @@
 import os
 import numpy as np
 from scipy.optimize import minimize
+from scipy.misc import logsumexp
 # import py_tools.numerical as nm
 from py_tools import in_out as io, numerical as nm
+from py_tools.prior import Prior
 
 def logit(x, lb=0.0, ub=1.0):
     return np.log(x - lb) - np.log(ub - x)
 
 def logistic(x, lb=0.0, ub=1.0):
     return lb + (ub - lb) / (1.0 + np.exp(-x))
+
+def transform(vals, lb, ub, to_bdd=True):
+
+    trans_vals = vals.copy()
+
+    # Indices
+    ix_lb = lb > -np.inf
+    ix_ub = ub < np.inf
+
+    ix_both = ix_lb & ix_ub
+    ix_lb_only = ix_lb & (~ix_ub)
+    ix_ub_only = (~ix_lb) & ix_ub
+
+    if to_bdd:
+        trans_vals[ix_both] = logistic(vals[ix_both], lb=lb[ix_both], ub=ub[ix_both])
+        trans_vals[ix_lb_only] = lb[ix_lb_only] + np.exp(vals[ix_lb_only])
+        trans_vals[ix_ub_only] = ub[ix_ub_only] - np.exp(vals[ix_ub_only])
+    else:
+        trans_vals[ix_both] = logit(vals[ix_both], lb=lb[ix_both], ub=ub[ix_both])
+        trans_vals[ix_lb_only] = np.log(vals[ix_lb_only] - lb[ix_lb_only])
+        trans_vals[ix_ub_only] = -np.log(ub[ix_ub_only] - vals[ix_ub_only])
+
+    return trans_vals
 
 def randomize_blocks(nx, nblock):
     """nx is number of entries, nblock is number of blocks"""
@@ -38,7 +63,7 @@ def numerical_to_bool_blocks(blocks, nx):
         
     return bool_blocks
 
-def check_bounds(x, bounds):
+def check_bounds(x, lb, ub):
 
     return (np.all(x >= lb) and np.all(x <= ub))
 
@@ -88,32 +113,80 @@ def load_file(out_dir, name, suffix=None, pickle=False):
     else:
         return np.load(outfile)
 
-def metropolis_step(fcn, x, x_try, L=None, log_u=None, args=()):
+def metropolis_step(fcn, x, x_try, post=None, log_u=None, args=()):
 
-    if L is None:
-        L = fcn(x, *args)
+    if post is None:
+        post = fcn(x, *args)
 
-    L_try = fcn(x_try, *args)
+    post_try = fcn(x_try, *args)
     
     if log_u is None:
         log_u = np.log(np.random.rand())
 
-    if log_u < L_try - L:
-        return (x_try, L_try, True)
+    if log_u < post_try - post:
+        return (x_try, post_try, True)
     else:
-        return (x, L, False)
+        return (x, post, False)
+
+def rwmh(posterior, x_init, jump_scale=1.0, C=None, Nstep=1, blocks=None,
+              block_sizes=None, post_init=None, e=None, log_u=None):
+
+    Nx = len(x_init)
+    Nblock = len(blocks)
+
+    if blocks is None:
+        blocks = [np.ones(Nx, dtype=bool)]
+
+    if block_sizes is None:
+        block_sizes = [np.sum(block) for block in blocks]
+
+    if e is None:
+        e = np.random.randn(Nstep, Nx)
+
+    if C is None:
+        C = [np.eye(block_size) for block_size in block_sizes]
+
+    if log_u is None:
+        log_u = np.log(np.random.rand(Nstep, Nblock))
+
+    if post_init is None:
+        post_init = posterior(x_init)
+
+    x_store = np.zeros((Nstep, Nx))
+    post_store = np.zeros(Nstep)
+    acc_rate = 0
+
+    x = x_init.copy()
+    post = post_init
+    
+    for istep in range(Nstep):
+
+        for iblock, block in enumerate(blocks):
+            x_try = x.copy()
+            x_try[block] += jump_scale * np.dot(C[iblock], e[istep, block])
+            x, post, acc = metropolis_step(posterior, x, x_try, post=post, log_u=log_u[istep, iblock])
+            acc_rate += acc
+        
+        x_store[istep, :] = x
+        post_store[istep] = post
+
+    acc_rate /= (Nstep * Nblock)
+
+    return (x_store, post_store, acc_rate)
 
 class MonteCarlo:
     """Master class for Monte Carlo samplers"""
 
-    def __init__(self, log_like=None, args=(), lb=None, ub=None, names=None,
-                 bounds_dict={}, out_dir=None, suffix=None, Nx=None):
+    def __init__(self, log_like=None, prior=Prior(), args=(), lb=None, ub=None,
+                 names=None, bounds_dict={}, out_dir=None, suffix=None,
+                 Nx=None):
 
         self.log_like = log_like
+        self.prior = prior
         self.args = args
         self.names = names
         self.x_mode = None
-        self.L_mode = None
+        self.post_mode = None
         self.CH_inv = None
 
         if lb is not None:
@@ -148,66 +221,47 @@ class MonteCarlo:
         self.out_dir = out_dir
         self.suffix = suffix
 
-    def log_like_args(self, params):
+    def posterior(self, params):
 
-        if check_bounds(params, self.bounds):
-            return self.log_like(params, *self.args)
+        if check_bounds(params, self.lb, self.ub):
+            return (self.log_like(params, *self.args) + self.prior.logpdf(params))
         else:
             return -1e+10
 
     def min_objfcn(self, unbdd_params):
 
         params = self.transform(unbdd_params, to_bdd=True)
-        return -self.log_like(params, *self.args)
+        return -self.posterior(params)
 
     def find_mode(self, x0, method='bfgs', tol=1e-8, **kwargs):
         
         self.tol = tol
 
         x0_u = self.transform(x0, to_bdd=False)
-        res = minimize(self.objfcn, x0_u, tol=self.tol)
+        res = minimize(self.min_objfcn, x0_u, tol=self.tol)
         self.x_mode = self.transform(res.x, to_bdd=True)
-        self.L_mode = -res.fun
+        self.post_mode = -res.fun
         return res
 
-    def transform(self, vals, to_bdd=True):
+    def transform(self, vals, *args, **kwargs):
 
-        trans_vals = vals.copy()
-        for ii, (lb, ub) in enumerate(self.bounds):
-            if to_bdd:
-                if lb is not None:
-                    if ub is not None:
-                        trans_vals[ii] = logistic(vals[ii], lb=lb, ub=ub)
-                    else:
-                        trans_vals[ii] = lb + np.exp(vals[ii])
-                elif ub is not None:
-                    trans_vals[ii] = ub - np.exp(vals[ii])
-            else:
-                if lb is not None:
-                    if ub is not None:
-                        trans_vals[ii] = logit(vals[ii], lb=lb, ub=ub)
-                    else:
-                        trans_vals[ii] = np.log(vals[ii] - lb)
-                elif ub is not None:
-                    trans_vals[ii] = -np.log(ub - vals[ii])
-
-        return trans_vals
+        return transform(vals, self.lb, self.ub, *args, **kwargs)
 
     def compute_hessian(self, x0=None, **kwargs):
 
         if x0 is None:
             x0 = self.x_mode.copy()
 
-        self.H = -nm.hessian(self.log_like_args, x0)
+        self.H = -nm.hessian(self.posterior, x0)
 
         self.H_inv = np.linalg.pinv(self.H)
         self.CH_inv = np.linalg.cholesky(self.H_inv)
 
         return None
 
-    def metro(self, x, L, x_try, **kwargs):
+    def metro(self, x, post, x_try, **kwargs):
 
-        return metropolis_step(self.log_like_args, x, x_try, L=L, **kwargs)
+        return metropolis_step(self.posterior, x, x_try, post=post, **kwargs)
 
     def open_log(self, title='log'):
 
@@ -252,12 +306,6 @@ class RWMC(MonteCarlo):
         """Constructor -- need to finish"""
 
         MonteCarlo.__init__(self, *args, **kwargs)
-
-        self.draws = None
-        self.acc_rate = None
-
-        self.out_dir = out_dir
-        self.suffix = suffix
 
     def initialize(self, x0=None, jump_scale=None, jump_mult=1.0, stride=1, 
                    C=None, blocks='none', bool_blocks=False, n_blocks=None):
@@ -309,7 +357,7 @@ class RWMC(MonteCarlo):
         self.Nsim = Nsim
 
         x = self.x0.copy()
-        L = self.log_like_args(x)
+        post = self.posterior(x)
 
         if self.Nx is None:
             self.Nx = len(x)
@@ -323,14 +371,14 @@ class RWMC(MonteCarlo):
         Ntot = Nstep * self.Nblock
 
         self.draws = np.zeros((self.Nsim, self.Nx))
-        self.L_sim = np.zeros(self.Nsim)
+        self.post_sim = np.zeros(self.Nsim)
         self.acc_rate = 0.0
         
         e = [np.random.randn(Nstep, np.sum(block)) for block in self.blocks]
         log_u = np.log(np.random.rand(Nstep, self.Nblock))
 
         self.max_x = 1.0 * x
-        self.max_L = 1.0 * L
+        self.max_post = 1.0 * post
 
         self.print_log("Jump scale is {}".format(self.jump_scale))
 
@@ -340,22 +388,22 @@ class RWMC(MonteCarlo):
 
                 x_try = x.copy()
                 x_try[block] += self.jump_scale * np.dot(self.C[iblock], e[iblock][istep, :])
-                x, L, acc = self.metro(x, L, x_try, log_u=log_u[istep, iblock])
+                x, post, acc = self.metro(x, post, x_try, log_u=log_u[istep, iblock])
 
-                if L > self.max_L:
-                    self.max_L = 1.0 * L
+                if post > self.max_post:
+                    self.max_post = 1.0 * post
                     self.max_x = 1.0 * x
 
                 self.acc_rate += acc
 
             if (istep + 1) % self.stride == 0:
                 self.draws[istep // self.stride, :] = x
-                self.L_sim[istep // self.stride] = L
+                self.post_sim[istep // self.stride] = post
 
                 if n_print is not None:
                     if (istep // self.stride + 1) % n_print == 0:
-                        self.print_log("Draw {0:d}. Acceptance rate: {1:4.3f}. Max L = {2:4.3f}".format(
-                            (istep + 1) // self.stride, self.acc_rate / istep, self.max_L
+                        self.print_log("Draw {0:d}. Acceptance rate: {1:4.3f}. Max posterior = {2:4.3f}".format(
+                            (istep + 1) // self.stride, self.acc_rate / istep, self.max_post
                         ))
 
                 # if n_recov is not None:
@@ -377,7 +425,7 @@ class RWMC(MonteCarlo):
 
     def save_all(self, **kwargs):
 
-        for name in ['x_mode', 'L_mode', 'CH_inv', 'draws', 'L_sim', 'acc_rate']:
+        for name in ['x_mode', 'post_mode', 'CH_inv', 'draws', 'post_sim', 'acc_rate']:
             self.save_item(name)
 
         # Pickled items
@@ -388,7 +436,7 @@ class RWMC(MonteCarlo):
 
     def load_all(self, **kwargs):
 
-        for name in ['x_mode', 'L_mode', 'CH_inv', 'draws', 'L_sim', 'acc_rate']:
+        for name in ['x_mode', 'post_mode', 'CH_inv', 'draws', 'post_sim', 'acc_rate']:
             self.load_item(name)
 
         # Pickled items
@@ -406,36 +454,140 @@ class RWMC(MonteCarlo):
         if self.out_dir is not None:
             self.save(self.out_dir, **kwargs)
 
-class SMC:
+class SMC(MonteCarlo):
     """Sequential Monte Carlo Sampler"""
 
-    def __init__(self, log_like, prior, args=()):
+    def __init__(self, *args, **kwargs):
+        """Constructor -- need to finish"""
 
-        self.like = like
-        self.prior = prior
-        self.Nx = len(prior.dists)
+        MonteCarlo.__init__(self, *args, **kwargs)
 
-    def initialize(self, Npts, Nsteps, init_jump_scale=0.25):
+    def initialize(self, Npt, Nstep, Nmut=1, Nblock=1, blocks=None,
+                   init_jump_scale=0.25, lam=2.0, adapt_sens=16.0,
+                   adapt_range=0.1, adapt_target=0.25):
 
-        self.Npts = Npts
-        self.Nsteps = Nsteps
+        self.Npt = Npt
+        self.Nstep = Nstep
+        self.Nmut = Nmut
 
-        self.jump_scales = np.zeros(self.Nsteps)
+        # Adaptive proposal
+        self.adapt_sens = adapt_sens
+        self.adapt_range = adapt_range
+        self.adapt_target = adapt_target
+
+        # Random walk jump scaling (c_n)
+        self.jump_scales = np.zeros(self.Nstep)
         self.jump_scales[0] = init_jump_scale
 
-        self.draws = np.zeros((self.Nsteps, self.Npts, self.Nx))
-        self.draws[0, :, :] = self.prior.sample(self.Npts).T 
+        # Acceptance rate
+        self.acc_rate = np.zeros(self.Nstep)
 
-        self.W = np.zeros((self.Nsteps, self.Npts))
-        self.W[0, :] = 1.0
+        self.draws = np.zeros((self.Nstep, self.Npt, self.Nx))
+        self.draws[0, :, :] = self.prior.sample(self.Npt).T 
+
+        self.W = np.ones((self.Nstep, self.Npt))
+        self.post = np.zeros((self.Nstep, self.Npt))
+
+        # Posterior weighting schedule
+        self.lam = lam
+        self.phi = (np.arange(self.Nstep + 1) / self.Nstep) ** self.lam
+
+        # Blocks
+        if blocks is None:
+            self.blocks = randomize_blocks(self.Nx, Nblock)
+        else:
+            self.blocks = blocks
+
+        self.Nblock = len(self.blocks)
+        self.block_sizes = [np.sum(block) for block in self.blocks]
+        
+        # Other drawing parameters
+        self.the_star = None
+        self.C_star = None
+        
+        # Temporary (for diagnostics)
+        self.ess = np.zeros(self.Nstep)
+        self.draws_pre_mut = self.draws.copy()
+        self.post_pre_mut = self.post.copy()
+
+    def sample(self):
+
+        for istep in range(1, self.Nstep):
+            self.correct(istep)
+            self.adapt(istep)
+            self.mutate(istep)
+
+    def correct(self, istep):
+        
+        self.draws[istep, :, :] = self.draws[istep-1, :, :]
+
+        this_post = np.zeros(self.Npt)
+        for ipt in range(self.Npt):
+            this_post[ipt] = self.posterior(self.draws[istep, ipt, :]) 
+            
+        # Turn into weight using incremental
+        w = np.exp((self.phi[istep] - self.phi[istep-1]) * this_post)
+        W_til = w * self.W[istep-1, :]
+        W_til /= np.mean(W_til)
+
+        # Resample if effective sample size too small
+        ess = self.Npt / np.mean(W_til ** 2)
+        if ess < self.Npt / 2:
+            ix = np.random.choice(self.Npt, size=self.Npt, p=W_til / self.Npt)
+            self.draws[istep, :, :] = self.draws[istep, ix, :]
+            
+            self.W[istep, :] = 1.0
+            self.post[istep, :] = this_post[ix]
+        else:
+            self.W[istep, :] = W_til
+            self.post[istep, :] = this_post
+            
+        self.draws_pre_mut[istep, :, :] = self.draws[istep, :, :]
+        self.post_pre_mut[istep, :] = self.post[istep, :]
+        self.ess[istep] = ess
 
     def adapt(self, istep):
-
-        self.the_star = np.mean(self.draws[istep-1, :, :], axis=0)
-        self.Sig_star = np.cov(self.draws[istep-1, :, :], rowvar=False)
-        self.C_star = np.linalg.cholesky(self.Sig_star)
-
-        if istep > 1:
+        
+        # Weighted mean
+        weights = self.W[istep, :]
+        self.the_star = np.dot(weights, self.draws[istep, :, :]) / self.Npt
+        
+        # Weighted covariance
+        the_til = self.draws[istep, :, :] - self.the_star[np.newaxis, :]
+        if np.any(self.the_star > 0.0):
+            w_the_til = weights[:, np.newaxis] * the_til
+            self.Sig_star = np.dot(w_the_til.T, the_til) / self.Npt
+#            print(self.Sig_star)
+            self.C_star = np.linalg.cholesky(self.Sig_star)
+        elif self.C_star is None:
+            print("No valid value for C_star")
             raise Exception
-        else:
-            self.jump_scales[istep] = self.jump_scales[istep-1]
+
+        self.jump_scales[istep] = self.jump_scales[istep-1]
+        if istep > 1:
+            e_term = np.exp(self.adapt_sens * (self.acc_rate[istep-1] - self.adapt_target))
+            adj = (1.0 - 0.5 * self.adapt_range) + self.adapt_range * (e_term / (1.0 + e_term))
+            self.jump_scales[istep] *= adj
+
+    def mutate(self, istep):
+
+        e = np.random.randn(self.Npt, self.Nmut, self.Nx)
+        log_u = np.log(np.random.rand(self.Npt, self.Nmut, self.Nblock))
+
+        for ipt in range(self.Npt):
+            
+            x_i, post_i, acc_rate_i = rwmh(
+                self.posterior, self.draws[istep, ipt, :],
+                jump_scale=self.jump_scales[istep], C=self.C_star,
+                Nstep=self.Nmut, blocks=self.blocks,
+                block_sizes=self.block_sizes, post_init=self.post[istep, ipt], 
+                e=e[ipt, :, :], log_u=log_u[ipt, :, :],
+            )
+            
+            self.draws[istep, ipt, :] = x_i[-1, :]
+            self.post[istep, ipt] = post_i[-1]
+            self.acc_rate[istep] += acc_rate_i
+            
+        self.acc_rate[istep] /= self.Npt
+
+        return None
