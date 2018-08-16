@@ -1,0 +1,110 @@
+import numpy as np
+from mpi4py import MPI
+
+class MPIArray:
+    """Array that automatically does MPI sharing"""
+
+    def __init__(self, root_data=None, root_shape=None, dtype='float64',
+                 scatter=True):
+
+        # Get info from array passed in
+        if root_data is not None:
+            root_shape = root_data.shape
+            self.dtype = root_data.dtype
+        else:
+            self.dtype = dtype
+
+        # Set up MPI
+        self.comm = MPI.COMM_WORLD
+        self.size = self.comm.Get_size()
+        self.rank = self.comm.Get_rank()
+
+        # Data shape
+        self.root_shape = list(root_shape)
+        self.nrow_root = self.root_shape[0]
+        self.npad_local = ((self.nrow_root - 1) // self.size) + 1
+        self.npad_root = self.npad_local * self.size # padded version
+
+        if len(self.root_shape) == 1:
+            # One-index vector
+            self.ncol = 1
+            self.vec_flag = 1
+        else:
+            # Multidimensional array
+            self.higher_dims = self.root_shape[1:]
+            self.ncol = int(np.prod(self.higher_dims))
+            self.vec_flag = 0
+
+        # Allocate arrays
+        if self.rank == 0:
+            self.root_data = np.empty((self.npad_root, self.ncol), dtype=self.dtype)
+        else:
+            self.root_data = None
+
+        self.local_data = np.empty((self.npad_local, self.ncol), dtype=self.dtype) 
+
+        # Allocate index for padding
+        if self.rank == 0:
+            self.ix_root = np.ones(self.npad_root, dtype=bool)
+            self.ix_root[self.nrow_root:] = False
+        else:
+            self.ix_root = None
+
+        self.ix_local = np.ones(self.npad_local, dtype=bool)
+
+        # Initialize data (if passed)
+        if root_data is not None:
+            self.set_root_data(root_data)
+            
+            # Scatter data
+            if scatter: self.scatter()
+
+    def set_root_data(self, data, scatter=True):
+
+        if self.rank == 0:
+            self.root_data[self.ix_root, :] = data.reshape((self.nrow_root, self.ncol))
+
+        if scatter: self.scatter()
+
+    def set_local_data(self, data, gather=True):
+
+        self.local_data[self.ix_local, :] = data.reshape((self.nrow_local, self.ncol))
+        if gather: self.gather()
+
+    def get_root_data(self, gather=False):
+
+        if gather: self.gather()
+
+        out_data = self.root_data[self.ix_root, :]
+
+        if self.vec_flag:
+            return out_data.ravel()
+        else:
+            return out_data.reshape(self.root_shape)
+        # return self.root_data[self.ix_root, :]
+
+    def get_local_data(self, scatter=False):
+
+        if scatter: self.scatter()
+
+        out_data = self.local_data[self.ix_local, :]
+
+        if self.vec_flag:
+            return out_data.ravel()
+        else:
+            return out_data.reshape(self.local_shape)
+
+    def scatter(self):
+
+        self.comm.Scatter(self.root_data, self.local_data, root=0) 
+        self.comm.Scatter(self.ix_root, self.ix_local, root=0)
+
+        # Update number of local rows
+        self.nrow_local = np.sum(self.ix_local)
+        if not self.vec_flag:
+            self.local_shape = [self.nrow_local] + self.higher_dims
+
+    def gather(self):
+
+        self.comm.Gather(self.local_data, self.root_data, root=0)
+        self.comm.Gather(self.ix_local, self.ix_root, root=0)

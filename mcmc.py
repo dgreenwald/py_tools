@@ -5,6 +5,9 @@ from scipy.misc import logsumexp
 # import py_tools.numerical as nm
 from py_tools import in_out as io, numerical as nm
 from py_tools.prior import Prior
+from py_tools.mpi_array import MPIArray
+
+from mpi4py import MPI
 
 def logit(x, lb=0.0, ub=1.0):
     return np.log(x - lb) - np.log(ub - x)
@@ -464,7 +467,7 @@ class SMC(MonteCarlo):
 
     def initialize(self, Npt, Nstep, Nmut=1, Nblock=1, blocks=None,
                    init_jump_scale=0.25, lam=2.0, adapt_sens=16.0,
-                   adapt_range=0.1, adapt_target=0.25):
+                   adapt_range=0.1, adapt_target=0.25, parallel=False):
 
         self.Npt = Npt
         self.Nstep = Nstep
@@ -510,6 +513,12 @@ class SMC(MonteCarlo):
         self.draws_pre_mut = self.draws.copy()
         self.post_pre_mut = self.post.copy()
 
+        # Parallelization
+        self.parallel = parallel
+        if self.parallel:
+            comm = MPI.COMM_WORLD
+            self.rank = comm.Get_rank()
+
     def sample(self):
 
         for istep in range(1, self.Nstep):
@@ -518,13 +527,45 @@ class SMC(MonteCarlo):
             self.mutate(istep)
 
     def correct(self, istep):
-        
-        self.draws[istep, :, :] = self.draws[istep-1, :, :]
 
-        this_post = np.zeros(self.Npt)
-        for ipt in range(self.Npt):
-            this_post[ipt] = self.posterior(self.draws[istep, ipt, :]) 
+        self.draws[istep, :, :] = self.draws[istep-1, :, :]
+        
+        if self.parallel:
+#        if True:
+             
+            # Create MPI arrays and scatter to nodes
+            mpi_draws = MPIArray(root_data=self.draws[istep, :, :])
+            mpi_post = MPIArray(root_data=self.post[istep, :])
+
+            # Get local data
+            local_draws = mpi_draws.get_local_data()
+            local_post = mpi_post.get_local_data()
+
+            # Loop
+            Nloc = local_draws.shape[0]
+            for ipt in range(Nloc):
+                local_post[ipt] = self.posterior(local_draws[ipt, :])
+
+            mpi_post.set_local_data(local_post)
             
+            if self.rank > 0: return
+#                raise Exception
+            
+#            this_post2 = mpi_post.get_root_data()
+            this_post = mpi_post.get_root_data()
+            
+        else:
+#        if True:
+             
+            this_post = np.zeros(self.Npt)
+            for ipt in range(self.Npt):
+                this_post[ipt] = self.posterior(self.draws[istep, ipt, :])
+                
+#        print("correct error:")
+#        print(this_post - this_post2)
+        
+#        raise Exception
+
         # Turn into weight using incremental
         w = np.exp((self.phi[istep] - self.phi[istep-1]) * this_post)
         W_til = w * self.W[istep-1, :]
@@ -548,6 +589,8 @@ class SMC(MonteCarlo):
 
     def adapt(self, istep):
         
+        if self.rank > 0: return
+        
         # Weighted mean
         weights = self.W[istep, :]
         self.the_star = np.dot(weights, self.draws[istep, :, :]) / self.Npt
@@ -558,6 +601,9 @@ class SMC(MonteCarlo):
             w_the_til = weights[:, np.newaxis] * the_til
             self.Sig_star = np.dot(w_the_til.T, the_til) / self.Npt
 #            print(self.Sig_star)
+            if not np.all(np.linalg.eigvals(self.Sig_star) > 0):
+                print("Bad Sig_star:")
+                print(self.Sig_star)
             self.C_star = np.linalg.cholesky(self.Sig_star)
         elif self.C_star is None:
             print("No valid value for C_star")
@@ -570,24 +616,37 @@ class SMC(MonteCarlo):
             self.jump_scales[istep] *= adj
 
     def mutate(self, istep):
+        
+        if self.rank > 0: return
 
-        e = np.random.randn(self.Npt, self.Nmut, self.Nx)
-        log_u = np.log(np.random.rand(self.Npt, self.Nmut, self.Nblock))
-
-        for ipt in range(self.Npt):
+#        if self.parallel:
+#            
+#            # Set arrays and scatter
+#            mpi_e = MPIArray(root_data=np.random.randn(self.Npt, self.Nmut * self.Nx))
+#            mpi_log_u = MPIArray(root_data=np.random.rand(self.Npt, self.Nmut * self.Nblock)
+#            mpi_draws = MPIArray(root_data=self.draws[istep, :, :])
+#            mpi_post = MPIArray(root_data=self.post[istep, :][:, np.newaxis])
+#            
+#        else:
+        if True:
             
-            x_i, post_i, acc_rate_i = rwmh(
-                self.posterior, self.draws[istep, ipt, :],
-                jump_scale=self.jump_scales[istep], C=self.C_star,
-                Nstep=self.Nmut, blocks=self.blocks,
-                block_sizes=self.block_sizes, post_init=self.post[istep, ipt], 
-                e=e[ipt, :, :], log_u=log_u[ipt, :, :],
-            )
-            
-            self.draws[istep, ipt, :] = x_i[-1, :]
-            self.post[istep, ipt] = post_i[-1]
-            self.acc_rate[istep] += acc_rate_i
-            
-        self.acc_rate[istep] /= self.Npt
+            e = np.random.randn(self.Npt, self.Nmut, self.Nx)
+            log_u = np.log(np.random.rand(self.Npt, self.Nmut, self.Nblock))
+    
+            for ipt in range(self.Npt):
+                
+                x_i, post_i, acc_rate_i = rwmh(
+                    self.posterior, self.draws[istep, ipt, :],
+                    jump_scale=self.jump_scales[istep], C=self.C_star,
+                    Nstep=self.Nmut, blocks=self.blocks,
+                    block_sizes=self.block_sizes, post_init=self.post[istep, ipt], 
+                    e=e[ipt, :, :], log_u=log_u[ipt, :, :],
+                )
+                
+                self.draws[istep, ipt, :] = x_i[-1, :]
+                self.post[istep, ipt] = post_i[-1]
+                self.acc_rate[istep] += acc_rate_i
+                
+            self.acc_rate[istep] /= self.Npt
 
         return None
