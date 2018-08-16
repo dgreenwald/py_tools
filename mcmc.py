@@ -132,7 +132,7 @@ def metropolis_step(fcn, x, x_try, post=None, log_u=None, args=()):
         return (x, post, False)
 
 def rwmh(posterior, x_init, jump_scale=1.0, C=None, Nstep=1, blocks=None,
-              block_sizes=None, post_init=None, e=None, log_u=None):
+              block_sizes=None, post_init=None, e=None, log_u=None, quiet=True):
 
     Nx = len(x_init)
     Nblock = len(blocks)
@@ -169,6 +169,11 @@ def rwmh(posterior, x_init, jump_scale=1.0, C=None, Nstep=1, blocks=None,
             x_try[block] += jump_scale * np.dot(C[iblock], e[istep, block])
             x, post, acc = metropolis_step(posterior, x, x_try, post=post, log_u=log_u[istep, iblock])
             acc_rate += acc
+            
+            if not quiet:
+                print("x: " + repr(x))
+                print("x_try: " + repr(x_try))
+                print("post: " + repr(post))
         
         x_store[istep, :] = x
         post_store[istep] = post
@@ -507,6 +512,7 @@ class SMC(MonteCarlo):
         # Other drawing parameters
         self.the_star = None
         self.C_star = None
+        self.C = None
         
         # Temporary (for diagnostics)
         self.ess = np.zeros(self.Nstep)
@@ -516,8 +522,9 @@ class SMC(MonteCarlo):
         # Parallelization
         self.parallel = parallel
         if self.parallel:
-            comm = MPI.COMM_WORLD
-            self.rank = comm.Get_rank()
+            self.comm = MPI.COMM_WORLD
+            self.mpi_size = self.comm.Get_size()
+            self.rank = self.comm.Get_rank()
 
     def sample(self):
 
@@ -548,7 +555,7 @@ class SMC(MonteCarlo):
 
             mpi_post.set_local_data(local_post)
             
-            if self.rank > 0: return
+            if self.rank > 0: return None
 #                raise Exception
             
 #            this_post2 = mpi_post.get_root_data()
@@ -589,7 +596,8 @@ class SMC(MonteCarlo):
 
     def adapt(self, istep):
         
-        if self.rank > 0: return
+        if self.parallel: 
+            if self.rank > 0: return None
         
         # Weighted mean
         weights = self.W[istep, :]
@@ -605,6 +613,12 @@ class SMC(MonteCarlo):
                 print("Bad Sig_star:")
                 print(self.Sig_star)
             self.C_star = np.linalg.cholesky(self.Sig_star)
+                
+            # Update C as list by block
+            self.C = []
+            for iblock, block in enumerate(self.blocks):
+                self.C += [self.C_star[block, :][:, block]]
+
         elif self.C_star is None:
             print("No valid value for C_star")
             raise Exception
@@ -616,28 +630,110 @@ class SMC(MonteCarlo):
             self.jump_scales[istep] *= adj
 
     def mutate(self, istep):
-        
-        if self.rank > 0: return
 
-#        if self.parallel:
-#            
-#            # Set arrays and scatter
-#            mpi_e = MPIArray(root_data=np.random.randn(self.Npt, self.Nmut * self.Nx))
-#            mpi_log_u = MPIArray(root_data=np.random.rand(self.Npt, self.Nmut * self.Nblock)
-#            mpi_draws = MPIArray(root_data=self.draws[istep, :, :])
-#            mpi_post = MPIArray(root_data=self.post[istep, :][:, np.newaxis])
-#            
-#        else:
-        if True:
+        e = np.random.randn(self.Npt, self.Nmut, self.Nx)
+        log_u = np.log(np.random.rand(self.Npt, self.Nmut, self.Nblock))
+        
+#        old_draws = self.draws[istep, :, :].copy()
+#        if self.rank == 0:
+#            print("all draws:\n" + repr(self.draws[istep, :, :]))
+        
+        if self.parallel:
+#        if True:
             
-            e = np.random.randn(self.Npt, self.Nmut, self.Nx)
-            log_u = np.log(np.random.rand(self.Npt, self.Nmut, self.Nblock))
+            local_C = self.comm.bcast(self.C, root=0)
+            local_jump_scale = self.comm.bcast(self.jump_scales[istep], root=0)
+            
+            # Set arrays and scatter
+            mpi_draws = MPIArray(root_data=self.draws[istep, :, :])
+            mpi_post = MPIArray(root_data=self.post[istep, :])
+            mpi_e = MPIArray(root_data=e)
+            mpi_log_u = MPIArray(root_data=log_u)
+            
+            local_draws = mpi_draws.get_local_data()
+            local_post = mpi_post.get_local_data()
+            local_e = mpi_e.get_local_data()
+            local_log_u = mpi_log_u.get_local_data()
+            
+            local_acc = np.zeros(1)
+            
+#            if self.rank == 1:
+#            local_pre = local_draws.copy()
+#                print("local draws_pre:\n" + repr(local_draws))
+            
+#            if self.rank == 1:
+#                quiet = False
+#                print("C = " + repr(local_C))
+#                print("jump_scale = " + repr(local_jump_scale))
+#            else:
+#                print("C = " + repr(self.C))
+#                print("jump_scale = " + repr(self.jump_scales[istep]))
+#                quiet = True
+        
+            Nloc = local_draws.shape[0]
+            for ipt in range(Nloc):
+                
+#                if self.rank == 1:
+#                    print("ipt = " + repr(ipt))
+#                    print("e = " + repr(local_e[ipt, :, :]))
+                
+                x_i, post_i, acc_rate_i = rwmh(
+                    self.posterior, local_draws[ipt, :],
+                    jump_scale=local_jump_scale, C=local_C,
+                    Nstep=self.Nmut, blocks=self.blocks,
+                    block_sizes=self.block_sizes, post_init=local_post[ipt], 
+                    e=local_e[ipt, :, :], log_u=local_log_u[ipt, :, :],
+#                    quiet=quiet,
+                )
+                
+#                    print("draw was: " + repr(local_pre[ipt, :]))
+#                    print("post was: " + repr(local_post[ipt]))
+#                    print("x_i: " + repr(x_i))
+#                    print("post_i: " + repr(post_i))
+#                    print("acc_rate_i: " + repr(acc_rate_i))
+                
+                local_draws[ipt, :] = x_i[-1, :]
+                local_post[ipt] = post_i[-1]
+                local_acc += acc_rate_i
+                
+#            if self.rank == 1:
+#            print("rank = " + repr(self.rank) + ", local update:\n" + repr(local_draws - local_pre))
+#            print("rank = " + repr(self.rank) + ", local acc rate:\n" + repr(local_acc))
+#            print("rank = " + repr(self.rank) + ", local log_u:\n" + repr(local_log_u))
+                
+#            if self.rank == 1:
+#                print("local_draws: " + repr(local_draws))
+                
+            mpi_draws.set_local_data(local_draws)
+            mpi_post.set_local_data(local_post)
+                
+            root_acc = np.zeros(1)
+            self.comm.Reduce(local_acc, root_acc, op=MPI.SUM, root=0)
+            root_acc /= self.Npt
+#            self.acc_rate[istep] = total_acc / self.Npt
+            
+            if self.rank > 0: return None
+            
+#            root_draws = mpi_draws.get_root_data()
+#            root_post = mpi_post.get_root_data()
+            
+            self.draws[istep, :, :] = mpi_draws.get_root_data()
+            self.post[istep, :] = mpi_post.get_root_data()
+            
+#            print("update:")
+#            print(self.draws[istep, :, :] - old_draws)
+        
+#        if True:
+        else:
+            
+#            e = np.random.randn(self.Npt, self.Nmut, self.Nx)
+#            log_u = np.log(np.random.rand(self.Npt, self.Nmut, self.Nblock))
     
             for ipt in range(self.Npt):
                 
                 x_i, post_i, acc_rate_i = rwmh(
                     self.posterior, self.draws[istep, ipt, :],
-                    jump_scale=self.jump_scales[istep], C=self.C_star,
+                    jump_scale=self.jump_scales[istep], C=self.C,
                     Nstep=self.Nmut, blocks=self.blocks,
                     block_sizes=self.block_sizes, post_init=self.post[istep, ipt], 
                     e=e[ipt, :, :], log_u=log_u[ipt, :, :],
@@ -648,5 +744,14 @@ class SMC(MonteCarlo):
                 self.acc_rate[istep] += acc_rate_i
                 
             self.acc_rate[istep] /= self.Npt
+            
+#        print("draws:")
+#        print(np.sum(np.abs(self.draws[istep, :, :] - root_draws)))
+#        print("post:")
+#        print(self.post[istep, :] - root_post)
+#        print("acc:")
+#        print(self.acc_rate[istep] - root_acc)
+        
+#        raise Exception
 
         return None
