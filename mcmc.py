@@ -131,7 +131,7 @@ def metropolis_step(fcn, x, x_try, post=None, log_u=None, args=()):
     else:
         return (x, post, False)
 
-def rwmh(posterior, x_init, jump_scale=1.0, C=None, Nstep=1, blocks=None,
+def rwmh(posterior, x_init, jump_scale=1.0, C_list=None, Nstep=1, blocks=None,
               block_sizes=None, post_init=None, e=None, log_u=None, quiet=True):
 
     Nx = len(x_init)
@@ -146,8 +146,8 @@ def rwmh(posterior, x_init, jump_scale=1.0, C=None, Nstep=1, blocks=None,
     if e is None:
         e = np.random.randn(Nstep, Nx)
 
-    if C is None:
-        C = [np.eye(block_size) for block_size in block_sizes]
+    if C_list is None:
+        C_list = [np.eye(block_size) for block_size in block_sizes]
 
     if log_u is None:
         log_u = np.log(np.random.rand(Nstep, Nblock))
@@ -166,7 +166,7 @@ def rwmh(posterior, x_init, jump_scale=1.0, C=None, Nstep=1, blocks=None,
 
         for iblock, block in enumerate(blocks):
             x_try = x.copy()
-            x_try[block] += jump_scale * np.dot(C[iblock], e[istep, block])
+            x_try[block] += jump_scale * np.dot(C_list[iblock], e[istep, block])
             x, post, acc = metropolis_step(posterior, x, x_try, post=post, log_u=log_u[istep, iblock])
             acc_rate += acc
             
@@ -315,8 +315,9 @@ class RWMC(MonteCarlo):
 
         MonteCarlo.__init__(self, *args, **kwargs)
 
-    def initialize(self, x0=None, jump_scale=None, jump_mult=1.0, stride=1, 
-                   C=None, blocks='none', bool_blocks=False, n_blocks=None):
+    def initialize(self, x0=None, jump_scale=None, jump_mult=1.0, stride=1,
+                   C=None, C_list=None, blocks='none', bool_blocks=False,
+                   n_blocks=None):
 
         self.stride = stride
 
@@ -350,12 +351,14 @@ class RWMC(MonteCarlo):
         # Make sure every parameter is in some block
         assert (sum([np.sum(block) for block in self.blocks])) == len(self.x0)
 
-        if C is None:
-            self.C = []
-            for iblock, block in enumerate(self.blocks):
-                self.C += [self.CH_inv[block, :][:, block]]
+        if C_list is not None:
+            self.C_list = C_list
         else:
-            self.C = C
+            if C is None:
+                C = self.CH_inv.copy()
+            self.C_list = []
+            for iblock, block in enumerate(self.blocks):
+                self.C_list += [C[block, :][:, block]]
 
         self.Nblock = len(self.blocks)
 
@@ -395,7 +398,7 @@ class RWMC(MonteCarlo):
             for iblock, block in enumerate(self.blocks):
 
                 x_try = x.copy()
-                x_try[block] += self.jump_scale * np.dot(self.C[iblock], e[iblock][istep, :])
+                x_try[block] += self.jump_scale * np.dot(self.C_list[iblock], e[iblock][istep, :])
                 x, post, acc = self.metro(x, post, x_try, log_u=log_u[istep, iblock])
 
                 if post > self.max_post:
@@ -417,7 +420,7 @@ class RWMC(MonteCarlo):
                 # if n_recov is not None:
                     # if ((istep // self.stride + 1) - n_burn) % n_recov == 0:
                         # self.print_log("Recomputing covariance")
-                        # self.C = np.linalg.cholesky(np.cov(self.draws[n_burn : (istep // self.stride) + 1, :], rowvar=False))
+                        # self.C_list = np.linalg.cholesky(np.cov(self.draws[n_burn : (istep // self.stride) + 1, :], rowvar=False))
 
                 if n_save is not None:
                     if ((istep // self.stride + 1) % n_save == 0) and istep < Nstep - 1:
@@ -512,7 +515,7 @@ class SMC(MonteCarlo):
         # Other drawing parameters
         self.the_star = None
         self.C_star = None
-        self.C = None
+        self.C_list = None
         
         # Temporary (for diagnostics)
         self.ess = np.zeros(self.Nstep)
@@ -525,11 +528,24 @@ class SMC(MonteCarlo):
             self.comm = MPI.COMM_WORLD
             self.mpi_size = self.comm.Get_size()
             self.rank = self.comm.Get_rank()
+        else:
+            self.rank = 0
 
-    def sample(self):
+    def sample(self, quiet=False):
+        
+        self.quiet = quiet
 
         for istep in range(1, self.Nstep):
+            
+#            start = MPI.Wtime()
             self.correct(istep)
+#            end = MPI.Wtime()
+#            
+#            if self.rank == 0:
+#                print("Time elapsed: {:g} seconds".format(end - start))
+#                
+#            raise Exception
+            
             self.adapt(istep)
             self.mutate(istep)
 
@@ -580,6 +596,9 @@ class SMC(MonteCarlo):
 
         # Resample if effective sample size too small
         ess = self.Npt / np.mean(W_til ** 2)
+        if (not self.quiet) and (self.rank == 0):
+            print("Step {:d}, ESS = {:g}".format(istep, ess))
+            
         if ess < self.Npt / 2:
             ix = np.random.choice(self.Npt, size=self.Npt, p=W_til / self.Npt)
             self.draws[istep, :, :] = self.draws[istep, ix, :]
@@ -614,10 +633,10 @@ class SMC(MonteCarlo):
                 print(self.Sig_star)
             self.C_star = np.linalg.cholesky(self.Sig_star)
                 
-            # Update C as list by block
-            self.C = []
+            # Update C_list as list by block
+            self.C_list = []
             for iblock, block in enumerate(self.blocks):
-                self.C += [self.C_star[block, :][:, block]]
+                self.C_list += [self.C_star[block, :][:, block]]
 
         elif self.C_star is None:
             print("No valid value for C_star")
@@ -641,7 +660,7 @@ class SMC(MonteCarlo):
         if self.parallel:
 #        if True:
             
-            local_C = self.comm.bcast(self.C, root=0)
+            local_C_list = self.comm.bcast(self.C_list, root=0)
             local_jump_scale = self.comm.bcast(self.jump_scales[istep], root=0)
             
             # Set arrays and scatter
@@ -663,10 +682,10 @@ class SMC(MonteCarlo):
             
 #            if self.rank == 1:
 #                quiet = False
-#                print("C = " + repr(local_C))
+#                print("C_list = " + repr(local_C_list))
 #                print("jump_scale = " + repr(local_jump_scale))
 #            else:
-#                print("C = " + repr(self.C))
+#                print("C_list = " + repr(self.C_list))
 #                print("jump_scale = " + repr(self.jump_scales[istep]))
 #                quiet = True
         
@@ -679,7 +698,7 @@ class SMC(MonteCarlo):
                 
                 x_i, post_i, acc_rate_i = rwmh(
                     self.posterior, local_draws[ipt, :],
-                    jump_scale=local_jump_scale, C=local_C,
+                    jump_scale=local_jump_scale, C_list=local_C_list,
                     Nstep=self.Nmut, blocks=self.blocks,
                     block_sizes=self.block_sizes, post_init=local_post[ipt], 
                     e=local_e[ipt, :, :], log_u=local_log_u[ipt, :, :],
@@ -709,8 +728,9 @@ class SMC(MonteCarlo):
                 
             root_acc = np.zeros(1)
             self.comm.Reduce(local_acc, root_acc, op=MPI.SUM, root=0)
-            root_acc /= self.Npt
-#            self.acc_rate[istep] = total_acc / self.Npt
+#            root_acc /= self.Npt
+            self.acc_rate[istep] = root_acc / self.Npt
+            
             
             if self.rank > 0: return None
             
@@ -733,7 +753,7 @@ class SMC(MonteCarlo):
                 
                 x_i, post_i, acc_rate_i = rwmh(
                     self.posterior, self.draws[istep, ipt, :],
-                    jump_scale=self.jump_scales[istep], C=self.C,
+                    jump_scale=self.jump_scales[istep], C_list=self.C_list,
                     Nstep=self.Nmut, blocks=self.blocks,
                     block_sizes=self.block_sizes, post_init=self.post[istep, ipt], 
                     e=e[ipt, :, :], log_u=log_u[ipt, :, :],
@@ -751,6 +771,9 @@ class SMC(MonteCarlo):
 #        print(self.post[istep, :] - root_post)
 #        print("acc:")
 #        print(self.acc_rate[istep] - root_acc)
+            
+        if not self.quiet:
+            print("Acceptance rate: {:g}".format(self.acc_rate[istep]))
         
 #        raise Exception
 
