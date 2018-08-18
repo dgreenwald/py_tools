@@ -537,17 +537,25 @@ class SMC(MonteCarlo):
 
         for istep in range(1, self.Nstep):
             
-#            start = MPI.Wtime()
+            start = MPI.Wtime()
             self.correct(istep)
-#            end = MPI.Wtime()
-#            
-#            if self.rank == 0:
-#                print("Time elapsed: {:g} seconds".format(end - start))
-#                
-#            raise Exception
+            end = MPI.Wtime()
+           
+            if self.rank == 0 and not self.quiet:
+                print("Correction step time elapsed: {:g} seconds".format(end - start))
+                print("Posterior: \n" + repr(self.post[istep, :]))
+
+            # raise Exception
             
             self.adapt(istep)
+
+            start = MPI.Wtime()
             self.mutate(istep)
+            end = MPI.Wtime()
+
+            if self.rank == 0:
+                print("Mutate step time elapsed: {:g} seconds".format(end - start))
+                print("Posterior: \n" + repr(self.post[istep, :]))
 
     def correct(self, istep):
 
