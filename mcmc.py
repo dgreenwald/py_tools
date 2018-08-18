@@ -56,6 +56,14 @@ def randomize_blocks(nx, nblock):
 
     return numerical_to_bool_blocks(blocks, nx)
 
+def partition_C(C, blocks):
+    
+    C_list = []
+    for iblock, block in enumerate(blocks):
+        C_list += [C[block, :][:, block]]
+        
+    return C_list
+
 def numerical_to_bool_blocks(blocks, nx):
     
     bool_blocks = []
@@ -206,10 +214,9 @@ class MonteCarlo:
         elif Nx is not None:
             self.Nx = Nx
         else:
-            print("Length of parameter vector unknown")
-            raise Exception
-
-        if lb is None or ub is None:
+            self.Nx = None
+            
+        if ((lb is None) or (ub is None)) and not self.Nx is None:
 
             if lb is None:
                 self.lb = np.inf * np.ones(self.Nx)
@@ -306,6 +313,26 @@ class MonteCarlo:
         setattr(self, name, load_file(self.out_dir, name, self.suffix, **kwargs))
 
         return None
+    
+    def save_list(self, np_list=[], pkl_list=[]):
+
+        for var in np_list:
+            self.save_item(var)
+            
+        for var in pkl_list:
+            self.save_item(var, pickle=True)
+
+        return None
+    
+    def load_list(self, np_list=[], pkl_list=[]):
+
+        for var in np_list:
+            self.load_item(var)
+            
+        for var in pkl_list:
+            self.load_item(var, pickle=True)
+
+        return None
 
 class RWMC(MonteCarlo):
     """Class for Markov Chain Monte Carlo sampler"""
@@ -314,6 +341,9 @@ class RWMC(MonteCarlo):
         """Constructor -- need to finish"""
 
         MonteCarlo.__init__(self, *args, **kwargs)
+        
+        self.np_list = ['x_mode', 'post_mode', 'CH_inv', 'draws', 'post_sim', 'acc_rate']
+        self.pkl_list = ['names']
 
     def initialize(self, x0=None, jump_scale=None, jump_mult=1.0, stride=1,
                    C=None, C_list=None, blocks='none', bool_blocks=False,
@@ -436,25 +466,11 @@ class RWMC(MonteCarlo):
 
     def save_all(self, **kwargs):
 
-        for name in ['x_mode', 'post_mode', 'CH_inv', 'draws', 'post_sim', 'acc_rate']:
-            self.save_item(name)
-
-        # Pickled items
-        for name in ['names']:
-            self.save_item(name, pickle=True)
-
-        return None
+        self.save_list(np_list=self.np_list, pkl_list=self.pkl_list)
 
     def load_all(self, **kwargs):
 
-        for name in ['x_mode', 'post_mode', 'CH_inv', 'draws', 'post_sim', 'acc_rate']:
-            self.load_item(name)
-
-        # Pickled items
-        for name in ['names']:
-            self.load_item(name, pickle=True)
-
-        return None
+        self.load_list(np_list=self.np_list, pkl_list=self.pkl_list)
 
     def run_all(self, x0, Nsim, **kwargs):
         """Find mode, run MCMC chain, and save"""
@@ -472,10 +488,20 @@ class SMC(MonteCarlo):
         """Constructor -- need to finish"""
 
         MonteCarlo.__init__(self, *args, **kwargs)
+        
+        # Lists for saving    
+        self.np_list = ['C_star', 'Sig_star', 'W', 'acc_rate', 'draws', 'ess',
+                        'jump_scales', 'lb', 'phi', 'post', 'the_star', 'ub']
+
+        self.pkl_list = ['C_list', 'Nblock', 'Nmut', 'Npt', 'Nstep', 'Nx',
+                         'args', 'blocks', 'block_sizes', 'fixed_blocks',
+                         'lam', 'log_like', 'names', 'parallel', 'post_mode',
+                         'prior', 'save_intermediate', 'x_mode']
 
     def initialize(self, Npt, Nstep, Nmut=1, Nblock=1, blocks=None,
                    init_jump_scale=0.25, lam=2.0, adapt_sens=16.0,
-                   adapt_range=0.1, adapt_target=0.25, parallel=False):
+                   adapt_range=0.1, adapt_target=0.25, parallel=False, 
+                   save_intermediate=True):
 
         self.Npt = Npt
         self.Nstep = Nstep
@@ -506,8 +532,10 @@ class SMC(MonteCarlo):
         # Blocks
         if blocks is None:
             self.blocks = randomize_blocks(self.Nx, Nblock)
+            self.fixed_blocks = False
         else:
             self.blocks = blocks
+            self.fixed_blocks = True
 
         self.Nblock = len(self.blocks)
         self.block_sizes = [np.sum(block) for block in self.blocks]
@@ -519,8 +547,6 @@ class SMC(MonteCarlo):
         
         # Temporary (for diagnostics)
         self.ess = np.zeros(self.Nstep)
-        self.draws_pre_mut = self.draws.copy()
-        self.post_pre_mut = self.post.copy()
 
         # Parallelization
         self.parallel = parallel
@@ -530,6 +556,9 @@ class SMC(MonteCarlo):
             self.rank = self.comm.Get_rank()
         else:
             self.rank = 0
+            
+        # Save output
+        self.save_intermediate = save_intermediate
 
     def sample(self, quiet=False):
         
@@ -537,52 +566,64 @@ class SMC(MonteCarlo):
 
         for istep in range(1, self.Nstep):
             
-#            start = MPI.Wtime()
-            self.correct(istep)
-#            end = MPI.Wtime()
-#            
-#            if self.rank == 0:
-#                print("Time elapsed: {:g} seconds".format(end - start))
-#                
-#            raise Exception
+            start = MPI.Wtime()
             
+            self.correct(istep)
             self.adapt(istep)
             self.mutate(istep)
+                
+            end = MPI.Wtime()
+            self.rank_print("Step {0:d} time elapsed: {1:g} seconds".format(istep, end - start))
+            
+            # End-of-iteration tasks
+            if self.rank == 0:
+                # Save key output
+                if self.save_intermediate:
+                    self.save_list(np_list=['draws', 'W', 'post'])
+                
+                # Re-randomize blocks
+                if not self.fixed_blocks:
+                    self.update_blocks()
 
     def correct(self, istep):
 
         self.draws[istep, :, :] = self.draws[istep-1, :, :]
         
-        if self.parallel:
-#        if True:
-             
-            # Create MPI arrays and scatter to nodes
-            mpi_draws = MPIArray(root_data=self.draws[istep, :, :])
-            mpi_post = MPIArray(root_data=self.post[istep, :])
-
-            # Get local data
-            local_draws = mpi_draws.get_local_data()
-            local_post = mpi_post.get_local_data()
-
-            # Loop
-            Nloc = local_draws.shape[0]
-            for ipt in range(Nloc):
-                local_post[ipt] = self.posterior(local_draws[ipt, :])
-
-            mpi_post.set_local_data(local_post)
-            
-            if self.rank > 0: return None
-#                raise Exception
-            
-#            this_post2 = mpi_post.get_root_data()
-            this_post = mpi_post.get_root_data()
-            
+        # Only time we don't have posterior from the mutation step
+        if istep == 1:
+            if self.parallel:
+    #        if True:
+                 
+                # Create MPI arrays and scatter to nodes
+                mpi_draws = MPIArray(root_data=self.draws[istep, :, :])
+                mpi_post = MPIArray(root_data=self.post[istep, :])
+    
+                # Get local data
+                local_draws = mpi_draws.get_local_data()
+                local_post = mpi_post.get_local_data()
+    
+                # Loop
+                Nloc = local_draws.shape[0]
+                for ipt in range(Nloc):
+                    local_post[ipt] = self.posterior(local_draws[ipt, :])
+    
+                mpi_post.set_local_data(local_post)
+                
+                if self.rank > 0: return None
+    #                raise Exception
+                
+    #            this_post2 = mpi_post.get_root_data()
+                this_post = mpi_post.get_root_data()
+                
+            else:
+    #        if True:
+                 
+                this_post = np.zeros(self.Npt)
+                for ipt in range(self.Npt):
+                    this_post[ipt] = self.posterior(self.draws[istep, ipt, :])
         else:
-#        if True:
-             
-            this_post = np.zeros(self.Npt)
-            for ipt in range(self.Npt):
-                this_post[ipt] = self.posterior(self.draws[istep, ipt, :])
+            
+            this_post = self.post[istep-1, :]
                 
 #        print("correct error:")
 #        print(this_post - this_post2)
@@ -596,8 +637,7 @@ class SMC(MonteCarlo):
 
         # Resample if effective sample size too small
         ess = self.Npt / np.mean(W_til ** 2)
-        if (not self.quiet) and (self.rank == 0):
-            print("Step {:d}, ESS = {:g}".format(istep, ess))
+        self.rank_print("Step {:d}, ESS = {:g}".format(istep, ess))
             
         if ess < self.Npt / 2:
             ix = np.random.choice(self.Npt, size=self.Npt, p=W_til / self.Npt)
@@ -609,8 +649,6 @@ class SMC(MonteCarlo):
             self.W[istep, :] = W_til
             self.post[istep, :] = this_post
             
-        self.draws_pre_mut[istep, :, :] = self.draws[istep, :, :]
-        self.post_pre_mut[istep, :] = self.post[istep, :]
         self.ess[istep] = ess
 
     def adapt(self, istep):
@@ -634,9 +672,7 @@ class SMC(MonteCarlo):
             self.C_star = np.linalg.cholesky(self.Sig_star)
                 
             # Update C_list as list by block
-            self.C_list = []
-            for iblock, block in enumerate(self.blocks):
-                self.C_list += [self.C_star[block, :][:, block]]
+            self.C_list = partition_C(self.C_star, self.blocks)
 
         elif self.C_star is None:
             print("No valid value for C_star")
@@ -772,9 +808,25 @@ class SMC(MonteCarlo):
 #        print("acc:")
 #        print(self.acc_rate[istep] - root_acc)
             
-        if not self.quiet:
-            print("Acceptance rate: {:g}".format(self.acc_rate[istep]))
+        self.rank_print("Acceptance rate: {:g}".format(self.acc_rate[istep]))
         
 #        raise Exception
 
         return None
+    
+    def update_blocks(self):
+        
+        self.blocks = randomize_blocks(self.Nx, self.Nblock)
+        self.C_list = partition_C(self.C_star, self.blocks)
+        
+    def rank_print(self, mesg):
+        if (not self.quiet) and (self.rank == 0):
+            print(mesg)
+            
+    def save(self):
+
+        self.save_list(np_list=self.np_list, pkl_list = self.pkl_list)
+
+    def load(self):
+
+        self.load_list(np_list=self.np_list, pkl_list = self.pkl_list)
