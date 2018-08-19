@@ -120,10 +120,19 @@ class HiddenMarkov:
         
         # Now iterate backwards
         for tt in range(self.Nt - 2, -1, -1):
-            px_joint_t = (self.P * self.px_filt[tt, :][:, np.newaxis]
-                          * (self.px_smooth[tt+1, :] / self.px_pred[tt, :])[np.newaxis, :])
-            new_probs = (px_joint_t[:, self.ix_sample[tt+1, :]] / 
-                         self.px_smooth[tt+1, self.ix_sample[tt+1, :]])
+            
+            # Old way -- inefficient, computed prob for all entries
+#            px_joint_t = (self.P * self.px_filt[tt, :][:, np.newaxis]
+#                          * (self.px_smooth[tt+1, :] / self.px_pred[tt, :])[np.newaxis, :])
+#            new_probs = (px_joint_t[:, self.ix_sample[tt+1, :]] / 
+#                         self.px_smooth[tt+1, self.ix_sample[tt+1, :]])
+
+            # New way -- computes only for sample paths.
+            # Could make even more efficient by only computing for unique next states
+            ix_next = self.ix_sample[tt+1, :]
+#            Pk = (self.P[:, ix_next].dot(1.0 / self.px_pred[tt+1, ix_next]))
+            Pk = self.P[:, ix_next] / self.px_pred[tt, ix_next][np.newaxis, :]
+            new_probs = self.px_filt[tt, :][:, np.newaxis] * Pk 
 
             self.ix_sample[tt, :] = econ.multi_choice(new_probs.T)
 
