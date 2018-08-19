@@ -501,7 +501,7 @@ class SMC(MonteCarlo):
     def initialize(self, Npt, Nstep, Nmut=1, Nblock=1, blocks=None,
                    init_jump_scale=0.25, lam=2.0, adapt_sens=16.0,
                    adapt_range=0.1, adapt_target=0.25, parallel=False, 
-                   save_intermediate=True):
+                   save_intermediate=True, test_flag=False):
 
         self.Npt = Npt
         self.Nstep = Nstep
@@ -520,7 +520,6 @@ class SMC(MonteCarlo):
         self.acc_rate = np.zeros(self.Nstep)
 
         self.draws = np.zeros((self.Nstep, self.Npt, self.Nx))
-        self.draws[0, :, :] = self.prior.sample(self.Npt).T 
 
         self.W = np.ones((self.Nstep, self.Npt))
         self.post = np.zeros((self.Nstep, self.Npt))
@@ -556,9 +555,17 @@ class SMC(MonteCarlo):
             self.rank = self.comm.Get_rank()
         else:
             self.rank = 0
+
+        # Initialize draws
+        if self.rank == 0:
+            self.draws[0, :, :] = self.prior.sample(self.Npt).T 
             
-        # Save output
+        # Save output?
         self.save_intermediate = save_intermediate
+
+        # Testing mode?
+        self.test_flag = test_flag
+        if (self.rank == 0) and self.test_flag: print("TEST FLAG ON")
 
     def sample(self, quiet=False):
         
@@ -569,6 +576,12 @@ class SMC(MonteCarlo):
             start = MPI.Wtime()
             
             self.correct(istep)
+
+            if self.parallel and self.test_flag:
+                end = MPI.Wtime()
+                self.rank_print("Step {0:d} time elapsed: {1:g} seconds".format(istep, end - start))
+                raise Exception
+
             self.adapt(istep)
             self.mutate(istep)
                 
@@ -587,7 +600,8 @@ class SMC(MonteCarlo):
 
     def correct(self, istep):
 
-        self.draws[istep, :, :] = self.draws[istep-1, :, :]
+        if self.rank == 0:
+            self.draws[istep, :, :] = self.draws[istep-1, :, :]
         
         # Only time we don't have posterior from the mutation step
         if istep == 1:
