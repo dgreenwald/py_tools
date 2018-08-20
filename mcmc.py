@@ -327,10 +327,16 @@ class MonteCarlo:
     def load_list(self, np_list=[], pkl_list=[]):
 
         for var in np_list:
-            self.load_item(var)
+            try:
+                self.load_item(var)
+            except:
+                print("Warning: could not load " + var)
             
         for var in pkl_list:
-            self.load_item(var, pickle=True)
+            try:
+                self.load_item(var, pickle=True)
+            except:
+                print("Warning: could not load " + var)
 
         return None
 
