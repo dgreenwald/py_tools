@@ -53,11 +53,11 @@ class MPIArray:
         self.ix_local = np.ones(self.npad_local, dtype=bool)
 
         # Initialize data (if passed)
-        if root_data is not None:
-            self.set_root_data(root_data)
+        # if root_data is not None:
+            # self.set_root_data(root_data)
             
-            # Scatter data
-            if scatter: self.scatter()
+        # Scatter data
+        if scatter: self.scatter()
 
     def set_root_data(self, data, scatter=True):
 
@@ -108,3 +108,38 @@ class MPIArray:
 
         self.comm.Gather(self.local_data, self.root_data, root=0)
         self.comm.Gather(self.ix_local, self.ix_root, root=0)
+
+class FakeMPIArray:
+    """Regular numpy array that has the same i/o functions"""
+
+    def __init__(self, root_data=None, root_shape=None, dtype='float64',
+                 copy=True, **kwargs):
+
+        if root_data is not None:
+            if copy:
+                self.data = root_data.copy()
+            else:
+                self.data = root_data
+        else:
+            assert (root_shape is not None)
+            self.data = np.empty(root_shape, dtype=dtype)
+
+    def set_root_data(self, data, copy=True, **kwargs):
+
+        if copy:
+            self.data = data.copy()
+        else:
+            self.data = data
+
+    def set_local_data(self, data, copy=True, **kwargs):
+
+        if copy:
+            self.data = data.copy()
+        else:
+            self.data = data
+
+    def get_root_data(self, **kwargs): return self.data
+    def get_local_data(self, **kwargs): return self.data
+
+    def scatter(self): return None
+    def gather(self): return None

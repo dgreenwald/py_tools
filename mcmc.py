@@ -548,13 +548,7 @@ class SMC(MonteCarlo):
         self.ess = np.zeros(self.Nstep)
 
         # Parallelization
-        self.parallel = parallel
-        if self.parallel:
-            self.comm = MPI.COMM_WORLD
-            self.mpi_size = self.comm.Get_size()
-            self.rank = self.comm.Get_rank()
-        else:
-            self.rank = 0
+        self.set_rank(parallel) # MPI rank
 
         # Initialize draws
         if self.rank == 0:
@@ -566,6 +560,18 @@ class SMC(MonteCarlo):
         # Testing mode?
         self.test_flag = test_flag
         if (self.rank == 0) and self.test_flag: print("TEST FLAG ON")
+        
+    def set_rank(self, parallel):
+        """ Set MPI rank and save parallel flag """
+        
+        self.parallel = parallel
+        
+        if self.parallel:
+            self.comm = MPI.COMM_WORLD
+            self.mpi_size = self.comm.Get_size()
+            self.rank = self.comm.Get_rank()
+        else:
+            self.rank = 0
 
     def sample(self, quiet=False):
         
@@ -841,6 +847,9 @@ class SMC(MonteCarlo):
 
         self.save_list(np_list=self.np_list, pkl_list = self.pkl_list)
 
-    def load(self):
+    def load(self, parallel=False):
 
         self.load_list(np_list=self.np_list, pkl_list = self.pkl_list)
+        
+        # Re-set parallel flag and rank
+        self.set_rank(parallel)
