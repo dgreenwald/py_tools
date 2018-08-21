@@ -53,11 +53,13 @@ class MPIArray:
         self.ix_local = np.ones(self.npad_local, dtype=bool)
 
         # Initialize data (if passed)
-        # if root_data is not None:
-            # self.set_root_data(root_data)
+        if root_data is not None:
+            self.set_root_data(root_data, scatter=scatter)
+        elif scatter:
+            self.scatter()
             
         # Scatter data
-        if scatter: self.scatter()
+        # if scatter: self.scatter()
 
     def set_root_data(self, data, scatter=True):
 
