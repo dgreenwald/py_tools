@@ -323,7 +323,7 @@ def plot_series(df_in, var_names, directory='', filename=None, labels={},
                 markersize=5, mew=2, fillstyle='none', fontsize=12,
                 plot_type='pdf', ylabel=None, sample='outer', title=None,
                 save=True, single_legend=True, vertline_ix=None,
-                vertline_kwargs={}):
+                vertline_kwargs={}, linewidths={}):
 
     matplotlib.rcParams.update({'font.size' : fontsize})
 
@@ -349,10 +349,11 @@ def plot_series(df_in, var_names, directory='', filename=None, labels={},
         label = labels.get(var, var)
         linestyle = linestyles.get(var, '-')
         color = colors.get(var, None)
+        linewidth=linewidths.get(var, 2)
 
         marker = markers.get(var, None)
         df[var].plot(
-            linewidth=2, linestyle=linestyle, label=label, marker=marker,
+            linewidth=linewidth, linestyle=linestyle, label=label, marker=marker,
             markevery=markevery, markersize=markersize, mew=mew, color=color
         )
         # plt.plot(df.index, df[var], linewidth=2, linestyle=linestyle,
