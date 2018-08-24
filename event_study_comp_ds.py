@@ -17,6 +17,7 @@ from time import time
 from operator import add
 from py_tools import data as dt
 import statsmodels.formula.api as smf
+import statsmodels.api as sm
 import matplotlib.pyplot as plt
 from matplotlib.pyplot import figure
 import pylab as pl
@@ -44,6 +45,7 @@ df = df_orig.copy()
 
 group=df.groupby('gvkey')
 
+df['lead1_violation']=group['violation'].shift(-1)
 df['lag1_violation']=group['violation'].shift(1)
 df['lag2_violation']=group['violation'].shift(2)
 df['lag3_violation']=group['violation'].shift(3)
@@ -53,11 +55,11 @@ df['lag4_violation']=group['violation'].shift(4)
 #VIOLATION 0: No violation in previous period
 #NEW VIOLATION: No violation in previous 2 years
 
-df['violation0']=0
-ix=df['lag1_violation']==0
-df.loc[ix, 'violation0']=1
+df['violation0']=df['violation'].copy()
+ix=df['lag1_violation']==1
+df.loc[ix, 'violation0']=0
 
-df['new_violation']=0
+df['new_violation']=df['violation'].copy()
 
 
 
@@ -77,6 +79,10 @@ if directory==data_dir+'compustat/ds_comp_q_93_07_resampled.feather':
     df['lag1_oibdp']=group['oibdpq'].shift(1)  
     df['lag1_xint']=group['xintq'].shift(1)  
     df['lag1_cheq']=group['cheq'].shift(1)  
+    df['lag1_D_interest']=group['D_interest'].shift(1)
+    df['lag1_D_interest_eop']=group['D_interest_eop'].shift(1)
+    df['lag1_D_interest_eoq']=group['D_interest_eoq'].shift(1)
+
 
     df['net_debt_issue_at_rate']=df['net_debt_issue']/df['lag1_at']
     df['capx_at_rate']=df['capxq']/df['lag1_at']
@@ -93,10 +99,10 @@ if directory==data_dir+'compustat/ds_comp_q_93_07_resampled.feather':
 
     df['lag1_netw_at_rate']=(df['lag1_at']-df['lag1_lt'])/df['lag1_at']
 
-    ix=np.logical_and(ix, df['lag2_violation']==0)
-    ix=np.logical_and(ix, df['lag3_violation']==0)
-    ix=np.logical_and(ix, df['lag4_violation']==0)
-    df.loc[ix, 'new_violation']=1
+    ix=np.logical_or(ix, df['lag2_violation']==1)
+    ix=np.logical_or(ix, df['lag3_violation']==1)
+    ix=np.logical_or(ix, df['lag4_violation']==1)
+    df.loc[ix, 'new_violation']=0
 
 elif directory==data_dir+'compustat/ds_comp_93_07_resampled.feather':
  
@@ -115,7 +121,9 @@ elif directory==data_dir+'compustat/ds_comp_93_07_resampled.feather':
     df['lag1_lt']=group['lt'].shift(1)       
     df['lag1_at']=group['at'].shift(1)
     df['lag1_intan']=group['intan'].shift(1)
-    
+    df['lag1_D_interest']=group['D_interest'].shift(1)
+    df['lag1_D_interest_eop']=group['D_interest_eop'].shift(1)
+    df['lag1_D_interest_eoy']=group['D_interest_eoy'].shift(1)    
     
     df['net_debt_issue_at_rate']=df['net_debt_issue']/df['lag1_at']
     df['gross_debt_issue_at_rate']=df['dltis']/df['lag1_at']
@@ -133,8 +141,8 @@ elif directory==data_dir+'compustat/ds_comp_93_07_resampled.feather':
 
     df['lag1_netw_at_rate']=(df['lag1_at']-df['lag1_lt'])/df['lag1_at']
 
-    ix=np.logical_and(ix, df['lag2_violation']==0)
-    df.loc[ix, 'new_violation']=1
+    ix=np.logical_or(ix, df['lag2_violation']==1)
+    df.loc[ix, 'new_violation']=0
    
     
     
@@ -249,6 +257,36 @@ elif directory==data_dir+'compustat/ds_comp_93_07_resampled.feather':
 
 
 
+        
+if True:
+    rhs_sets=[['D_interest'], ['D_interest_eop'], ['D_interest_eoq'],
+              ['lag1_D_interest'], ['lag1_D_interest_eop'],['lag1_D_interest_eoq']]
+    
+    for rhs_set in rhs_sets:
+    
+        df_use=df.copy()
+        
+        lhs_vars=['violation','violation0', 'new_violation']
+        
+        for lhs_var in lhs_vars:  
+            
+
+            rhs_vars=controls+rhs_set
+            cols=lhs_vars+rhs_vars
+    
+    
+            df_use = df.dropna(subset=cols).copy()
+            df_use = dt.demean2( ['gvkey'],cols, df_use)
+            df_use = dt.demean2(['datadate'], cols, df_use)
+        
+            _ = dt.regression(df_use, lhs_var, rhs_vars, display='True', 
+#                          cluster_groups=df_use['gvkey'], 
+                          )
+        input("Press Enter to continue...")
+
+
+
+        
 
 
 if True:
@@ -302,29 +340,3 @@ if True:
                           cluster_groups=df_use[['gvkey']], 
                           )
         input("Press Enter to continue...")
-        
-if True:
-    rhs_sets=[['D_interest'], ['D_interest_eop'], ['D_interest_eoq']]
-    
-    for rhs_set in rhs_sets:
-    
-        df_use=df.copy()
-        
-        lhs_vars=['violation','violation0', 'new_violation']
-        
-        for lhs_var in lhs_vars:  
-            
-
-            rhs_vars=controls+rhs_set
-            cols=lhs_vars+rhs_vars
-    
-    
-            df_use = df.dropna(subset=cols).copy()
-            df_use = dt.demean2( ['ones'],cols, df_use)
-            #df_use = dt.demean2(['datadate'], cols, df_use)
-        
-            _ = dt.regression(df_use, lhs_var, rhs_vars, display='True', 
-                          cluster_groups=df_use[['gvkey']], 
-                          )
-        input("Press Enter to continue...")
- 

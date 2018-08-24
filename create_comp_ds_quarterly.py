@@ -1,6 +1,14 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
+Created on Wed Aug 22 15:44:06 2018
+
+@author: MaryGong
+"""
+
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
 Created on Sat Aug 11 17:22:14 2018
 
 @author: MaryGong
@@ -26,38 +34,8 @@ from matplotlib import collections  as mc
 data_dir = '/Users/MaryGong/Dropbox (MIT)/firm_credit/'
 
 
-comp_ds=pd.read_feather(data_dir+'compustat/comp_ds_ann.feather')
+comp_ds=pd.read_feather(data_dir+'compustat/comp_ds_q.feather')
 
-
-"""
-df_mkt=pd.read_sas(data_dir+'compustat/co_amkt.sas7bdat')
-
-coded=['gvkey', 'cfflag', 'curcd']
-for variable in coded:
-    df_mkt[variable]=df_mkt[variable].str.decode('UTF-8')
-    
-
-    
-ix= df_mkt['curcd']=='USD'    
-df_mkt=df_mkt.loc[ix].copy()
-ix= df_mkt['cfflag']=='F'    
-df_mkt=df_mkt.loc[ix].copy()
-
-
-df_mkt['gvkey']=df_mkt['gvkey'].astype(np.int64)
-
-
-df_mkt=df_mkt[['gvkey','mkvalt', 'prcc', 'prch', 'prcl','clsm','cfflag','datadate']]
-df_mkt=df_mkt.set_index(np.arange(len(df_mkt)))
-
-df_mkt.columns=['gvkey','mkvalt', 'prcc', 'prch', 'prcl','month','cfflag','datadate']
-df_mkt['year']=df_mkt['datadate'].dt.year
-df_mkt=df_mkt[['gvkey','mkvalt', 'prcc', 'prch', 'prcl', 'month', 'year']]
-
-
-
-
-"""
 
 
 
@@ -75,6 +53,25 @@ df_mkt['month']=df_mkt['clsm'].copy()
 ix=np.isnan(df_mkt['clsm'])
 df_mkt.loc[ix, 'month']=df_mkt['datadate'].dt.month
 
+
+q2=np.logical_or(df_mkt['month']==4,df_mkt['month']==5)
+q2=np.logical_or(q2,df_mkt['month']==6)
+
+q3=np.logical_or(df_mkt['month']==7,df_mkt['month']==8)
+q3=np.logical_or(q3,df_mkt['month']==9)
+
+q4=np.logical_or(df_mkt['month']==10,df_mkt['month']==11)
+q4=np.logical_or(q4,df_mkt['month']==12)
+
+
+df_mkt['quarter']=1
+
+df_mkt.loc[q2, 'quarter']=2
+df_mkt.loc[q3, 'quarter']=3
+df_mkt.loc[q4, 'quarter']=4
+
+
+
 # KEEP ONLY THOSE DENOTED IN USD
 ix= df_mkt['curcd']=='USD'    
 df_mkt=df_mkt.loc[ix].copy()
@@ -85,9 +82,13 @@ ix=np.isnan(df_mkt['prcc'])
 df_mkt=df_mkt.loc[~ix].copy()
 
 
+
+
 #Drop all duplicates on gvkey, date, and prcc
 ix=df_mkt.duplicated(['gvkey', 'year', 'month', 'prcc'])
 df_mkt=df_mkt.loc[~ix].copy()
+
+
 
 
 # drop duplicates on gvkey and date where closing month is missing
@@ -97,29 +98,51 @@ df_mkt=df_mkt.loc[~ix].copy()
 
 
 
+
+
+
 # Drop duplicates on company, date, keeping the version that is 'fiscal'
 ix=df_mkt.duplicated(['gvkey', 'year', 'month'], keep=False)
 ix=np.logical_and(ix, df_mkt['cfflag']=='C')
 df_mkt=df_mkt.loc[~ix].copy()
 
 ix=df_mkt.duplicated(['gvkey', 'month', 'year'], keep=False)
-
-if sum(ix)==2:
-    iy=np.logical_and(ix, df_mkt['datadate']=='1987-02-28' )
-    df_mkt=df_mkt.loc[~iy].copy()
-
-else:
-    print('RECHECK CODE FOR MKT')
+iy=np.logical_and(ix, df_mkt['datadate']=='1987-02-28' )
 
 
+df_mkt=df_mkt.loc[~iy].copy()
 
 
-df_mkt=df_mkt[['gvkey','mkvalt', 'prcc', 'prch', 'prcl','month', 'year']]
+df_mkt['day']=1
 
 
-df_annual=pd.merge(comp_ds, df_mkt, how='outer', on=['gvkey', 'year', 'month'])
 
 
+
+
+df_mkt=df_mkt[['gvkey','mkvalt', 'prcc', 'prch', 'prcl','month', 'year', 'quarter', 'day']]
+
+df_mkt['month']=df_mkt['month'].astype(np.int64)
+df_mkt['datadate']=pd.to_datetime(df_mkt[['year', 'month', 'day']])
+
+
+df_mkt = df_mkt.set_index(['gvkey', 'datadate']).sort_index()
+df_mkt = df_mkt.groupby(level=0).resample('Q', level=1).last()
+
+df_mkt['gvkey']=df_mkt.index.get_level_values(0)
+df_mkt['datadate']=df_mkt.index.get_level_values(1)
+
+df_mkt=df_mkt.set_index(np.arange(len(df_mkt)))
+df_mkt=df_mkt.sort_values(['gvkey', 'datadate'])
+df_mkt=df_mkt.set_index(np.arange(len(df_mkt)))
+
+
+df_mkt=df_mkt[['gvkey','mkvalt', 'prcc', 'prch', 'prcl', 'quarter', 'year']]
+
+
+df_annual=pd.merge(comp_ds, df_mkt, how='outer', on=['gvkey', 'year', 'quarter'])
+
+#PRCC, TXDB
 
 
 
@@ -172,8 +195,8 @@ df_annual=df_annual.set_index(np.arange(len(df_annual)))
 ### Throw out firms with acquisitions/mergers
 #############
 
-ix=df_annual['aqc']>.1
-iy=df_annual['aqc']<-.1
+ix=df_annual['aqpq']>.1
+iy=df_annual['aqpq']<-.1
 iz=np.logical_or(ix, iy)
 
 df_annual=df_annual.loc[~iz].copy()
@@ -187,7 +210,7 @@ df_ind['consol']=df_ind['consol'].str.decode('UTF-8')
 df_ind['popsrc']=df_ind['popsrc'].str.decode('UTF-8')
 
 
-df_ind['gvkey']=df_ind['gvkey'].astype(np.int64)
+df_ind['gvkey']=df_ind['gvkey'].astype(np.float64)
 
 
 ix=~np.isnan(df_ind['sich'])
@@ -196,7 +219,7 @@ df_ind['sich']=df_ind['sich'].astype(np.int64)
 df_ind['sich']=df_ind['sich'].astype(str)
 
 df_ind['sic2']=df_ind['sich'].apply(lambda x: x[:2])
-df_ind=df_ind.drop_duplicates(['gvkey','consol', 'year'])
+df_ind=df_ind.drop_duplicates(['gvkey','consol', 'year' ,'sic2'])
 df_ind=df_ind[['gvkey', 'consol', 'year', 'sic2']]
 
 
@@ -238,37 +261,46 @@ tbill=tbill.set_index(np.arange(len(tbill)))
 tbill['datadate']=pd.to_datetime(tbill['datadate'])
 tbill['year']=tbill['datadate'].dt.year
 tbill['month']=tbill['datadate'].dt.month
+tbill['quarter']=tbill['datadate'].dt.quarter
 
 
-lags=list(range(1, 12))
+lags=list(range(1, 3))
 for lag in lags:
     tbill['lag'+str(lag)+'_TB3MS']=tbill['TB3MS'].shift(lag)
 
-tbill['oneyearmean']=tbill['TB3MS']
+tbill['oneqmean']=tbill['TB3MS']
 for lag in lags:
-    tbill['oneyearmean']=tbill['oneyearmean']+tbill['lag'+str(lag)+'_TB3MS']
+    tbill['oneqmean']=tbill['oneqmean']+tbill['lag'+str(lag)+'_TB3MS']
 
-tbill['oneyearmean']=tbill['oneyearmean']/12
+tbill['oneqmean']=tbill['oneqmean']/3
 
 
 ix=np.isnan(tbill['TB3MS'])
 for lag in lags:
     ix=np.logical_or(ix, np.isnan(tbill['lag'+str(lag)+'_TB3MS']))
 
-tbill.loc[ix, 'oneyearmean']=np.nan
+tbill.loc[ix, 'oneyqmean']=np.nan
 
 
+ix3=tbill['month']==3 
+ix6=tbill['month']==6
+ix9=tbill['month']==9
 ix12=tbill['month']==12
-tbill_endofyear=tbill.loc[ix12].copy()
-tbill_endofyear=tbill_endofyear[['year', 'TB3MS']]
-tbill_endofyear.columns=['year', 'TB3MS_eoy']
 
-tbill_annual=tbill[['year', 'month', 'TB3MS', 'oneyearmean']]
+ix=np.logical_or(ix3, ix6)
+ix=np.logical_or(ix, ix9)
+ix=np.logical_or(ix, ix12)
+
+tbill_eoq=tbill.loc[ix].copy()
+tbill_eoq=tbill_eoq[['year', 'TB3MS']]
+tbill_eoq.columns=['year', 'TB3MS_eoq']
+
+tbill_annual=tbill[['year', 'month', 'TB3MS', 'oneqmean']]
 tbill_annual.columns=['year', 'month', 'TB3MS_eop','TB3MS']
 
 
 dfa=pd.merge(df_ind, tbill_annual, how='outer', on=['year', 'month'])
-dfa=pd.merge(dfa, tbill_endofyear, how='outer', on='year')
+dfa=pd.merge(dfa, tbill_eoq, how='outer', on='year')
 
 print(1)
 
@@ -287,7 +319,7 @@ idx = pd.IndexSlice
 dfa_sub = dfa.loc[idx[:, 'INDL', 'STD', 'C', :], :]
 dfa_sub = dfa_sub.reset_index().drop(['indfmt', 'datafmt', 'consol'], axis=1)
 dfa_sub = dfa_sub.set_index(['gvkey', 'datadate']).sort_index()
-dfa_sub = dfa_sub.groupby(level=0).resample('A', level=1).last()
+dfa_sub = dfa_sub.groupby(level=0).resample('Q', level=1).last()
 
 dfa_sub['gvkey']=dfa_sub.index.get_level_values(0)
 dfa_sub['datadate']=dfa_sub.index.get_level_values(1)
@@ -320,29 +352,34 @@ dfa_final=df.sort_values(['gvkey', 'datadate'])
 dfa_final=dfa_final.set_index(np.arange(len(dfa_final)))
 
 
-dfa_final['debt']=dfa_final['dltt']+dfa_final['dlc']
-dfa_final['m2b']=(dfa_final['csho']*dfa_final['prcc']+dfa_final['at']-dfa_final['ceq']-dfa_final['txdb'])/dfa_final['at']
+dfa_final['debt']=dfa_final['dlttq']+dfa_final['dlcq']
+dfa_final['m2b']=(dfa_final['cshoq']*dfa_final['prcc']+dfa_final['atq']-dfa_final['ceqq']-dfa_final['txdbq'])/dfa_final['atq']
 
 
 
 group=dfa_final.groupby(by=['gvkey']) # Why by month?
+dfa_final['lag1_icaptq']=group['icaptq'].shift(1)
+dfa_final['lag1_dlttq']=group['dlttq'].shift(1)
 dfa_final['lag1_m2b']=group['m2b'].shift(1)
-dfa_final['lag1_ppegt']=group['ppegt'].shift(1)
-dfa_final['lag1_ppent']=group['ppent'].shift(1)
-dfa_final['capx_rate']=dfa_final['capx']/dfa_final['lag1_ppent']
-dfa_final['ebitda_rate']=dfa_final['oibdp']/dfa_final['lag1_ppent']
-dfa_final['D_ppegt']=dfa_final['ppegt']-dfa_final['lag1_ppegt']
-dfa_final['D_ppent']=dfa_final['ppent']-dfa_final['lag1_ppent']
-dfa_final['lag1_at']=group['at'].shift(1)
+dfa_final['lag1_ppentq']=group['ppentq'].shift(1)
+dfa_final['capxq']=dfa_final['ppentq']-dfa_final['lag1_ppentq']
+
+ix=dfa_final['capxq']<0
+dfa_final.loc[ix, 'capxq']=0
+
+dfa_final['capxq_rate']=dfa_final['capxq']/dfa_final['lag1_ppentq']
+dfa_final['ebitda_rate']=dfa_final['oibdpq']/dfa_final['lag1_ppentq']
+dfa_final['lag1_atq']=group['atq'].shift(1)
 dfa_final['lag1_debt']=group['debt'].shift(1)
 dfa_final['lead1_debt']=group['debt'].shift(-1)
 
+
 dfa_final['debt_growth']=dfa_final['debt']-dfa_final['lag1_debt']
-dfa_final['debt_growth_rate']=dfa_final['debt_growth']/dfa_final['lag1_ppent']
+dfa_final['debt_growth_rate']=dfa_final['debt_growth']/dfa_final['lag1_ppentq']
 
 
 dfa_final['lead1_debt_growth']=dfa_final['lead1_debt']-dfa_final['debt']
-dfa_final['lead1_debt_growth_rate']=dfa_final['lead1_debt_growth']/dfa_final['lag1_ppent']
+dfa_final['lead1_debt_growth_rate']=dfa_final['lead1_debt_growth']/dfa_final['lag1_ppentq']
 
 
 
@@ -355,8 +392,8 @@ print(3)
 
 horizons=list(range(0, 4))
 for horizon in horizons:
-    dfa_final['lead'+str(horizon)+'_capx']=group['capx'].shift(-horizon)
-    dfa_final['lead'+str(horizon)+'_capx_rate']=dfa_final['lead'+str(horizon)+'_capx']/dfa_final['lag1_ppent']
+    dfa_final['lead'+str(horizon)+'_capxq']=group['capxq'].shift(-horizon)
+    dfa_final['lead'+str(horizon)+'_capxq_rate']=dfa_final['lead'+str(horizon)+'_capxq']/dfa_final['lag1_ppentq']
 
 
 
@@ -365,7 +402,7 @@ dfa_final=dfa_final.sort_values(['gvkey', 'datadate'])
 dfa_final=dfa_final.set_index(np.arange(len(dfa_final)))
 group=dfa_final.groupby(by=['gvkey'])
 
-dfa_final['m2b']=(dfa_final['csho']*dfa_final['prcc']+dfa_final['at']-dfa_final['ceq']-dfa_final['txdb'])/dfa_final['at']
+dfa_final['m2b']=(dfa_final['cshoq']*dfa_final['prcc']+dfa_final['atq']-dfa_final['ceqq']-dfa_final['txdbq'])/dfa_final['atq']
 
 dfa_final['lag1_ebitda_rate']=group['ebitda_rate'].shift(1)
 
@@ -374,8 +411,8 @@ dfa=dfa_final.copy()
 
 
 ## DEFINE OTHER VARIABLES
-dfa['lag1_debt_rate'] = dfa['lag1_debt'] / dfa['lag1_ppent']
-dfa['debt_rate'] = dfa['debt'] / dfa['ppent']
+dfa['lag1_debt_rate'] = dfa['lag1_debt'] / dfa['lag1_ppentq']
+dfa['debt_rate'] = dfa['debt'] / dfa['ppentq']
 
 
 dfa=dfa.replace([np.inf, -np.inf], np.nan)
@@ -386,16 +423,31 @@ dfa_sub=dfa.copy()
 group=dfa_sub.groupby('gvkey')
 
 # Add cash
-dfa_sub['lag1_cash'] = group['ch'].shift(1)
-dfa_sub['lag1_cash_rate'] = dfa_sub['lag1_cash'] / dfa_sub['lag1_ppent']
-dfa_sub['cash_rate'] = dfa_sub['ch'] / dfa_sub['ppent']
-dfa_sub['lag1_asset_rate'] = dfa_sub['lag1_at'] / dfa_sub['lag1_ppent']
-dfa_sub['asset_rate'] = dfa_sub['at'] / dfa_sub['ppent']
+dfa_sub['lag1_cash'] = group['chq'].shift(1)
+dfa_sub['lag1_cash_rate'] = dfa_sub['lag1_cash'] / dfa_sub['lag1_ppentq']
+dfa_sub['cash_rate'] = dfa_sub['chq'] / dfa_sub['ppentq']
+dfa_sub['lag1_asset_rate'] = dfa_sub['lag1_atq'] / dfa_sub['lag1_ppentq']
+dfa_sub['asset_rate'] = dfa_sub['atq'] / dfa_sub['ppentq']
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 # Debt issuance
-dfa_sub['gross_debt_issue_rate'] = dfa_sub['dltis'] / dfa_sub['lag1_ppent']
-dfa_sub['net_debt_issue']=dfa_sub['dltis']-dfa_sub['dltr']
-dfa_sub['net_debt_issue_rate']=dfa_sub['net_debt_issue']/dfa_sub['lag1_ppent']
+dfa_sub['net_debt_issue']=dfa_sub['dlttq']-dfa_sub['lag1_dlttq']
+
+dfa_sub['net_debt_issue_rate']=dfa_sub['net_debt_issue']/dfa_sub['lag1_ppentq']
 
 dfa_sub['lag1_interest'] = group['interest'].shift(1)
 
@@ -404,29 +456,28 @@ dfa_sub['lag1_interest'] = group['interest'].shift(1)
 dfa=dfa_sub.copy()
 
 
-dfa['debt_d2e']=dfa['max_debt_to_ebitda']*dfa['ebitda']
+dfa['debt_d2e']=dfa['max_debt_to_ebitda']*dfa['oibdpq']
 dfa['ddebt_d2e']=dfa['debt_d2e']-dfa['debt']
 
 
-dfa['debt_d2at']=dfa['max_net_debt_to_assets']*dfa['at']
+dfa['debt_d2at']=dfa['max_net_debt_to_assets']*dfa['atq']
 dfa['ddebt_d2at']=dfa['debt_d2at']-dfa['debt']
 
-dfa['xint_rate']=dfa['xint']/dfa['debt']
-dfa['debt_ic']=dfa['oibdp']/(dfa['xint_rate']*dfa['min_interest_coverage'])
+dfa['xint_rate']=dfa['xintq']/dfa['debt']
+dfa['debt_ic']=dfa['oibdpq']/(dfa['xint_rate']*dfa['min_interest_coverage'])
 dfa['ddebt_ic']=dfa['debt_ic']-dfa['debt']
 
 
-dfa['intpn_rate']=dfa['intpn']/dfa['debt']
-dfa['debt_cic']=dfa['oibdp']/(dfa['intpn_rate']*dfa['min_cash_interest_coverage'])
+dfa['debt_cic']=dfa['oibdpq']/(dfa['xint_rate']*dfa['min_cash_interest_coverage'])
 dfa['ddebt_cic']=dfa['debt_cic']-dfa['debt']
 
 
-dfa['debt_d2eq']=dfa['max_debt_to_equity']*(dfa['at']-dfa['lt'])
+dfa['debt_d2eq']=dfa['max_debt_to_equity']*(dfa['atq']-dfa['ltq'])
 dfa['ddebt_d2eq']=dfa['debt_d2eq']-dfa['debt']
 
 dfa['distance']=dfa[['ddebt_d2e','ddebt_d2at','ddebt_ic','ddebt_cic','ddebt_d2eq']].min(axis=1, skipna=True)
-dfa['distance_rate_lag']=dfa['distance']/dfa['lag1_ppent']
-dfa['distance_rate']=dfa['distance']/dfa['ppent']
+dfa['distance_rate_lag']=dfa['distance']/dfa['lag1_ppentq']
+dfa['distance_rate']=dfa['distance']/dfa['ppentq']
 
 
 
@@ -440,7 +491,7 @@ dfa.loc[ix, 'distance_rate0']=0
 
 
 dfa['dbar']=dfa[['debt_d2e','debt_d2at','debt_ic','debt_cic','debt_d2eq']].min(axis=1, skipna=True)
-dfa['dbar_rate']=dfa['dbar']/dfa['lag1_ppent']
+dfa['dbar_rate']=dfa['dbar']/dfa['lag1_ppentq']
 
 dfa=dfa.sort_values(['gvkey', 'datadate'])
 dfa=dfa.set_index(np.arange(len(dfa)))
@@ -490,11 +541,8 @@ ix = dfa['ebitda_rate'] > 0.0
 dfa.loc[ix, 'ebitda_rate']=np.nan
 dfa=dfa.set_index(np.arange(len(dfa)))
 
-ix=dfa['D_ppent']<0
-dfa.loc[ix, 'D_ppent']=0
 
-ix=dfa['D_ppegt']<0
-dfa.loc[ix, 'D_ppegt']=0
+
 
 
 dfa=dfa.replace([np.inf, -np.inf], np.nan)
@@ -508,16 +556,17 @@ dfa.loc[ix, 'violation']=0
 
 
 
+
 dfa=dfa.sort_values(['gvkey', 'datadate'])
 dfa=dfa.set_index(np.arange(len(dfa)))
 
 
 dfa['lag1_TB3MS']=group['TB3MS'].shift(1)
-dfa['lag1_TB3MS_eoy']=group['TB3MS_eoy'].shift(1)
+dfa['lag1_TB3MS_eoq']=group['TB3MS_eoq'].shift(1)
 dfa['lag1_TB3MS_eop']=group['TB3MS_eop'].shift(1)
 
 dfa['D_interest']=dfa['TB3MS']-dfa['lag1_TB3MS']
-dfa['D_interest_eoy']=dfa['TB3MS_eoy']-dfa['lag1_TB3MS_eoy']
+dfa['D_interest_eoq']=dfa['TB3MS_eoq']-dfa['lag1_TB3MS_eoq']
 dfa['D_interest_eop']=dfa['TB3MS_eop']-dfa['lag1_TB3MS_eop']
 
 
@@ -529,51 +578,46 @@ dfa['lag1_distance_rate']=group['distance_rate'].shift(1)
 dfa['lag1_distance_rate0']=group['distance_rate0'].shift(1)
 
 
-dfa['lag1_capx_rate']=group['capx_rate'].shift(1)
+
+
+dfa['lag1_capxq_rate']=group['capxq_rate'].shift(1)
 dfa['lag1_net_debt_issue_rate']=group['net_debt_issue_rate'].shift(1)
-dfa['lag1_gross_debt_issue_rate']=group['gross_debt_issue_rate'].shift(1)
-
-dfa['lead1_capx_rate']=group['capx_rate'].shift(-1)
-dfa['lead1_net_debt_issue_rate']=group['net_debt_issue_rate'].shift(-1)
-dfa['lead1_gross_debt_issue_rate']=group['gross_debt_issue_rate'].shift(-1)
 
 
 
 
 
-columns=['capx_rate', 'net_debt_issue_rate', 'gross_debt_issue_rate']
+
+columns=['capxq_rate', 'net_debt_issue_rate']
 for col in columns:
     dfa['D_'+col]=dfa[col]-dfa['lag1_'+col]
     dfa['lead1_D_'+col]=dfa['lead1_'+col]-dfa[col]
-    
-    
+
+
+
 ##############################
 ## Keep only those with 3 consecutive years
 ##############################
- 
+
+
+
 years={}
 group=df_ind.groupby(by=['gvkey'])
-years['years']=group['ones'].sum()
+years['quarters']=group['ones'].sum()
 years=pd.DataFrame(years)
+
 years['gvkey']=years.index.get_level_values(0)
 years=years.set_index(np.arange(len(years)))
 
-
 dfa=pd.merge(dfa, years, how='outer', on='gvkey')
 
-ix=dfa['years']>=3
+ix=dfa['quarters']>=8
 dfa=dfa.loc[ix].copy()
 
 dfa=dfa.sort_values(['gvkey', 'datadate'])
 dfa=dfa.set_index(np.arange(len(dfa)))
 
-
-
-
-
-
 """
-
 
 
 
@@ -599,19 +643,19 @@ for yr in list(range(int(df['year'].min()), int(df['year'].max()))):
 
 
 
-dfa.to_feather(data_dir+'compustat/ds_comp_resampled.feather')
-
-dfa['lag']=group['year'].shift(0)-group['year'].shift(1)
+dfa.to_feather(data_dir+'compustat/ds_comp_q_resampled.feather')
 
 
 
 
 ix=dfa['violation']==1
 
-leadlag=[1, 2, 3, 4, 6]
-dropcols=[]
+
+leadlag=list(range(1, 21))
 
 group=dfa.groupby('gvkey')
+
+dropcols=[]
 
 for ll in leadlag:
     dfa['lead'+str(ll)+'_violation']=group['violation'].shift(-ll)
@@ -622,6 +666,7 @@ for ll in leadlag:
     ix=np.logical_or(ix, dfa['lag'+str(ll)+'_violation']==1)
 
 
+print(5)
 
 dfa=dfa.drop(dropcols, axis=1)
 
@@ -630,7 +675,7 @@ df_eventstudy=dfa.loc[ix].copy()
 df_eventstudy=df_eventstudy.sort_values(['gvkey', 'datadate'])
 df_eventstudy=df_eventstudy.set_index(np.arange(len(df_eventstudy)))
 
-df_eventstudy.to_feather(data_dir+'compustat/ds_comp_eventstudy_resampled.feather')
+df_eventstudy.to_feather(data_dir+'compustat/ds_comp_q_eventstudy_resampled.feather')
 
 
 
@@ -640,4 +685,4 @@ iz=np.logical_and(ix, iy)
 dfa_sub=dfa.loc[iz].copy()
 dfa_sub=dfa_sub.sort_values(by=['gvkey', 'datadate'])
 dfa_sub=dfa_sub.set_index(np.arange(len(dfa_sub)))
-dfa_sub.to_feather(data_dir+'compustat/ds_comp_93_07_resampled.feather')
+dfa_sub.to_feather(data_dir+'compustat/ds_comp_q_93_07_resampled.feather')
