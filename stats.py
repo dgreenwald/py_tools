@@ -13,6 +13,17 @@ def weighted_quantile(values_in, weights_in, quantiles, sort=True):
 
     return np.interp(quantiles, cumulative_weights, values)
 
+def wq_by_col(values, weights, quantiles, **kwargs):
+
+    Ncol = values.shape[1]
+    output = np.zeros((len(quantiles), Ncol))
+    for icol in range(Ncol):
+        output[:, icol] = weighted_quantile(
+            values[:, icol], weights, quantiles, **kwargs
+        )
+
+    return output
+
 def weighted_mean(values_in, weights_in):
 
     num = np.dot(values_in, weights_in)
