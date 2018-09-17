@@ -33,7 +33,18 @@ def date_index(df, startdate, freq='QS'):
 
 def quarter_index(df, yr, q):
     mon = 3 * (int(q) - 1) + 1
+    return month_index(df, yr, mon)
+
+def month_index(df, yr, mon):
     return date_index(df, '{0}/1/{1}'.format(mon, yr))
+
+def date_from_qtr(yr, q):
+    mon = 3 * (q - 1) + 1
+    return date_from_month(yr, mon)
+
+def date_from_month(yr, mon):
+    date = yr.astype(str) + '-' + mon.astype(str) + '-01'
+    return pd.to_datetime(date)
 
 def resample(df, methods_vars, freq='QS'):
     df_resamp = None

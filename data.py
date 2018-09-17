@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 # import pdb
 import pickle
+import patsy
 
 import statsmodels.api as sm
 import statsmodels.formula.api as smf
@@ -142,14 +143,17 @@ def match_xy(X, z, how='inner', ix=None):
 
 
 def regression(df_in, lhs, rhs, fes=[], intercept=True, formula_extra=None, ix=None, 
-               trend=None, cluster_groups=None, **kwargs):
+               trend=None, cluster_groups=None, weight_var=None, **kwargs):
     """Run regression from pandas dataframe"""
 
     formula = '{0} ~ {1}'.format(lhs, ' + '.join(rhs))
     if fes:
         formula += ' + '.join([''] + ['C({})'.format(fe) for fe in fes])
 
-    df = df_in[[lhs] + rhs + fes].copy()
+    var_list = [lhs] + rhs + fes
+    if weight_var is not None:
+        var_list += [weight_var]
+    df = df_in[var_list].copy()
 
     ix_samp, _ = match_sample(df.values, how='inner')
     if ix is None:
@@ -182,12 +186,47 @@ def regression(df_in, lhs, rhs, fes=[], intercept=True, formula_extra=None, ix=N
     else:
         these_groups = None
 
-    fr = formula_regression(df, formula, ix=ix, cluster_groups=these_groups, **kwargs)
-    fr.ix = ix_both
-    fr.Xs = Xs
-    fr.zs = zs
+    if weight_var is None:
+        fr = formula_regression(df, formula, ix=ix, cluster_groups=these_groups, **kwargs)
+    else:
+        fr = wls_formula(df, formula, weight_var=weight_var, ix=ix, cluster_groups=these_groups, **kwargs)
+
+    return FullResults(fr.results, ix=ix, Xs=Xs, zs=zs)
+
+def wls_formula(df, formula, weight_var=None, weights=None, ix=None, nw_lags=0,
+                cluster_groups=None, display=False):
     
-    return fr
+    if weight_var is not None:
+        assert weights is None
+        weights = df[weight_var]
+
+    weights /= np.sum(weights)
+
+    if ix is None:
+        ix = np.ones(len(df), dtype=bool)
+    
+    y, X = patsy.dmatrices(formula, df.loc[ix, :], return_type='dataframe')
+    results = smf.WLS(y, X, weights=weights).fit()
+    results = results.get_robustcov_results('HC0')
+
+    results = update_results_cov(results, nw_lags=nw_lags, cluster_groups=cluster_groups)
+
+    if display:
+        print(results.summary())
+
+    return results
+
+def update_results_cov(results, nw_lags=0, cluster_groups=None):
+
+    if cluster_groups is not None:
+        assert(nw_lags == 0)
+        results = results.get_robustcov_results('cluster', groups=cluster_groups)
+    elif nw_lags > 0:
+        results = results.get_robustcov_results('HAC', maxlags=nw_lags)
+    else:
+        results = results.get_robustcov_results('HC0')
+
+    return results
 
 def formula_regression(df, formula, ix=None, nw_lags=0, cluster_groups=None, display=False):
 
@@ -204,13 +243,7 @@ def formula_regression(df, formula, ix=None, nw_lags=0, cluster_groups=None, dis
 
     results = model.fit()
 
-    if cluster_groups is not None:
-        assert(nw_lags == 0)
-        results = results.get_robustcov_results('cluster', groups=cluster_groups)
-    elif nw_lags > 0:
-        results = results.get_robustcov_results('HAC', maxlags=nw_lags)
-    else:
-        results = results.get_robustcov_results('HC0')
+    results = update_results_cov(results, nw_lags=nw_lags, cluster_groups=cluster_groups)
 
     if display:
         print(results.summary())

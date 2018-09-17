@@ -159,6 +159,19 @@ def load(dataset, user='DAN', master_dirs={}, **kwargs):
         del df['date']
         ts.date_index(df, '1947/1/1', freq='QS')
 
+    elif dataset == 'martin_svix':
+
+        infile = data_dir + 'martin_svix2.xls'
+        df = pd.read_excel(
+            infile,
+            skiprows=0,
+            header=None,
+            names=['date', 'svix_1mo', 'svix_2mo', 'svix_3mo', 'svix_6mo', 'svix_12mo'],
+        )
+
+        df['date'] = pd.to_datetime(df['date'])
+        df.set_index('date')
+
     elif dataset == 'nber_dates':
 
         infile = data_dir + 'nber_dates.csv'
@@ -194,6 +207,13 @@ def load(dataset, user='DAN', master_dirs={}, **kwargs):
 
         for col in df.columns:
             df[col] = pd.to_numeric(df[col], errors='coerce')
+
+    elif dataset == 'vrp':
+
+        infile = data_dir + 'VRPtable.txt'
+        df = pd.read_table(infile, sep='\s+')
+        df['date'] = ts.date_from_month(df['Year'], df['Month'])
+        df = df.drop(columns=['Year', 'Month']).set_index('date').sort_index()
 
     elif dataset == 'welch_goyal':
         """Include keyword argument freq to specify frequency of dataset"""
