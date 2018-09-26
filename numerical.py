@@ -77,3 +77,15 @@ def svd_inv(A, sv_tol=1e-8, **kwargs):
     A_inv = np.dot(vh.T, np.dot(S_inv, u.T))
     return A_inv
 
+def ghquad_norm(degree, mu=0.0, sig=1.0):
+
+    x, w = np.polynomial.hermite.hermgauss(degree) 
+
+    # Re-scale weights (currently add to pi^{1/2})
+    w /= np.sum(w)
+
+    # Re-scale nodes to adjust for mu and sigma
+    x *= np.sqrt(2.0) * sig
+    x += mu
+
+    return x, w

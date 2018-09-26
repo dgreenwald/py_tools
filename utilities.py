@@ -86,6 +86,24 @@ def toc(start, display=True):
     print("Time elapsed: {:4.3g} seconds".format(elapsed))
     return elapsed
 
+def log_if_pos(x):
+    """
+    Compute the log of an array if positive, otherwise return NaNs
+    Parameters
+    ----------
+    x : array-like 
+        Array to take log of
+    Returns 
+    -------
+    out: ndarray
+        Log if all positive, otherwise NaN
+    """
+
+    if np.all(x > 0):
+        return np.log(x)
+    else:
+        return np.nan * np.ones(x.shape)
+
 def cartesian(arrays, out=None):
     """
     Generate a cartesian product of input arrays.
