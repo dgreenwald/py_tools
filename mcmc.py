@@ -547,6 +547,7 @@ class SMC(MonteCarlo):
         
         # Other drawing parameters
         self.the_star = None
+        self.Sig_star = None
         self.C_star = None
         self.C_list = None
         
@@ -851,11 +852,11 @@ class SMC(MonteCarlo):
             
     def save(self):
 
-        self.save_list(np_list=self.np_list, pkl_list = self.pkl_list)
+        self.save_list(np_list=self.np_list, pkl_list=self.pkl_list)
 
     def load(self, parallel=False):
 
-        self.load_list(np_list=self.np_list, pkl_list = self.pkl_list)
+        self.load_list(np_list=self.np_list, pkl_list=self.pkl_list)
         
         # Re-set parallel flag and rank
         self.set_rank(parallel)
