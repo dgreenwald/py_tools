@@ -657,8 +657,11 @@ class SMC(MonteCarlo):
         
 #        raise Exception
 
-        # Turn into weight using incremental
-        w = np.exp((self.phi[istep] - self.phi[istep-1]) * this_post)
+        # Turn into weight using incremental, ignoring non-finite values
+        ix_good = np.isfinite(this_post)
+        w = np.zeros(this_post.shape)
+        w[ix_good] = np.exp((self.phi[istep] - self.phi[istep-1]) * this_post[ix_good])
+
         W_til = w * self.W[istep-1, :]
         W_til /= np.mean(W_til)
 
@@ -682,7 +685,7 @@ class SMC(MonteCarlo):
         
         if self.parallel: 
             if self.rank > 0: return None
-        
+
         # Weighted mean
         weights = self.W[istep, :]
         self.the_star = np.dot(weights, self.draws[istep, :, :]) / self.Npt
