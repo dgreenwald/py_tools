@@ -33,26 +33,19 @@ def any2(list_of_items, list_to_check):
 def join_lists(list_of_lists):
     return list(itertools.chain.from_iterable(list_of_lists))
 
-class PresetDict(dict):
-    """dict that does not update if there is already a key present"""
+def check_duplicates(var_list):
 
-    def __init__(self, other=None, quiet=False, **kwargs):
-        super().__init__()
-        self.quiet=quiet
-        self.update(other, **kwargs)
-
-    def __setitem__(self, key, value):
-        if key not in self:
-            super().__setitem__(key, value)
-        elif not self.quiet:
-            print("PresetDict: ignoring key '{}'".format(key))
-
-    def update(self, other=None, **kwargs):
-        if other is not None:
-            for k, v in other.items() if isinstance(other, Mapping) else other:
-                self[k] = v
-        for k, v in kwargs.items():
-            self[k] = v
+    if len(var_list) != len(set(var_list)):
+        seen = set()
+        duplicate = set()
+        for var in var_list:
+            if var not in seen:
+                seen.add(var)
+            else:
+                duplicate.add(var)
+        print("Repeated variables detected:")
+        print(duplicate)
+        raise Exception
 
 def swap_all_axes(a, target_axes, count=0):
 

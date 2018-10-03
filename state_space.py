@@ -1,4 +1,5 @@
 import numpy as np
+import scipy as sp
 from scipy.stats import multivariate_normal as mvn
 
 def init_to_val(shape, val):
@@ -115,7 +116,7 @@ class StateSpaceEstimates:
         self.ssm = ssm
         self.Nx, _ = self.ssm.A.shape
 
-    def kalman_filter(self, x_init, P_init):
+    def kalman_filter(self, x_init=None, P_init=None):
         """Run the Kalman filter on the data y.
         
         Inputs:
@@ -124,6 +125,12 @@ class StateSpaceEstimates:
             x_init: Length Nx mean of initial x distribution
             P_init: (Nx x Nx) covariance matrix of initial x distribution
         """
+
+        if x_init is None:
+            x_init = np.zeros(self.Nx)
+
+        if P_init is None:
+            P_init = sp.linalg.solve_discrete_lyapunov(self.ssm.A, self.ssm.Q)
 
         self.x_init = x_init
         self.P_init = P_init
@@ -159,15 +166,8 @@ class StateSpaceEstimates:
             log_like += mvn.logpdf(err_t, mean=np.zeros(self.Ny), cov=V) 
             
             # Filtering step
-            # F_t = np.dot(ssm.Z[ix_t, :], PZ) + H
             F_t = V + self.ssm.H
-            # Fi_t = np.linalg.inv(F_t)
             ZFi_t = rsolve(self.ssm.Z[ix_t, :].T, F_t)
-            # K_t = np.dot(ssm.A, rsolve(PZ, F_t)) # no separate pred, filter
-            # L_t = ssm.A - np.dot(K_t, ssm.Z[ix_t, :]) # no separate pred, filter
-            # K_t = rsolve(PZ, F_t)
-            # K_t = np.dot(P_pred_t, ZFi)
-            # K_t = np.dot(PZ, Fi_t)
             K_t = np.dot(P_pred_t, ZFi_t)
             L_t = np.eye(self.Nx) - np.dot(K_t, self.ssm.Z[ix_t, :])
 
@@ -199,7 +199,6 @@ class StateSpaceEstimates:
 
         for tt in range(self.Nt - 1, -1, -1):
 
-            # NOTE: don't need to directly invert F, could compute Z F^{-1}
             r_t = (np.dot(self.ZFi[tt, :, :], self.err[tt, :]) 
                    + np.dot(self.L[tt, :, :].T, r_t))
 
