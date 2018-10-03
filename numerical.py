@@ -89,3 +89,32 @@ def ghquad_norm(degree, mu=0.0, sig=1.0):
     x += mu
 
     return x, w
+
+def logit(x, lb=0.0, ub=1.0):
+    return np.log(x - lb) - np.log(ub - x)
+
+def logistic(x, lb=0.0, ub=1.0):
+    return lb + (ub - lb) / (1.0 + np.exp(-x))
+
+def bound_transform(vals, lb, ub, to_bdd=True):
+
+    trans_vals = vals.copy()
+
+    # Indices
+    ix_lb = lb > -np.inf
+    ix_ub = ub < np.inf
+
+    ix_both = ix_lb & ix_ub
+    ix_lb_only = ix_lb & (~ix_ub)
+    ix_ub_only = (~ix_lb) & ix_ub
+
+    if to_bdd:
+        trans_vals[ix_both] = logistic(vals[ix_both], lb=lb[ix_both], ub=ub[ix_both])
+        trans_vals[ix_lb_only] = lb[ix_lb_only] + np.exp(vals[ix_lb_only])
+        trans_vals[ix_ub_only] = ub[ix_ub_only] - np.exp(vals[ix_ub_only])
+    else:
+        trans_vals[ix_both] = logit(vals[ix_both], lb=lb[ix_both], ub=ub[ix_both])
+        trans_vals[ix_lb_only] = np.log(vals[ix_lb_only] - lb[ix_lb_only])
+        trans_vals[ix_ub_only] = -np.log(ub[ix_ub_only] - vals[ix_ub_only])
+
+    return trans_vals

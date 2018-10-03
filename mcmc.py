@@ -9,35 +9,6 @@ from py_tools.mpi_array import MPIArray
 
 from mpi4py import MPI
 
-def logit(x, lb=0.0, ub=1.0):
-    return np.log(x - lb) - np.log(ub - x)
-
-def logistic(x, lb=0.0, ub=1.0):
-    return lb + (ub - lb) / (1.0 + np.exp(-x))
-
-def transform(vals, lb, ub, to_bdd=True):
-
-    trans_vals = vals.copy()
-
-    # Indices
-    ix_lb = lb > -np.inf
-    ix_ub = ub < np.inf
-
-    ix_both = ix_lb & ix_ub
-    ix_lb_only = ix_lb & (~ix_ub)
-    ix_ub_only = (~ix_lb) & ix_ub
-
-    if to_bdd:
-        trans_vals[ix_both] = logistic(vals[ix_both], lb=lb[ix_both], ub=ub[ix_both])
-        trans_vals[ix_lb_only] = lb[ix_lb_only] + np.exp(vals[ix_lb_only])
-        trans_vals[ix_ub_only] = ub[ix_ub_only] - np.exp(vals[ix_ub_only])
-    else:
-        trans_vals[ix_both] = logit(vals[ix_both], lb=lb[ix_both], ub=ub[ix_both])
-        trans_vals[ix_lb_only] = np.log(vals[ix_lb_only] - lb[ix_lb_only])
-        trans_vals[ix_ub_only] = -np.log(ub[ix_ub_only] - vals[ix_ub_only])
-
-    return trans_vals
-
 def randomize_blocks(nx, nblock):
     """nx is number of entries, nblock is number of blocks"""
     ix_all = np.random.permutation(nx)
@@ -196,6 +167,30 @@ class MonteCarlo:
     def __init__(self, log_like=None, prior=Prior(), args=(), lb=None, ub=None,
                  names=None, bounds_dict={}, out_dir=None, suffix=None,
                  Nx=None):
+        """
+        Parameters
+        ----------
+        log_like : function
+            Function of (vals, *args) that evaluates the log likelihood.
+        prior : Prior object
+            Bayesian prior
+        args : tuple
+            Additional arguments of log_like
+        lb : ndarray
+            Lower bounds of parameters
+        ub : ndarray
+            Upper bounds of parameters
+        names : list
+            Names of parameters
+        bounds_dict: dict
+            Alternative bounds input, maps param names to (lb, ub) pairs
+        out_dir: string
+            Directory where output should be saved
+        suffix: string
+            Suffix for labeling
+        Nx : int
+            number of parameters
+        """
 
         self.log_like = log_like
         self.prior = prior
@@ -245,22 +240,22 @@ class MonteCarlo:
 
     def min_objfcn(self, unbdd_params):
 
-        params = self.transform(unbdd_params, to_bdd=True)
+        params = self.bound_transform(unbdd_params, to_bdd=True)
         return -self.posterior(params)
 
     def find_mode(self, x0, method='bfgs', tol=1e-8, **kwargs):
         
         self.tol = tol
 
-        x0_u = self.transform(x0, to_bdd=False)
+        x0_u = self.bound_transform(x0, to_bdd=False)
         res = minimize(self.min_objfcn, x0_u, tol=self.tol)
-        self.x_mode = self.transform(res.x, to_bdd=True)
+        self.x_mode = self.bound_transform(res.x, to_bdd=True)
         self.post_mode = -res.fun
         return res
 
-    def transform(self, vals, *args, **kwargs):
+    def bound_transform(self, vals, *args, **kwargs):
 
-        return transform(vals, self.lb, self.ub, *args, **kwargs)
+        return nm.bound_transform(vals, self.lb, self.ub, *args, **kwargs)
 
     def compute_hessian(self, x0=None, **kwargs):
 

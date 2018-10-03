@@ -66,18 +66,22 @@ class PresetDict(dict):
         for k, v in kwargs.items():
             self[k] = v
 
-    def override(self, other):
+    def overwrite_item(self, key, value):
 
-        override_preset_dict(self, other)
+        super().__setitem__(key, value)
+        
+    def overwrite_update(self, other):
+        
+        super().update(other)
 
-def override_preset_dict(preset, other):
-    """Update preset dict, replacing even if value already set"""
-
-    temp = preset.copy()
-    preset = PresetDict(other)
-    preset.update(temp)
-
-    return preset 
+#def override_preset_dict(preset, other):
+#    """Update preset dict, replacing even if value already set"""
+#
+#    temp = preset.copy()
+#    preset = PresetDict(other)
+#    preset.update(temp)
+#
+#    return preset 
             
 def replace_keys(my_dict, orig, repl):
     """Replace keys in a dict according to a regex pattern"""

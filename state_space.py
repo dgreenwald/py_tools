@@ -148,9 +148,9 @@ class StateSpaceEstimates:
 
         self.ZFi = np.zeros((self.Nt, self.Nx, self.Ny))
         self.K = np.zeros((self.Nt, self.Nx, self.Ny))
-        self.L = np.zeros((self.Nt, self.Nx, self.Nx))
+        self.G = np.zeros((self.Nt, self.Nx, self.Nx))
 
-        log_like = 0.0 # log likelihood
+        self.log_like = 0.0 # log likelihood
 
         for tt in range(self.Nt):
 
@@ -163,16 +163,16 @@ class StateSpaceEstimates:
 
             PZ = np.dot(P_pred_t, self.ssm.Z[ix_t, :].T)
             V = np.dot(self.ssm.Z[ix_t, :], PZ)
-            log_like += mvn.logpdf(err_t, mean=np.zeros(self.Ny), cov=V) 
+            self.log_like += mvn.logpdf(err_t, mean=np.zeros(self.Ny), cov=V) 
             
             # Filtering step
             F_t = V + self.ssm.H
             ZFi_t = rsolve(self.ssm.Z[ix_t, :].T, F_t)
             K_t = np.dot(P_pred_t, ZFi_t)
-            L_t = np.eye(self.Nx) - np.dot(K_t, self.ssm.Z[ix_t, :])
+            G_t = np.eye(self.Nx) - np.dot(K_t, self.ssm.Z[ix_t, :])
 
             x_filt = x_pred_t + np.dot(K_t, err_t)
-            P_filt = np.dot(P_pred_t, L_t.T)
+            P_filt = np.dot(P_pred_t, G_t.T)
 
             # Save values
             self.ix[tt, :] = ix_t
@@ -183,7 +183,7 @@ class StateSpaceEstimates:
 
             self.ZFi[tt, :, :] = ZFi_t
             self.K[tt, :, :] = K_t
-            self.L[tt, :, :] = L_t
+            self.G[tt, :, :] = G_t
 
             # Update for next period
             x_pred_t = np.dot(self.ssm.A, x_filt)
