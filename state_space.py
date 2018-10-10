@@ -166,15 +166,15 @@ class StateSpaceEstimates:
             err_t = self.y[tt, ix_t] - np.dot(self.ssm.Z[ix_t, :], x_pred_t) - self.ssm.b[ix_t]
 
             PZ = np.dot(P_pred_t, self.ssm.Z[ix_t, :].T)
-            V = np.dot(self.ssm.Z[ix_t, :], PZ)
+            F_t = np.dot(self.ssm.Z[ix_t, :], PZ) + self.ssm.H[ix_t, ix_t]
+            
             try:
-                self.log_like += mvn.logpdf(err_t, mean=np.zeros(self.Ny), cov=V) 
+                self.log_like += mvn.logpdf(err_t, mean=np.zeros(self.Ny), cov=F_t) 
             except:
                 self.log_like = -1e+10
                 return None
             
             # Filtering step
-            F_t = V + self.ssm.H
             ZFi_t = rsolve(self.ssm.Z[ix_t, :].T, F_t)
 #            AP_t = np.dot(self.ssm.A, P_pred_t)
             
