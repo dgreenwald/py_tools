@@ -39,10 +39,23 @@ for tt in range(1, 20):
     L_all[tt] = dist.logpdf(e_sim[tt-1, :])
 
 L_true = np.sum(L_all)
-print(L_all)
+#print(L_all)
 
 y_sim = x_sim.copy()
 
 ssm = state_space.StateSpaceModel(A, R, Q, Z, H)
-sse = state_space.StateSpaceEstimates(ssm, y_sim)
-sse.kalman_filter(x_init=x0, P_init=P0)
+sse = state_space.StateSpaceEstimates(ssm, y_sim, x_init=x0, P_init=P0)
+sse.kalman_filter()
+
+print("True: {0:g}, filtered: {1:g}".format(L_true, sse.log_like))
+
+sse.disturbance_smoother()
+# Check
+#x0_hat = x0 + np.dot(P0, sse.r[0, :])
+#print(x0_hat - x_sim[0, :])
+#e_hat = np.dot(sse.r, np.dot(Q.T, R))
+#print(e_hat[1:, :] - e_sim)
+
+sse.state_smoother()
+# Check
+#print(sse.x_smooth - x_sim)
