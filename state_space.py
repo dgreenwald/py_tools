@@ -1,6 +1,7 @@
 import numpy as np
 import scipy as sp
 from scipy.stats import multivariate_normal as mvn
+import sys
 
 def init_to_val(shape, val):
 
@@ -115,6 +116,9 @@ class StateSpaceEstimates:
 
         self.ssm = ssm
         self.Nx, _ = self.ssm.A.shape
+        
+        # Item for smoother
+        self.r = None
 
     def kalman_filter(self, x_init=None, P_init=None):
         """Run the Kalman filter on the data y.
@@ -163,11 +167,18 @@ class StateSpaceEstimates:
 
             PZ = np.dot(P_pred_t, self.ssm.Z[ix_t, :].T)
             V = np.dot(self.ssm.Z[ix_t, :], PZ)
-            self.log_like += mvn.logpdf(err_t, mean=np.zeros(self.Ny), cov=V) 
+            try:
+                self.log_like += mvn.logpdf(err_t, mean=np.zeros(self.Ny), cov=V) 
+            except:
+                self.log_like = -1e+10
+                return None
             
             # Filtering step
             F_t = V + self.ssm.H
             ZFi_t = rsolve(self.ssm.Z[ix_t, :].T, F_t)
+#            AP_t = np.dot(self.ssm.A, P_pred_t)
+            
+            # Note: "K" in DK notation is AK. "L" is AG.
             K_t = np.dot(P_pred_t, ZFi_t)
             G_t = np.eye(self.Nx) - np.dot(K_t, self.ssm.Z[ix_t, :])
 
@@ -200,13 +211,16 @@ class StateSpaceEstimates:
         for tt in range(self.Nt - 1, -1, -1):
 
             r_t = (np.dot(self.ZFi[tt, :, :], self.err[tt, :]) 
-                   + np.dot(self.L[tt, :, :].T, r_t))
+                   + np.dot(np.dot(self.ssm.A, self.G[tt, :, :]).T, r_t))
 
             self.r[tt, :] = r_t
 
         return None
 
     def state_smoother(self):
+        
+        if self.r is None:
+            self.disturbance_smoother()
 
         self.x_smooth = np.zeros((self.Nt, self.Nx))
 
