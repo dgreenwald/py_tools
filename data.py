@@ -96,7 +96,7 @@ def demean(df_in, var_list, by_var, weight_var=None):
         for var in var_list:
             df[var + '_wtd'] = df[var] * df[weight_var]
 
-        df_by = df[keep_list].groupby(by_var).sum()
+        df_by = df.groupby(by_var).sum()
         for var in var_list:
             df_by[var + '_mean'] = df_by[var + '_wtd'] / df_by[weight_var]
 
