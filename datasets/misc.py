@@ -171,6 +171,17 @@ def load(dataset, user='DAN', master_dirs={}, **kwargs):
 
         df['date'] = pd.to_datetime(df['date'])
         df.set_index('date')
+        
+    elif dataset == 'ns_mp_shocks':
+        # Nakamura and Steinsson shocks
+        
+        infile = data_dir + 'ns_mp_shocks.pkl'
+        if not os.path.exists(infile):
+            rawfile = data_dir + 'PolicyNewsShocksWeb.xlsx'
+            df = pd.read_excel(rawfile, sheet_name='PolicyNewsShocks1995')
+            df.to_pickle(infile)
+        else:
+            df = pd.read_pickle(infile)
 
     elif dataset == 'nber_dates':
 
