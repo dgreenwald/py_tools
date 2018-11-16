@@ -1,6 +1,7 @@
 import numpy as np
 import scipy as sp
 from scipy.stats import multivariate_normal as mvn
+import sys
 
 def init_to_val(shape, val):
 
@@ -79,35 +80,13 @@ class StateSpaceModel:
 
         return (y_sim, x_sim)
 
-    def draw_states(self, y, x_init, P_init):
-
-        # Draw shocks
-        ix = np.isfinite(y)
-        Nt, _ = y.shape
-        shocks = draw_norm_multi(self.Q, Nt)
-        x_1 = x_init + draw_norm(P_init)
-
-        # Simulate using random draws
-        y_plus, x_plus = self.simulate(x_1, shocks, ix)
-
-        # Create artificial observations
-        y_star = y - y_plus
-
-        # Get smoothed values
-        sse = StateSpaceEstimates(self, y_star)
-        sse.kalman_filter(x_init, P_init)
-        sse.disturbance_smoother()
-        sse.state_smoother()
-
-        return x_plus + sse.x_smooth
-
 class StateSpaceEstimates:
     """Estimated states from applying state space model to particular dataset
     
     Associated with StateSpaceModel ssm
     """
 
-    def __init__(self, ssm, y):
+    def __init__(self, ssm, y, x_init=None, P_init=None):
 
         self.y = y
         self.Nt, self.Ny = self.y.shape
@@ -115,8 +94,21 @@ class StateSpaceEstimates:
 
         self.ssm = ssm
         self.Nx, _ = self.ssm.A.shape
+        
+        # Set initializations
+        if x_init is None:
+            x_init = np.zeros(self.Nx)
 
-    def kalman_filter(self, x_init=None, P_init=None):
+        if P_init is None:
+            P_init = sp.linalg.solve_discrete_lyapunov(self.ssm.A, self.ssm.Q)
+
+        self.x_init = x_init
+        self.P_init = P_init
+        
+        # Item for smoother
+        self.r = None
+
+    def kalman_filter(self):
         """Run the Kalman filter on the data y.
         
         Inputs:
@@ -126,22 +118,13 @@ class StateSpaceEstimates:
             P_init: (Nx x Nx) covariance matrix of initial x distribution
         """
 
-        if x_init is None:
-            x_init = np.zeros(self.Nx)
-
-        if P_init is None:
-            P_init = sp.linalg.solve_discrete_lyapunov(self.ssm.A, self.ssm.Q)
-
-        self.x_init = x_init
-        self.P_init = P_init
-
-        x_pred_t = x_init
-        P_pred_t = P_init
+        x_pred_t = self.x_init
+        P_pred_t = self.P_init
 
         self.err = np.zeros((self.Nt, self.Ny))
 
-        self.x_filt = np.zeros((self.Nt, self.Nx))
-        self.P_filt = np.zeros((self.Nt, self.Nx, self.Nx))
+#        self.x_filt = np.zeros((self.Nt, self.Nx))
+#        self.P_filt = np.zeros((self.Nt, self.Nx, self.Nx))
 
         self.x_pred = np.zeros((self.Nt, self.Nx))
         self.P_pred = np.zeros((self.Nt, self.Nx, self.Nx))
@@ -159,35 +142,49 @@ class StateSpaceEstimates:
 
             # Get error and update likelihood
             ix_t = self.ix[tt, :]
-            err_t = self.y[tt, ix_t] - np.dot(self.ssm.Z[ix_t, :], x_pred_t) - self.ssm.b[ix_t]
+            Z_t = self.ssm.Z[ix_t, :]
+            err_t = self.y[tt, ix_t] - np.dot(Z_t, x_pred_t) - self.ssm.b[ix_t]
 
-            PZ = np.dot(P_pred_t, self.ssm.Z[ix_t, :].T)
-            V = np.dot(self.ssm.Z[ix_t, :], PZ)
-            self.log_like += mvn.logpdf(err_t, mean=np.zeros(self.Ny), cov=V) 
+            PZ = np.dot(P_pred_t, Z_t.T)
+            F_t = np.dot(Z_t, PZ) + self.ssm.H[ix_t, ix_t]
             
-            # Filtering step
-            F_t = V + self.ssm.H
-            ZFi_t = rsolve(self.ssm.Z[ix_t, :].T, F_t)
-            K_t = np.dot(P_pred_t, ZFi_t)
-            G_t = np.eye(self.Nx) - np.dot(K_t, self.ssm.Z[ix_t, :])
+            try:
+                self.log_like += mvn.logpdf(err_t, mean=np.zeros(self.Ny), cov=F_t) 
+            except:
+                self.log_like = -1e+10
+                return None
+            
+            # Update step (DK style)
+            ZFi_t = rsolve(Z_t.T, F_t)
+            AP_t = np.dot(self.ssm.A, P_pred_t)
+            K_t = np.dot(AP_t, ZFi_t)
+            G_t = self.ssm.A - np.dot(K_t, Z_t)
+            
+            x_pred_t = np.dot(self.ssm.A, x_pred_t) + np.dot(K_t, err_t)
+            P_pred_t = np.dot(AP_t, G_t.T) + self.ssm.RQR
 
-            x_filt = x_pred_t + np.dot(K_t, err_t)
-            P_filt = np.dot(P_pred_t, G_t.T)
+            """OLD VERSION: STORE FILTERED RESULTS SEPARATELY"""            
+            # Note: "K" in DK notation is AK. "L" is AG.
+#            K_t = np.dot(P_pred_t, ZFi_t)
+#            G_t = np.eye(self.Nx) - np.dot(K_t, self.ssm.Z[ix_t, :])
+
+#            x_filt = x_pred_t + np.dot(K_t, err_t)
+#            P_filt = np.dot(P_pred_t, G_t.T)
 
             # Save values
             self.ix[tt, :] = ix_t
             self.err[tt, :] = err_t
 
-            self.x_filt[tt, :] = x_filt
-            self.P_filt[tt, :, :] = P_filt
+#            self.x_filt[tt, :] = x_filt
+#            self.P_filt[tt, :, :] = P_filt
 
             self.ZFi[tt, :, :] = ZFi_t
             self.K[tt, :, :] = K_t
             self.G[tt, :, :] = G_t
 
             # Update for next period
-            x_pred_t = np.dot(self.ssm.A, x_filt)
-            P_pred_t = np.dot(self.ssm.A, np.dot(P_filt, self.ssm.A.T)) + self.ssm.RQR
+#            x_pred_t = np.dot(self.ssm.A, x_filt)
+#            P_pred_t = np.dot(self.ssm.A, np.dot(P_filt, self.ssm.A.T)) + self.ssm.RQR
 
         return None
 
@@ -200,13 +197,16 @@ class StateSpaceEstimates:
         for tt in range(self.Nt - 1, -1, -1):
 
             r_t = (np.dot(self.ZFi[tt, :, :], self.err[tt, :]) 
-                   + np.dot(self.L[tt, :, :].T, r_t))
-
+                   + np.dot(self.G[tt, :, :].T, r_t))
+            
             self.r[tt, :] = r_t
 
         return None
 
     def state_smoother(self):
+        
+        if self.r is None:
+            self.disturbance_smoother()
 
         self.x_smooth = np.zeros((self.Nt, self.Nx))
 
@@ -216,8 +216,27 @@ class StateSpaceEstimates:
         # Recursively compute later values
         for tt in range(1, self.Nt):
 
-            self.x_smooth[tt, :] = np.dot(self.ssm.A, self.x_smooth[tt-1, :] 
+            self.x_smooth[tt, :] = (np.dot(self.ssm.A, self.x_smooth[tt-1, :]) 
                                           + np.dot(self.ssm.RQR, self.r[tt, :]))
 
         return None
+    
+    def draw_states(self):
 
+        # Draw shocks
+        shocks = draw_norm_multi(self.Q, self.Nt)
+        x_1 = self.x_init + draw_norm(self.P_init)
+
+        # Simulate using random draws
+        y_plus, x_plus = self.ssm.simulate(x_1, shocks, self.ix)
+
+        # Create artificial observations
+        y_star = self.y - y_plus
+
+        # Get smoothed values
+        sse = StateSpaceEstimates(self, y_star)
+        sse.kalman_filter(self.x_init, self.P_init)
+        sse.disturbance_smoother()
+        sse.state_smoother()
+
+        return x_plus + sse.x_smooth
