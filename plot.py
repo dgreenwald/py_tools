@@ -352,13 +352,19 @@ def plot_series(df_in, var_names, directory='', filename=None, labels={},
         linewidth=linewidths.get(var, 2)
 
         marker = markers.get(var, None)
-        df[var].plot(
+
+#        if label is None:
+#            plt.plot(
+#                df.index, df[var],
+#                linewidth=linewidth, linestyle=linestyle, marker=marker,
+#                markevery=markevery, markersize=markersize, mew=mew, color=color
+#            )
+#        else:
+        plt.plot(
+            df.index, df[var].values,
             linewidth=linewidth, linestyle=linestyle, label=label, marker=marker,
             markevery=markevery, markersize=markersize, mew=mew, color=color
         )
-        # plt.plot(df.index, df[var], linewidth=2, linestyle=linestyle,
-                 # label=label, marker=marker, markevery=markevery,
-                 # markersize=markersize, mew=mew, color=color)
 
     if vertline_ix is not None:
         plt.axvline(x=df.index[vertline_ix], **vertline_kwargs)
