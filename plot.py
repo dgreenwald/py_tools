@@ -161,7 +161,7 @@ def hist(df_in, var, label=None, xlabel=None, ylabel=None, wvar=None,
     # TODO: could use kwargs for some of these
     fig = plt.figure()
     matplotlib.rcParams.update({'font.size' : label_font})
-    plt.hist(df[var].values, bins=bins, alpha=0.5,
+    plt.hist(df[var].values, bins=bins, alpha=0.5, edgecolor='black',
              weights=w, label=label, **kwargs)
 
     if xlabel is not None:
@@ -245,9 +245,9 @@ def double_hist(df_in1, df_in2=None, label1='Var 1', label2='Var 2', var=None,
     fig = plt.figure()
     matplotlib.rcParams.update({'font.size' : label_font})
 
-    plt.hist(df1[var1].values, bins=bins, alpha=0.5,
+    plt.hist(df1[var1].values, bins=bins, alpha=0.5, edgecolor='black',
              weights=w1, label=str(label1), color=color1, **kwargs)
-    plt.hist(df2[var2].values, bins=bins, alpha=0.5,
+    plt.hist(df2[var2].values, bins=bins, alpha=0.5, edgecolor='black',
              weights=w2, label=str(label2), color=color2, **kwargs)
     plt.legend(fontsize=legend_font)
 
