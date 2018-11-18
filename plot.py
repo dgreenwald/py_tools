@@ -323,7 +323,7 @@ def plot_series(df_in, var_names, directory='', filename=None, labels={},
                 markersize=5, mew=2, fillstyle='none', fontsize=12,
                 plot_type='pdf', ylabel=None, sample='outer', title=None,
                 save=True, single_legend=True, vertline_ix=None,
-                vertline_kwargs={}, linewidths={}):
+                vertline_kwargs={}, linewidths={}, ylim=None):
 
     matplotlib.rcParams.update({'font.size' : fontsize})
 
@@ -373,6 +373,9 @@ def plot_series(df_in, var_names, directory='', filename=None, labels={},
         plt.legend(fontsize=fontsize)
 
     plt.xlim(df.index[[0, -1]])
+    
+    if ylim is not None:
+        plt.ylim(ylim)
 
     if ylabel is not None:
         plt.ylabel(ylabel)
