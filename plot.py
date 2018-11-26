@@ -161,7 +161,7 @@ def hist(df_in, var, label=None, xlabel=None, ylabel=None, wvar=None,
     # TODO: could use kwargs for some of these
     fig = plt.figure()
     matplotlib.rcParams.update({'font.size' : label_font})
-    plt.hist(df[var].values, bins=bins, alpha=0.5,
+    plt.hist(df[var].values, bins=bins, alpha=0.5, edgecolor='black',
              weights=w, label=label, **kwargs)
 
     if xlabel is not None:
@@ -245,9 +245,9 @@ def double_hist(df_in1, df_in2=None, label1='Var 1', label2='Var 2', var=None,
     fig = plt.figure()
     matplotlib.rcParams.update({'font.size' : label_font})
 
-    plt.hist(df1[var1].values, bins=bins, alpha=0.5,
+    plt.hist(df1[var1].values, bins=bins, alpha=0.5, edgecolor='black',
              weights=w1, label=str(label1), color=color1, **kwargs)
-    plt.hist(df2[var2].values, bins=bins, alpha=0.5,
+    plt.hist(df2[var2].values, bins=bins, alpha=0.5, edgecolor='black',
              weights=w2, label=str(label2), color=color2, **kwargs)
     plt.legend(fontsize=legend_font)
 
@@ -323,7 +323,7 @@ def plot_series(df_in, var_names, directory='', filename=None, labels={},
                 markersize=5, mew=2, fillstyle='none', fontsize=12,
                 plot_type='pdf', ylabel=None, sample='outer', title=None,
                 save=True, single_legend=True, vertline_ix=None,
-                vertline_kwargs={}, linewidths={}):
+                vertline_kwargs={}, linewidths={}, ylim=None):
 
     matplotlib.rcParams.update({'font.size' : fontsize})
 
@@ -352,13 +352,19 @@ def plot_series(df_in, var_names, directory='', filename=None, labels={},
         linewidth=linewidths.get(var, 2)
 
         marker = markers.get(var, None)
-        df[var].plot(
+
+#        if label is None:
+#            plt.plot(
+#                df.index, df[var],
+#                linewidth=linewidth, linestyle=linestyle, marker=marker,
+#                markevery=markevery, markersize=markersize, mew=mew, color=color
+#            )
+#        else:
+        plt.plot(
+            df.index, df[var].values,
             linewidth=linewidth, linestyle=linestyle, label=label, marker=marker,
             markevery=markevery, markersize=markersize, mew=mew, color=color
         )
-        # plt.plot(df.index, df[var], linewidth=2, linestyle=linestyle,
-                 # label=label, marker=marker, markevery=markevery,
-                 # markersize=markersize, mew=mew, color=color)
 
     if vertline_ix is not None:
         plt.axvline(x=df.index[vertline_ix], **vertline_kwargs)
@@ -367,6 +373,9 @@ def plot_series(df_in, var_names, directory='', filename=None, labels={},
         plt.legend(fontsize=fontsize)
 
     plt.xlim(df.index[[0, -1]])
+    
+    if ylim is not None:
+        plt.ylim(ylim)
 
     if ylabel is not None:
         plt.ylabel(ylabel)

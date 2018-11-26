@@ -219,6 +219,12 @@ def load(dataset, user='DAN', master_dirs={}, **kwargs):
         for col in df.columns:
             df[col] = pd.to_numeric(df[col], errors='coerce')
 
+    elif dataset == 'state_codes':
+
+        infile = data_dir + 'state_codes.csv'
+        df = pd.read_csv(infile, header=None, 
+                         names=['state_abbr', 'state_code', 'state_name'])
+
     elif dataset == 'vrp':
 
         infile = data_dir + 'VRPtable.txt'

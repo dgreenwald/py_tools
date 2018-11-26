@@ -143,7 +143,7 @@ def match_xy(X, z, how='inner', ix=None):
 
 
 def regression(df_in, lhs, rhs, fes=[], intercept=True, formula_extra=None, ix=None, 
-               trend=None, cluster_groups=None, weight_var=None, **kwargs):
+               trend=None, cluster_var=None, cluster_groups=None, weight_var=None, **kwargs):
     """Run regression from pandas dataframe"""
 
     formula = '{0} ~ {1}'.format(lhs, ' + '.join(rhs))
@@ -153,6 +153,9 @@ def regression(df_in, lhs, rhs, fes=[], intercept=True, formula_extra=None, ix=N
     var_list = [lhs] + rhs + fes
     if weight_var is not None:
         var_list += [weight_var]
+    if cluster_var is not None:
+        var_list += [cluster_var]
+        
     df = df_in[var_list].copy()
 
     ix_samp, _ = match_sample(df.values, how='inner')
@@ -180,6 +183,9 @@ def regression(df_in, lhs, rhs, fes=[], intercept=True, formula_extra=None, ix=N
         formula += ' -1'
     else:
         Xs = np.hstack((np.ones((Xs.shape[0], 1)), Xs))
+
+    if cluster_var is not None:
+        cluster_groups = get_cluster_groups(df, cluster_var)
 
     if cluster_groups is not None:
         these_groups = cluster_groups[ix_both]
@@ -227,6 +233,11 @@ def update_results_cov(results, nw_lags=0, cluster_groups=None):
         results = results.get_robustcov_results('HC0')
 
     return results
+
+def get_cluster_groups(df, cluster_var):
+
+    index_dict = {val : ii for ii, val in enumerate(df[cluster_var].unique())}
+    return df[cluster_var].map(index_dict).values
 
 def formula_regression(df, formula, ix=None, nw_lags=0, cluster_groups=None, display=False):
 
