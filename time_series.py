@@ -740,3 +740,30 @@ def rolling_forecast_internal(y, X, t_min=None):
         Xy_t += np.dot(x_t, y_t.T) 
 
     return forecast
+
+def local_projection(df_in, y_var, shock_var, controls=[], periods=16, shock_lags=2, **kwargs):
+    
+    df = df_in[[y_var, shock_var] + controls].copy()
+    
+    rhs = [shock_var]
+    
+    for jj in range(1, shock_lags+1):
+        var_name = 'L{0:d}_{1}'.format(jj, shock_var)
+        df[var_name] = df[shock_var].shift(jj)
+        rhs.append(var_name)
+        
+    for var in [y_var] + controls:
+        var_name = 'L_' + var
+        df[var_name] = df[var].shift()
+        rhs.append(var_name)
+    
+    fr_list = []
+    for tt in range(periods+1):
+        var_name = 'F{0:d}_{1}'.format(tt, y_var)
+        df[var_name] = df[y_var].shift(-tt)
+        fr_list.append(dt.regression(df, var_name, rhs, nw_lags=tt, **kwargs))
+        
+    coeffs = np.array([fr.results.params[1] for fr in fr_list])
+    se = np.array([fr.results.HC0_se[1] for fr in fr_list])
+    
+    return (coeffs, se)

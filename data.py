@@ -442,6 +442,14 @@ def read_pickle(path):
 
     return pickle.load(open(path, "rb"))
 
+def demean_separate(df, var_list, group_list, **kwargs):
+    """This function demeans by each variable one at at a time"""
+    
+    for group in group_list:
+        df = demean2(group, var_list, df, **kwargs)
+        
+    return df
+
 def demean2(group_list, var_list, df, prefix=None):
     """Set prefix to None to overwrite existing variables with demeaned
     versions, otherwise demeaned versions will have specified prefix"""

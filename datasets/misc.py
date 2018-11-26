@@ -153,7 +153,7 @@ def load(dataset, user='DAN', master_dirs={}, **kwargs):
             infile,
             skiprows=1,
             sheet_name='quarterly',
-            skip_footer=6,
+            skipfooter=6,
         )
 
         del df['date']
