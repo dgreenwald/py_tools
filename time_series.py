@@ -767,3 +767,58 @@ def local_projection(df_in, y_var, shock_var, controls=[], periods=16, shock_lag
     se = np.array([fr.results.HC0_se[1] for fr in fr_list])
     
     return (coeffs, se)
+
+def add_lags_by_group(df, x_var, date_var, lag_list, group_id=None, group_vars=None, freq='Q', 
+                lag_str='lag', lead_str='lead', leads=False, zero_type=None):
+    """Add lags of a variable by group.
+    
+    Args:
+        df: pandas dataframe, should contain relevant series
+        var: string, name of series to lag
+        lag_list: list-like, use negative numbers for leads
+        grouped: pandas groupby object, for pre-grouping if data is multiindexed
+        group_levels: list-like, does grouping if not already grouped for multiindex
+    
+    Returns:
+        df: pandas dataframe, now containing leads and lags.
+    """
+
+    assert (group_id is not None) or (group_vars is not None)
+
+    if group_id is None:
+        assert 'group_no' not in df
+        group_id = 'group_no'
+        df[group_id] = df.groupby(group_vars).ngroup()
+
+    tmp = (df[[x_var, date_var, group_id]].set_index([group_id, date_var])\
+           .unstack(group_id).resample(freq).asfreq())
+
+    for lag in lag_list:
+        
+        if leads:
+            lag *= -1
+        
+        if lag == 0:
+            
+            if zero_type == None:
+                lag_var = x_var
+            elif zero_type == 'lead':
+                lag_var = '{0}{1:d}_{2}'.format(lead_str, -lag, x_var)
+            elif zero_type == 'lag':
+                lag_var = '{0}{1:d}_{2}'.format(lag_str, lag, x_var)
+                
+            if lag_var not in df:
+                df[lag_var] = df[x_var]
+                
+        else:
+            
+            if lag < 0:
+                lag_var = '{0}{1:d}_{2}'.format(lead_str, -lag, x_var)
+            else:
+                lag_var = '{0}{1:d}_{2}'.format(lag_str, lag, x_var)
+                
+            if lag_var not in df:
+                shifted = tmp.shift(lag).stack(group_id)[x_var].rename(lag_var)
+                df = df.join(shifted, on=[date_var, group_id])
+                
+    return df

@@ -485,3 +485,47 @@ def demean2(group_list, var_list, df, prefix=None):
     df = df.drop(['MEAN_' + var for var in var_list], axis=1)
         
     return df
+
+def weight_regression_params(weights, params=None, cov=None, results=None):
+    """Produce point estimate and standard error for weighted coefficient.
+    
+    Args:
+        weights: vector of weights, x = w'c where c are coefficients
+        params: vector of coefficients (if inputting directly)
+        cov: covariance matrix of coefficients (if inputting directly)
+        results: statsmodels results object (alternative input)
+
+    Returns:
+        x: summed coefficient
+        se: standard error of summed coefficient
+    
+    """
+
+    assert ((params is not None) and (cov is not None)) or (results is not None)
+
+    if results is not None:
+        params = results.params
+        cov = results.cov_HC0
+
+    x = np.dot(params, weights)
+    se = np.sqrt(np.dot(weights, np.dot(cov, weights)))
+
+    return x, se
+
+def sum_regression_params(positions, *args, **kwargs):
+    """Produce point estimate and standard error for summed coefficient.
+    
+    Args:
+        positions: indices of coefficients to sum
+        *args, **kwargs: to be passed to weight_regression_params
+
+    Returns:
+        x: summed coefficient
+        se: standard error of summed coefficient
+    
+    """
+
+    e_vec = np.zeros(len(params))
+    e_vec[positions] = 1.0
+
+    return weight_regression_params(e_vec, *args, **kwargs)
