@@ -48,3 +48,17 @@ def make_dir(path):
     if not os.path.exists(path):
         os.makedirs(path)
     return None
+
+def write_text(string, filename):
+    
+    with open(filename, 'w') as fid:
+        fid.write(string)
+        
+    return None
+
+def write_numeric(val, filename, precision='4.3f'):
+    
+    with open(filename, 'w') as fid:
+        fid.write('{0:{1}}'.format(val, precision))
+        
+    return None
