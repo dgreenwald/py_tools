@@ -20,11 +20,14 @@ def stripHTML(url):
     
     return soup.get_text(strip=True)
 
-def url_to_nltk(url):
+def url_to_nltk(url, lower=False):
     """Load URL directly into NLTK"""
 
     raw = stripHTML(url)
     if raw is None: return None
     
+    if lower:
+        raw = raw.lower()
+
     tokens = nltk.word_tokenize(raw)
     return nltk.Text(tokens)

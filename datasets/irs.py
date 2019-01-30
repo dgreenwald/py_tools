@@ -241,7 +241,7 @@ def load_county(data_dir=default_dir, reimport=False, reimport_year=False):
     pkl_file = data_dir + 'irs_county.pkl'
     if reimport or not os.path.exists(pkl_file):
 
-        df = pd.concat((load_county_year(year, reimport=reimport_year) for year in range(1989, 2016)))
+        df = pd.concat((load_county_year(year, reimport=reimport_year) for year in range(1989, 2016)), sort=True)
         df['date'] = pd.to_datetime(df['date'])
         df = df.set_index(['fips', 'date']).sort_index()
         df.to_pickle(pkl_file)
