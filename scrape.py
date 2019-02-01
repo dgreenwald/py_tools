@@ -26,5 +26,5 @@ def url_to_nltk(url):
     raw = stripHTML(url)
     if raw is None: return None
     
-    tokens = nltk.word_tokenize(raw)
+    tokens = nltk.word_tokenize(raw.lower())
     return nltk.Text(tokens)
