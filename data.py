@@ -156,6 +156,8 @@ def regression(df_in, lhs, rhs, fes=[], intercept=True, formula_extra=None, ix=N
     if cluster_var is not None:
         var_list += [cluster_var]
         
+    var_list = list(set(var_list))
+        
     df = df_in[var_list].copy()
 
     ix_samp, _ = match_sample(df.values, how='inner')

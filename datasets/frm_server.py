@@ -84,6 +84,105 @@ def load_freddie(yr, q, **kwargs):
     else:
         return None
 
+def load_hmda_raw(yr, nrows=None, usecols=None):
+
+    data_dir = '/nobackup1/dlg/hmda/ultimate/'
+
+  # Filename
+    if yr == 2001:
+        filename = 'HMS.U2001.LARS.PUBLIC.DATA'
+    elif yr == 2004:
+        filename = 'u2004lar.public.dat'
+    elif yr in [2005, 2006]:
+        filename = 'LARS.ULTIMATE.{}.DAT'.format(yr)
+    elif yr in [2007, 2008]:
+        filename = 'lars.ultimate.{}.dat'.format(yr)
+    elif yr == 2009:
+        filename = '2009_Ultimate_PUBLIC_LAR.dat'
+    elif yr > 2009 and yr <= 2013:
+        filename = 'Lars.ultimate.{0}.dat'.format(yr)
+    elif yr > 2013:
+        filename = '{0}HMDALAR - National.zip'.format(yr)
+    else:
+        filename = 'HMS.U{}.LARS'.format(yr)
+
+    filepath = data_dir + filename
+    if yr < 2014:
+        filepath += '.zip?download=true'
+
+    if yr < 2004:
+        widths = [
+                4, 10, 1, 1, 1,
+                1, 5, 1, 4, 2,
+                3, 7, 1, 1, 1,
+                1, 4, 1, 1, 1,
+                1, 1, 7,
+                ]
+        names = [
+                'asof_date', 'resp_id', 'agency_code', 'loan_type', 'loan_purp',
+                'occupancy', 'loan_amt', 'action_taken', 'prop_msa', 'state_code',
+                'county_code', 'census_tract', 'app_race', 'co_app_race', 'app_sex',
+                'co_app_sex', 'app_income', 'purchaser_type', 'denial_reason_1', 'denial_reason_2',
+                'denial_reason_3', 'edit_status', 'seq_num',
+                ]
+
+        df = pd.read_fwf(filepath, widths=widths, names=names,
+                usecols=usecols, nrows=nrows, compression='zip')
+
+    elif yr < 2014:
+        widths=[
+                4, 10, 1, 1, 1,
+                1, 5, 1, 5, 2,
+                3, 7, 1, 1, 4,
+                1, 1, 1, 1, 1,
+                1, 1, 1, 1, 1,
+                1, 1, 1, 1, 1,
+                1, 1, 1, 1, 5,
+                1, 1, 7,
+                ]
+        names = [
+                'asof_date', 'resp_id', 'agency_code', 'loan_type', 'loan_purp',
+                'occupancy', 'loan_amt', 'action_taken', 'prop_msa', 'state_code',
+                'county_code', 'census_tract', 'app_sex', 'co_app_sex', 'app_income', 
+                'purchaser_type', 'denial_reason_1', 'denial_reason_2', 'denial_reason_3', 'edit_status', 
+                'prop_type', 'preapprovals', 'app_ethnicity', 'co_app_ethnicity', 'app_race_1', 
+                'app_race_2', 'app_race_3', 'app_race_4', 'app_race_5', 'co_app_race_1', 
+                'co_app_race_2', 'co_app_race_3', 'co_app_race_4', 'co_app_race_5', 'rate_spread',
+                'hoepa_status', 'lien_status', 'seq_num',
+                ]
+
+        df = pd.read_fwf(filepath, widths=widths, names=names,
+                usecols=usecols, nrows=nrows, compression='zip')
+
+    else:
+        # widths=[
+            # 4, 10, 1, 1, 1,
+            # 1, 1, 5, 1, 1,
+            # 5, 2, 3, 7, 1,
+            # 1, 1, 1, 1, 1,
+            # 1, 1, 1, 1, 1,
+            # 1, 1, 1, 4, 1,
+            # 1, 1, 1, 5, 1,
+            # 1, 1, 7, 8, 6,
+            # 8, 6, 8, 8, 1,
+        # ]
+        names = [
+            'asof_date', 'resp_id', 'agency_code', 'loan_type', 'prop_type',
+            'loan_purp', 'occupancy', 'loan_amt', 'preapprovals', 'action_taken',
+            'prop_msa', 'state_code', 'county_code', 'census_tract', 'app_ethnicity',
+            'co_app_ethnicity', 'app_race_1', 'app_race_2', 'app_race_3', 'app_race_4',
+            'app_race_5', 'co_app_race_1', 'co_app_race_2', 'co_app_race_3', 'co_app_race_4',
+            'co_app_race_5', 'app_sex', 'co_app_sex', 'app_income', 'purchaser_type',
+            'denial_reason_1', 'denial_reason_2', 'denial_reason_3', 'rate_spread', 'hoepa_status',
+            'lien_status', 'edit_status', 'seq_num', 'pop', 'minority_pop_share',
+            'median_family_inc', 'tract_to_msa_inc', 'n_units', 'n_1to4_units', 'app_date',
+        ]
+
+        df = pd.read_csv(filepath, names=names, usecols=usecols,
+                             nrows=nrows, compression='zip')
+
+    return df
+
 def store_hmda(yr, nrows=None, usecols=None, reimport=False, chunksize=500000):
 
     data_dir = '/nobackup1/dlg/hmda/ultimate/'
