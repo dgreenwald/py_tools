@@ -207,6 +207,11 @@ def load(dataset, user='DAN', master_dirs={}, **kwargs):
         infile = data_dir + 'price_rent_new.pkl'
         df = pd.read_pickle(infile)
 
+    elif dataset == 'ssa_life_expectancy':
+
+        infile = data_dir + 'ssa_life_expectancy.csv'
+        df = pd.read_csv(infile)
+
     elif dataset == 'shiller':
 
         infile = data_dir + 'shiller.csv'
