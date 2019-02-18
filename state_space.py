@@ -61,10 +61,31 @@ class StateSpaceModel:
             self.b -= np.dot(Z, x_bar) 
 
         self.RQR = np.dot(self.R, np.dot(self.Q, self.R.T))
+        
+    def unconditional_cov(self):
+        
+        return sp.linalg.solve_discrete_lyapunov(self.A, self.RQR)
 
-    def simulate(self, x_1, shocks, ix):
+    def simulate(self, x_1=None, Nt=None, shocks=None, ix=None):
 
-        Nt, _ = shocks.shape
+        if shocks is None:
+            assert Nt is not None
+            CQ = np.linalg.cholesky(self.Q)
+            shocks = np.dot(CQ, np.random.randn(self.Ne, Nt)).T
+        else:
+            assert Nt is None
+            Nt, _ = shocks.shape
+        
+        if x_1 is None:
+            Sig0 = self.unconditional_cov()
+            C = np.linalg.cholesky(Sig0)
+            x_1 = np.dot(C, np.random.randn(self.Nx))
+
+        if ix is None:
+            ix = np.ones((Nt, self.Ny), dtype=bool)
+        else:
+            assert ix.shape == (Nt, self.Ny)
+            
         y_sim = init_to_val((Nt, self.Ny), np.nan)
         x_sim = np.zeros((Nt, self.Nx))
 
@@ -73,7 +94,7 @@ class StateSpaceModel:
         for tt in range(Nt):
 
             ix_t = ix[tt, :]
-            y_sim[tt, ix_t] = np.dot(self.Z[ix_t, :], x_t)
+            y_sim[tt, ix_t] = np.dot(self.Z[ix_t, :], x_t) + self.b[ix_t]
             x_sim[tt, :] = x_t
 
             x_t = np.dot(self.A, x_t) + np.dot(self.R, shocks[tt, :])
@@ -100,7 +121,13 @@ class StateSpaceEstimates:
             x_init = np.zeros(self.Nx)
 
         if P_init is None:
-            P_init = sp.linalg.solve_discrete_lyapunov(self.ssm.A, self.ssm.Q)
+            P_init = self.ssm.unconditional_cov()
+##            if np.linalg.cond(self.ssm.Q) < 1e+16:
+#            if True:
+#                P_init = sp.linalg.solve_discrete_lyapunov(self.ssm.A, self.ssm.Q)
+##            else:
+##                print("Bad P_init")
+##                raise Exception
 
         self.x_init = x_init
         self.P_init = P_init
