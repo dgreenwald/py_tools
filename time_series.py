@@ -690,6 +690,13 @@ def lead_lag_correlations(df_in, var1, var2, lags=None,
 
     return table 
 
+def fit_ar1(df_in, var, **kwargs):
+
+    df = df_in[[var]].copy()
+    df['L_' + var] = df[var].shift()
+
+    return dt.regression(df, var, ['L_' + var], **kwargs)
+
 def rolling_forecast(df_in, lhs, rhs=[], use_const=True, **kwargs):
 
     df, ix = dt.dropna_ix(df_in[lhs + rhs])
