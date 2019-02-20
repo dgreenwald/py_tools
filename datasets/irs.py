@@ -20,6 +20,10 @@ def compute_fips(df_t):
     df_t = df_t.loc[ix, :]
         
     df_t['fips'] = df_t['countyfips'] + 1000 * df_t['statefips']
+    
+#    counts = df_t['fips'].value_counts()
+#    if np.any(counts > 1):
+#        print(counts.loc[counts > 1])
 
     return df_t
 
@@ -38,7 +42,8 @@ def load_county_year(year, data_dir=default_dir, reimport=False):
 
     pkl_file = data_dir + 'irs_county_{:d}.pkl'.format(year)
     if reimport or not os.path.exists(pkl_file):
-
+        
+        print("Loading year {}".format(year))
         if year <= 2009:
             df_t = import_county_year_to_2009(year, data_dir=default_dir)
         elif year == 2010:
@@ -241,7 +246,7 @@ def load_county(data_dir=default_dir, reimport=False, reimport_year=False):
     pkl_file = data_dir + 'irs_county.pkl'
     if reimport or not os.path.exists(pkl_file):
 
-        df = pd.concat((load_county_year(year, reimport=reimport_year) for year in range(1989, 2016)), sort=True)
+        df = pd.concat((load_county_year(year, reimport=reimport_year) for year in range(1989, 2017)), sort=True)
         df['date'] = pd.to_datetime(df['date'])
         df = df.set_index(['fips', 'date']).sort_index()
         df.to_pickle(pkl_file)
