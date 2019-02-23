@@ -64,7 +64,10 @@ class StateSpaceModel:
         
     def unconditional_cov(self):
         
-        return sp.linalg.solve_discrete_lyapunov(self.A, self.RQR)
+        try: 
+            return sp.linalg.solve_discrete_lyapunov(self.A, self.RQR)
+        except:
+            return None
 
     def simulate(self, x_1=None, Nt=None, shocks=None, ix=None):
 
@@ -122,12 +125,10 @@ class StateSpaceEstimates:
 
         if P_init is None:
             P_init = self.ssm.unconditional_cov()
-##            if np.linalg.cond(self.ssm.Q) < 1e+16:
-#            if True:
-#                P_init = sp.linalg.solve_discrete_lyapunov(self.ssm.A, self.ssm.Q)
-##            else:
-##                print("Bad P_init")
-##                raise Exception
+            if P_init is None:
+                self.valid = False # bad model
+            else:
+                self.valid = True
 
         self.x_init = x_init
         self.P_init = P_init
@@ -135,7 +136,7 @@ class StateSpaceEstimates:
         # Item for smoother
         self.r = None
 
-    def kalman_filter(self):
+    def kalman_filter(self, x_init=None, P_init=None):
         """Run the Kalman filter on the data y.
         
         Inputs:
@@ -144,6 +145,11 @@ class StateSpaceEstimates:
             x_init: Length Nx mean of initial x distribution
             P_init: (Nx x Nx) covariance matrix of initial x distribution
         """
+        
+        if x_init is not None:
+            self.x_init = x_init
+        if P_init is not None:
+            self.P_init = P_init
 
         x_pred_t = self.x_init
         P_pred_t = self.P_init
@@ -251,18 +257,18 @@ class StateSpaceEstimates:
     def draw_states(self):
 
         # Draw shocks
-        shocks = draw_norm_multi(self.Q, self.Nt)
+        shocks = draw_norm_multi(self.ssm.Q, self.Nt)
         x_1 = self.x_init + draw_norm(self.P_init)
 
         # Simulate using random draws
-        y_plus, x_plus = self.ssm.simulate(x_1, shocks, self.ix)
+        y_plus, x_plus = self.ssm.simulate(x_1, shocks=shocks, ix=self.ix)
 
         # Create artificial observations
         y_star = self.y - y_plus
 
         # Get smoothed values
-        sse = StateSpaceEstimates(self, y_star)
-        sse.kalman_filter(self.x_init, self.P_init)
+        sse = StateSpaceEstimates(self.ssm, y_star)
+        sse.kalman_filter(x_init=self.x_init, P_init=self.P_init)
         sse.disturbance_smoother()
         sse.state_smoother()
 
