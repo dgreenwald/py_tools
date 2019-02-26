@@ -6,6 +6,7 @@ BETA = 1
 GAMMA = 2
 INV_GAMMA = 3
 NORM = 4
+TRUNC_NORM = 5
 
 def get_prior(prior_type, mean=None, sd=None, params=None):
 
@@ -14,6 +15,7 @@ def get_prior(prior_type, mean=None, sd=None, params=None):
         'gamma' : GAMMA,
         'inv_gamma' : INV_GAMMA,
         'norm' : NORM,
+        'trunc_norm' : TRUNC_NORM,
     }
 
     if prior_type is None:
@@ -49,6 +51,10 @@ def get_prior(prior_type, mean=None, sd=None, params=None):
             return st.invgamma(alp, scale=bet)
         elif prior_num == NORM:
             return st.norm(loc=mean, scale=sd)
+        elif prior_num == TRUNC_NORM:
+            a = (0.0 - mean) / sd
+            b = (1.0 - mean) / sd
+            return st.truncnorm(a, b, mean, sd)
         else:
            raise Exception
 
