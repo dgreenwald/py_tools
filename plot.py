@@ -19,13 +19,20 @@ def save_hist(vals, path, **kwargs):
     dt.to_pickle(h, path)
 
 def two_axis(df_in, var1, var2, filepath=None, label1=None, label2=None,
-             loc1='upper left', loc2='upper right', legend_font=10,
-             label_font=12, normalize=False, color1='#1f77b4',
+             loc1='upper left', loc2='upper right', loc_single=None,
+             legend_font=10, label_font=12, normalize=False, color1='#1f77b4',
              color2='#ff7f0e', flip1=False, flip2=False, markevery=4,
-             legend=True, print_legend_axis=True, label_dict={}):
+             mark2='o', legend=True, single_legend=False,
+             print_legend_axis=True, label_dict={}, drop=True):
 
     matplotlib.rcParams.update({'font.size' : label_font})
-    df = df_in[[var1, var2]].dropna()
+    
+    df = df_in[[var1, var2]].copy()
+    if drop:
+        df = df.dropna()
+
+    if markevery is None:
+        markevery = math.round(len(df) / 20)
 
     fig, ax1 = plt.subplots()
 
@@ -38,24 +45,37 @@ def two_axis(df_in, var1, var2, filepath=None, label1=None, label2=None,
     leglabel1 = label1
     leglabel2 = label2
     if print_legend_axis:
-        leglabel1 = label1 + ' (left axis)'
-        leglabel2 = label2 + ' (right axis)'
+        leglabel1 = label1 + ' (left)'
+        leglabel2 = label2 + ' (right)'
 
     if flip1:
-        (-df[var1]).plot(ax=ax1, linewidth=2, label=('(-1) x ' + leglabel1), color=color1)
+        line1 = ax1.plot(df.index, -df[var1], linewidth=2, label=('(-1) x ' + leglabel1), color=color1)        
+        # (-df[var1]).plot(ax=ax1, linewidth=2, label=('(-1) x ' + leglabel1), color=color1)
     else:
-        df[var1].plot(ax=ax1, linewidth=2, label=leglabel1, color=color1)
+        line1 = ax1.plot(df.index, df[var1], linewidth=2, label=leglabel1, color=color1)
+        # df[var1].plot(ax=ax1, linewidth=2, label=leglabel1, color=color1)
 
     ax2 = ax1.twinx()
     if flip2:
-        (-df[var2]).plot(ax=ax2, linestyle='-', linewidth=2, label=('(-1) x ' + leglabel2), 
-                         color=color2, marker='o', fillstyle='none', markersize=5, 
+        line2 = ax2.plot(df.index, -df[var2], linestyle='-', linewidth=2, label=('(-1) x ' + leglabel2), 
+                         color=color2, marker=mark2, fillstyle='none', markersize=5, 
                          mew=1.5, markevery=markevery)
-    else:
-        df[var2].plot(ax=ax2, linestyle='-', linewidth=2, label=leglabel2, color=color2,
-                      marker='o', fillstyle='none', markersize=5, mew=1.5, markevery=markevery)
 
-    if legend:
+        # (-df[var2]).plot(ax=ax2, linestyle='-', linewidth=2, label=('(-1) x ' + leglabel2), 
+                         # color=color2, marker=mark2, fillstyle='none', markersize=5, 
+                         # mew=1.5, markevery=markevery)
+    else:
+        line2 = ax2.plot(df.index, df[var2], linestyle='-', linewidth=2, label=leglabel2, 
+                         color=color2, marker=mark2, fillstyle='none', markersize=5, 
+                         mew=1.5, markevery=markevery)
+        # df[var2].plot(ax=ax2, linestyle='-', linewidth=2, label=leglabel2, color=color2,
+                      # marker='o', fillstyle='none', markersize=5, mew=1.5, markevery=markevery)
+
+    if single_legend:
+        lines = line1 + line2
+        leg_labels = [line.get_label() for line in lines]
+        ax1.legend(lines, leg_labels, loc=loc_single, fontsize=legend_font)
+    else:
         ax1.legend(loc=loc1, fontsize=legend_font)
         ax2.legend(loc=loc2, fontsize=legend_font)
 
