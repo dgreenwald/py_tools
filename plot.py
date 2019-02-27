@@ -4,6 +4,7 @@ import os
 if os.environ.get('USE_MATPLOTLIB_AGG', 0):
     matplotlib.use('Agg')
 
+import math
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -114,6 +115,8 @@ def two_axis(df_in, var1, var2, filepath=None, label1=None, label2=None,
 
         ax1.set_ylim(ax1_ylim_new)
         ax2.set_ylim(ax2_ylim_new)
+
+    plt.xlim(df.index[[0, -1]])
 
     if filepath is not None:
         plt.tight_layout()
