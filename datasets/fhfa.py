@@ -5,7 +5,7 @@ from py_tools import time_series as ts
 from . import defaults
 default_dir = defaults.base_dir() + 'fhfa/'
 
-def load(dataset, all_transactions=True, reimport=True, data_dir=default_dir):
+def load(dataset, all_transactions=True, reimport=False, data_dir=default_dir):
 
     if dataset == 'metro':
 
@@ -18,6 +18,8 @@ def load(dataset, all_transactions=True, reimport=True, data_dir=default_dir):
         df['month'] = df['q'] * 3 - 2
         df['day'] = 1
         df['date'] = pd.to_datetime(df[['year', 'month', 'day']])
+
+        # df['date'] = ts.date_from_qtr(df['year'], df['q'])
 
         df['hpi'] = pd.to_numeric(df['hpi'], errors='coerce')
 
@@ -57,5 +59,19 @@ def load(dataset, all_transactions=True, reimport=True, data_dir=default_dir):
         else:
             raise Exception
 
+    elif dataset == 'zip3':
+
+        assert all_transactions
+
+        filename = 'HPI_AT_3zip'
+        pkl_file = data_dir + filename + '.pkl'
+        excel_file = data_dir + filename + '.xlsx'
+        if reimport or not os.path.exists(pkl_file):
+            df = pd.read_excel(excel_file, skiprows=4)
+            df['date'] = ts.date_from_qtr(df['Year'], df['Quarter'])
+            df = df.drop(columns=['Index Type']).rename(columns={'Index (NSA)' : 'hpi'})
+            df.to_pickle(pkl_file)
+        else:
+            df = pd.read_pickle(pkl_file)
 
     return df
