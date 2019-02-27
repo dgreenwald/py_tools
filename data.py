@@ -224,6 +224,11 @@ def wls_formula(df, formula, weight_var=None, weights=None, ix=None, nw_lags=0,
 
     return FullResults(results, ix=ix, Xs=None, zs=None)
 
+def compute_histogram(series, name='bin', **kwargs):
+   
+    this_hist, _ = np.histogram(series, **kwargs)
+    return pd.Series(this_hist, index=[name + str(ii) for ii in range(len(this_hist))])
+
 def update_results_cov(results, nw_lags=0, cluster_groups=None):
 
     if cluster_groups is not None:
