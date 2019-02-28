@@ -189,10 +189,10 @@ class StateSpaceEstimates:
             err_t = self.y_til[tt, ix_t] - np.dot(Z_t, x_pred_t)
 
             PZ = np.dot(P_pred_t, Z_t.T)
-            F_t = np.dot(Z_t, PZ) + self.ssm.H[ix_t, ix_t]
+            F_t = np.dot(Z_t, PZ) + self.ssm.H[ix_t, :][:, ix_t]
             
             try:
-                self.log_like += mvn.logpdf(err_t, mean=np.zeros(self.Ny), cov=F_t) 
+                self.log_like += mvn.logpdf(err_t, mean=np.zeros(np.sum(ix_t)), cov=F_t) 
             except:
                 self.log_like = -1e+10
                 return None
@@ -216,13 +216,13 @@ class StateSpaceEstimates:
 
             # Save values
             self.ix[tt, :] = ix_t
-            self.err[tt, :] = err_t
+            self.err[tt, ix_t] = err_t
 
 #            self.x_filt[tt, :] = x_filt
 #            self.P_filt[tt, :, :] = P_filt
 
-            self.ZFi[tt, :, :] = ZFi_t
-            self.K[tt, :, :] = K_t
+            self.ZFi[tt, :, ix_t] = ZFi_t.T
+            self.K[tt, :, ix_t] = K_t.T
             self.G[tt, :, :] = G_t
 
             # Update for next period
@@ -239,7 +239,8 @@ class StateSpaceEstimates:
 
         for tt in range(self.Nt - 1, -1, -1):
 
-            r_t = (np.dot(self.ZFi[tt, :, :], self.err[tt, :]) 
+            ix_t = self.ix[tt, :]
+            r_t = (np.dot(self.ZFi[tt, :, ix_t].T, self.err[tt, ix_t]) 
                    + np.dot(self.G[tt, :, :].T, r_t))
             
             self.r[tt, :] = r_t
