@@ -1,7 +1,8 @@
 import numpy as np
 import scipy as sp
 from scipy.stats import multivariate_normal as mvn
-import sys
+
+import copy
 
 def init_to_val(shape, val):
 
@@ -69,7 +70,7 @@ class StateSpaceModel:
         except:
             return None
 
-    def simulate(self, x_1=None, Nt=None, shocks=None, ix=None):
+    def simulate(self, x_1=None, Nt=None, shocks=None, ix=None, use_b=True):
 
         if shocks is None:
             assert Nt is not None
@@ -97,7 +98,9 @@ class StateSpaceModel:
         for tt in range(Nt):
 
             ix_t = ix[tt, :]
-            y_sim[tt, ix_t] = np.dot(self.Z[ix_t, :], x_t) + self.b[ix_t]
+            y_sim[tt, ix_t] = np.dot(self.Z[ix_t, :], x_t)
+            if use_b: 
+                y_sim[tt, ix_t] += self.b[ix_t]
             x_sim[tt, :] = x_t
 
             x_t = np.dot(self.A, x_t) + np.dot(self.R, shocks[tt, :])
@@ -118,6 +121,13 @@ class StateSpaceEstimates:
 
         self.ssm = ssm
         self.Nx, _ = self.ssm.A.shape
+        
+        # Create version with no constant
+        self.ssm_til = copy.deepcopy(ssm)
+        self.ssm_til.b = np.zeros(ssm.b.shape)
+        
+        # Data net of constant
+        self.y_til = self.y - self.ssm.b[np.newaxis, :]
         
         # Set initializations
         if x_init is None:
@@ -176,7 +186,7 @@ class StateSpaceEstimates:
             # Get error and update likelihood
             ix_t = self.ix[tt, :]
             Z_t = self.ssm.Z[ix_t, :]
-            err_t = self.y[tt, ix_t] - np.dot(Z_t, x_pred_t) - self.ssm.b[ix_t]
+            err_t = self.y_til[tt, ix_t] - np.dot(Z_t, x_pred_t)
 
             PZ = np.dot(P_pred_t, Z_t.T)
             F_t = np.dot(Z_t, PZ) + self.ssm.H[ix_t, ix_t]
@@ -261,15 +271,15 @@ class StateSpaceEstimates:
         x_1 = self.x_init + draw_norm(self.P_init)
 
         # Simulate using random draws
-        y_plus, x_plus = self.ssm.simulate(x_1, shocks=shocks, ix=self.ix)
+        y_plus, x_plus = self.ssm.simulate(x_1, shocks=shocks, ix=self.ix, use_b=False)
 
         # Create artificial observations
-        y_star = self.y - y_plus
+        y_star = self.y_til - y_plus
 
         # Get smoothed values
-        sse = StateSpaceEstimates(self.ssm, y_star)
-        sse.kalman_filter(x_init=self.x_init, P_init=self.P_init)
-        sse.disturbance_smoother()
-        sse.state_smoother()
+        sse_til = StateSpaceEstimates(self.ssm_til, y_star)
+        sse_til.kalman_filter(x_init=self.x_init, P_init=self.P_init)
+        sse_til.disturbance_smoother()
+        sse_til.state_smoother()
 
-        return x_plus + sse.x_smooth
+        return x_plus + sse_til.x_smooth
