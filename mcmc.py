@@ -2,12 +2,36 @@ import os
 import numpy as np
 from scipy.optimize import minimize
 from scipy.misc import logsumexp
+from scipy.stats import multivariate_normal as mv
 # import py_tools.numerical as nm
 from py_tools import in_out as io, numerical as nm
 from py_tools.prior import Prior
 from py_tools.mpi_array import MPIArray
 
 from mpi4py import MPI
+
+#class MultivariateNormalSingular:
+#    """MVN distribution for singular covariance matrix"""
+#    
+#    def __init__(self, mean, cov):
+#        
+#        self.mean = mean
+#        self.cov = cov
+#        self.Nx = len(mean)
+#        
+#        assert self.cov.shape == (self.Nx, self.Nx)
+#        
+#        self.u, self.s, self.vh = np.linalg.svd(cov)
+#        
+#        self.C = self.u @ np.diag(np.sqrt(self.s))
+#        
+#    def rvs(self, Nsim):
+#        
+#        return np.random.randn(Nsim, Nx) @ self.C.T
+#    
+#    def logpdf(self, x):
+#        
+#        
 
 def randomize_blocks(nx, nblock):
     """nx is number of entries, nblock is number of blocks"""
@@ -110,6 +134,19 @@ def metropolis_step(fcn, x, x_try, post=None, log_u=None, args=()):
     else:
         return (x, post, False)
 
+def importance_sample(fcn, dist, Nsim, args=()):
+
+    draws = dist.rvs(Nsim)
+    p_proposal = dist.logpdf(draws)
+
+    post = np.zeros(Nsim)
+    for jj in range(Nsim):
+        post[jj] = fcn(draws[jj, :], *args)
+
+    log_weights = post - p_proposal
+
+    return draws, log_weights
+
 def rwmh(posterior, x_init, jump_scale=1.0, C_list=None, Nstep=1, blocks=None,
               block_sizes=None, post_init=None, e=None, log_u=None, quiet=True):
 
@@ -198,6 +235,7 @@ class MonteCarlo:
         self.names = names
         self.x_mode = None
         self.post_mode = None
+        self.H_inv = None
         self.CH_inv = None
 
         if lb is not None:
@@ -257,7 +295,7 @@ class MonteCarlo:
 
         return nm.bound_transform(vals, self.lb, self.ub, *args, **kwargs)
 
-    def compute_hessian(self, x0=None, **kwargs):
+    def compute_hessian(self, x0=None, cholesky=True, **kwargs):
 
         if x0 is None:
             x0 = self.x_mode.copy()
@@ -265,7 +303,8 @@ class MonteCarlo:
         self.H = -nm.hessian(self.posterior, x0)
 
         self.H_inv = np.linalg.pinv(self.H)
-        self.CH_inv = np.linalg.cholesky(self.H_inv)
+        if cholesky:
+            self.CH_inv = np.linalg.cholesky(self.H_inv)
 
         return None
 
@@ -334,6 +373,28 @@ class MonteCarlo:
                 print("Warning: could not load " + var)
 
         return None
+
+    def importance_sample(self, Nsim, resample=True, offset=None):
+
+        assert self.x_mode is not None
+        assert self.H_inv is not None
+        
+#        (u, s, vh) = np.linalg.svd(self.H_inv)
+        cov = self.H_inv.copy()
+        if offset is not None:
+            cov += np.diag(offset * np.ones(self.Nx))
+
+        dist = mv(mean=self.x_mode, cov=cov)
+        draws, log_weights = importance_sample(self.posterior, dist, Nsim)
+
+        if resample:
+            probs = np.exp(log_weights - np.amax(log_weights))
+            probs /= np.sum(probs)
+            ix = np.random.choice(Nsim, size=Nsim, p=probs)
+            draws = draws[ix, :]
+            log_weights = np.zeros(log_weights.shape)
+
+        return draws, log_weights
 
 class RWMC(MonteCarlo):
     """Class for Markov Chain Monte Carlo sampler"""
