@@ -249,8 +249,8 @@ class StateSpaceEstimates:
 
     def state_smoother(self):
         
-        if self.r is None:
-            self.disturbance_smoother()
+        # if self.r is None:
+        self.disturbance_smoother()
 
         self.x_smooth = np.zeros((self.Nt, self.Nx))
 

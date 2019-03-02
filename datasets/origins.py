@@ -45,7 +45,7 @@ def load(dataset, master_dirs={}, **kwargs):
             infile = 'stockw_{}.csv'.format(vintage)
             sep = ';'
 
-        df = pd.read_table(data_dir + infile, sep=sep, 
+        df = pd.read_csv(data_dir + infile, sep=sep, 
                                names=['dates', 'stockw'], usecols=['stockw'])
 
         # df['stockw'] = np.log(df['stockw_level'])
@@ -60,7 +60,7 @@ def load(dataset, master_dirs={}, **kwargs):
         data_dir = dirs['gll']
         infile = 'crsp.csv' 
 
-        df_m = pd.read_table(data_dir + infile, sep=',',
+        df_m = pd.read_csv(data_dir + infile, sep=',',
                                names=['date', 'vwretd', 'vwretx'],
                                usecols=['vwretd', 'vwretx'])
         df_m = ts.date_index(df_m, '12/1/1925', freq='MS')
@@ -100,7 +100,7 @@ def load(dataset, master_dirs={}, **kwargs):
         data_dir = dirs['gll_pred']
         infile = 'crsp.csv'
 
-        df = pd.read_table(
+        df = pd.read_csv(
             data_dir + infile,
             sep=',',
             # names=['date', 'vwretd', 'vwretx'],
@@ -130,7 +130,7 @@ def load(dataset, master_dirs={}, **kwargs):
         data_dir = dirs['gll']
         infile = 'caydata.txt'
 
-        df = pd.read_table(data_dir + infile, delim_whitespace=True, 
+        df = pd.read_csv(data_dir + infile, delim_whitespace=True, 
                            names=['dates', 'c', 'a', 'y', 'cay'])
         df = ts.date_index(df, '1/1/1952')
 
@@ -139,7 +139,7 @@ def load(dataset, master_dirs={}, **kwargs):
         data_dir = dirs['gll']
         infile = 'cay_current.csv'
 
-        df = pd.read_table(data_dir + infile, sep=',', header=2,
+        df = pd.read_csv(data_dir + infile, sep=',', header=2,
                            names=['dates', 'c', 'a', 'y', 'cay'])
         df = ts.date_index(df, '1/1/1952')
 
@@ -164,7 +164,7 @@ def load(dataset, master_dirs={}, **kwargs):
         data_dir = dirs['gll']
         infile = 'bls_labor_share.csv'
 
-        df = pd.read_table(data_dir + infile, sep=',',
+        df = pd.read_csv(data_dir + infile, sep=',',
                                names=['dates', 'bls_ls'],
                                usecols=['bls_ls'])
         df = ts.date_index(df, '1/1/1947')
