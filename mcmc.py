@@ -295,7 +295,7 @@ class MonteCarlo:
 
         return nm.bound_transform(vals, self.lb, self.ub, *args, **kwargs)
 
-    def compute_hessian(self, x0=None, cholesky=True, **kwargs):
+    def compute_hessian(self, x0=None, cholesky=True, offset=None, **kwargs):
 
         if x0 is None:
             x0 = self.x_mode.copy()
@@ -303,8 +303,15 @@ class MonteCarlo:
         self.H = -nm.hessian(self.posterior, x0)
 
         self.H_inv = np.linalg.pinv(self.H)
+        
         if cholesky:
-            self.CH_inv = np.linalg.cholesky(self.H_inv)
+            
+            if offset is not None:
+                cov = self.H_inv + np.diag(offset * np.ones(len(x0)))
+            else:
+                cov = self.H_inv
+                
+            self.CH_inv = np.linalg.cholesky(cov)
 
         return None
 
