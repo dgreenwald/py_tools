@@ -462,7 +462,7 @@ class RWMC(MonteCarlo):
         self.Nblock = len(self.blocks)
 
     def sample(self, Nsim, n_print=None, n_recov=None, n_save=None, log=True,
-               *args, **kwargs):
+               cov_offset=1e-12, *args, **kwargs):
 
         self.Nsim = Nsim
 
@@ -507,22 +507,28 @@ class RWMC(MonteCarlo):
                 self.acc_rate += acc
 
             if (istep + 1) % self.stride == 0:
-                self.draws[istep // self.stride, :] = x
-                self.post_sim[istep // self.stride] = post
+
+                jstep = (istep + 1) // self.stride - 1
+
+                self.draws[jstep, :] = x
+                self.post_sim[jstep] = post
 
                 if n_print is not None:
-                    if (istep // self.stride + 1) % n_print == 0:
+                    if (jstep + 1) % n_print == 0:
                         self.print_log("Draw {0:d}. Acceptance rate: {1:4.3f}. Max posterior = {2:4.3f}".format(
-                            (istep + 1) // self.stride, self.acc_rate / istep, self.max_post
+                            jstep, self.acc_rate / istep, self.max_post
                         ))
 
-                # if n_recov is not None:
-                    # if ((istep // self.stride + 1) - n_burn) % n_recov == 0:
-                        # self.print_log("Recomputing covariance")
-                        # self.C_list = np.linalg.cholesky(np.cov(self.draws[n_burn : (istep // self.stride) + 1, :], rowvar=False))
+                if n_recov is not None:
+                    if (jstep + 1) % n_recov == 0:
+                        self.print_log("Recomputing covariance")
+                        for iblock, block in enumerate(self.blocks):
+                            sample_cov = (np.cov(self.draws[:jstep+1, block], rowvar=False) 
+                                          + cov_offset * np.eye(len(x)))
+                            self.C_list[iblock] = np.linalg.cholesky(sample_cov)
 
                 if n_save is not None:
-                    if ((istep // self.stride + 1) % n_save == 0) and istep < Nstep - 1:
+                    if (jstep + 1) % n_save == 0:
                         self.print_log("Saving intermediate output")
                         self.save_all()
 
