@@ -462,7 +462,7 @@ class RWMC(MonteCarlo):
         self.Nblock = len(self.blocks)
 
     def sample(self, Nsim, n_print=None, n_recov=None, n_save=None, log=True,
-               cov_offset=1e-12, *args, **kwargs):
+               cov_offset=1e-12, min_recov=0, *args, **kwargs):
 
         self.Nsim = Nsim
 
@@ -520,7 +520,7 @@ class RWMC(MonteCarlo):
                         ))
 
                 if n_recov is not None:
-                    if (jstep + 1) % n_recov == 0:
+                    if (jstep + 1 >= min_recov) and (((jstep + 1) - min_recov) % n_recov == 0):
                         self.print_log("Recomputing covariance")
                         for iblock, block in enumerate(self.blocks):
                             sample_cov = (np.cov(self.draws[:jstep+1, block], rowvar=False) 
