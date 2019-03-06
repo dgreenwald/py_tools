@@ -33,6 +33,11 @@ from mpi4py import MPI
 #        
 #        
 
+def adapt_jump_scale(acc_rate, adapt_sens, adapt_target, adapt_range):
+
+    e_term = np.exp(adapt_sens * (acc_rate - adapt_target))
+    return (1.0 - 0.5 * adapt_range) + adapt_range * (e_term / (1.0 + e_term))
+
 def randomize_blocks(nx, nblock):
     """nx is number of entries, nblock is number of blocks"""
     ix_all = np.random.permutation(nx)
@@ -416,7 +421,8 @@ class RWMC(MonteCarlo):
 
     def initialize(self, x0=None, jump_scale=None, jump_mult=1.0, stride=1,
                    C=None, C_list=None, blocks='none', bool_blocks=False,
-                   n_blocks=None):
+                   n_blocks=None, adapt_sens=16.0, adapt_range=0.1,
+                   adapt_target=0.25):
 
         self.stride = stride
 
@@ -458,11 +464,15 @@ class RWMC(MonteCarlo):
             self.C_list = []
             for iblock, block in enumerate(self.blocks):
                 self.C_list += [C[block, :][:, block]]
+                
+        self.adapt_sens = adapt_sens
+        self.adapt_range = adapt_range
+        self.adapt_target = adapt_target
 
         self.Nblock = len(self.blocks)
 
     def sample(self, Nsim, n_print=None, n_recov=None, n_save=None, log=True,
-               cov_offset=1e-12, min_recov=0, *args, **kwargs):
+               cov_offset=0.0, min_recov=0, n_retune=None, *args, **kwargs):
 
         self.Nsim = Nsim
 
@@ -482,7 +492,7 @@ class RWMC(MonteCarlo):
 
         self.draws = np.zeros((self.Nsim, self.Nx))
         self.post_sim = np.zeros(self.Nsim)
-        self.acc_rate = 0.0
+        self.acc = 0
         
         e = [np.random.randn(Nstep, np.sum(block)) for block in self.blocks]
         log_u = np.log(np.random.rand(Nstep, self.Nblock))
@@ -504,10 +514,11 @@ class RWMC(MonteCarlo):
                     self.max_post = 1.0 * post
                     self.max_x = 1.0 * x
 
-                self.acc_rate += acc
+                self.acc += acc
 
             if (istep + 1) % self.stride == 0:
 
+                acc_rate_t = self.acc / ((istep + 1) * self.Nblock)
                 jstep = (istep + 1) // self.stride - 1
 
                 self.draws[jstep, :] = x
@@ -516,23 +527,32 @@ class RWMC(MonteCarlo):
                 if n_print is not None:
                     if (jstep + 1) % n_print == 0:
                         self.print_log("Draw {0:d}. Acceptance rate: {1:4.3f}. Max posterior = {2:4.3f}".format(
-                            jstep, self.acc_rate / istep, self.max_post
+                            jstep, self.acc / istep, self.max_post
                         ))
 
                 if n_recov is not None:
                     if (jstep + 1 >= min_recov) and (((jstep + 1) - min_recov) % n_recov == 0):
+
                         self.print_log("Recomputing covariance")
                         for iblock, block in enumerate(self.blocks):
                             sample_cov = (np.cov(self.draws[:jstep+1, block], rowvar=False) 
                                           + cov_offset * np.eye(len(x)))
                             self.C_list[iblock] = np.linalg.cholesky(sample_cov)
 
+                if n_retune is not None:
+                    if (jstep + 1) % n_retune == 0:
+                        self.print_log("Retuning: old jump scale = {:7.6f}".format(self.jump_scale))
+                        self.jump_scale *= adapt_jump_scale(
+                            acc_rate_t, self.adapt_sens, self.adapt_target, self.adapt_range
+                        )
+                        self.print_log("Retuning: new jump scale = {:7.6f}".format(self.jump_scale))
+
                 if n_save is not None:
                     if (jstep + 1) % n_save == 0:
                         self.print_log("Saving intermediate output")
                         self.save_all()
 
-        self.acc_rate /= Ntot
+        self.acc_rate = self.acc / Ntot
 
         if self.fid is not None:
             self.fid.close()
@@ -779,9 +799,12 @@ class SMC(MonteCarlo):
 
         self.jump_scales[istep] = self.jump_scales[istep-1]
         if istep > 1:
-            e_term = np.exp(self.adapt_sens * (self.acc_rate[istep-1] - self.adapt_target))
-            adj = (1.0 - 0.5 * self.adapt_range) + self.adapt_range * (e_term / (1.0 + e_term))
-            self.jump_scales[istep] *= adj
+            # e_term = np.exp(self.adapt_sens * (self.acc_rate[istep-1] - self.adapt_target))
+            # adj = (1.0 - 0.5 * self.adapt_range) + self.adapt_range * (e_term / (1.0 + e_term))
+            # self.jump_scales[istep] *= adj
+            self.jump_scales[istep] *= adapt_jump_scale(
+                self.acc_rate[istep-1], self.adapt_sens, self.adapt_target, self.adapt_range
+            )
 
     def mutate(self, istep):
 
