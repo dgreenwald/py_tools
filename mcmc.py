@@ -518,7 +518,7 @@ class RWMC(MonteCarlo):
 
             if (istep + 1) % self.stride == 0:
 
-                acc_rate_t = self.acc / ((istep + 1) * self.Nblock)
+                self.acc_rate = self.acc / ((istep + 1) * self.Nblock)
                 jstep = (istep + 1) // self.stride - 1
 
                 self.draws[jstep, :] = x
@@ -543,7 +543,7 @@ class RWMC(MonteCarlo):
                     if (jstep + 1) % n_retune == 0:
                         self.print_log("Retuning: old jump scale = {:7.6f}".format(self.jump_scale))
                         self.jump_scale *= adapt_jump_scale(
-                            acc_rate_t, self.adapt_sens, self.adapt_target, self.adapt_range
+                            self.acc_rate, self.adapt_sens, self.adapt_target, self.adapt_range
                         )
                         self.print_log("Retuning: new jump scale = {:7.6f}".format(self.jump_scale))
 
