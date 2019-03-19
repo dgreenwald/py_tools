@@ -96,7 +96,7 @@ class Table:
             table_text += r"""%TCIMACRO{\TeXButton{E}{\end{table}}}%
 %BeginExpansion
 """
-        table_text += r'\end{table}' + '\n\n'
+        table_text += r'\end{table}' + '\n'
         
         if swp:
             table_text += r"""%EndExpansion

@@ -160,7 +160,8 @@ def normalized(df, var_list, filepath=None, invert_list=[]):
 
 def hist(df_in, var, label=None, xlabel=None, ylabel=None, wvar=None, 
          bins=None, xlim=None, ylim=None, filepath=None,
-         legend_font=10, label_font=12, copy_path=None, **kwargs):
+         legend_font=10, label_font=12, copy_path=None, x_vertline=None,
+         vertline_kwargs={}, **kwargs):
 
     df = dt.clean(df_in, [var, wvar])
 
@@ -183,6 +184,9 @@ def hist(df_in, var, label=None, xlabel=None, ylabel=None, wvar=None,
     matplotlib.rcParams.update({'font.size' : label_font})
     plt.hist(df[var].values, bins=bins, alpha=0.5, edgecolor='black',
              weights=w, label=label, **kwargs)
+    
+    if x_vertline is not None:
+        plt.axvline(x=x_vertline, **vertline_kwargs)
 
     if xlabel is not None:
         plt.xlabel(xlabel)
