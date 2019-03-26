@@ -9,6 +9,48 @@ import statsmodels.formula.api as smf
 
 from . import stats
 
+def compute_binscatter(df_in, n_bins, xvar, yvar, wvar=None):
+
+    df = df_in[[xvar, yvar]].copy()
+    if wvar is not None:
+        df[wvar] = df_in[wvar]
+    else:
+        wvar='weight'
+        df[wvar] = 1.0
+        
+    df['x_bin'] = bin_data(df[xvar], n_bins, weights=df[wvar])
+
+    df[xvar] *= df[wvar]
+    df[yvar] *= df[wvar]
+    
+    by_bin = df.groupby('x_bin')[xvar, yvar, wvar].sum()
+    by_bin[xvar] /= by_bin[wvar]
+    by_bin[yvar] /= by_bin[wvar]
+    
+    weight_adj = n_bins / len(df)
+    by_bin[wvar] *= weight_adj
+
+    return by_bin
+
+def bin_data(series, n_bins, weights=None):
+    """Group data into bins based on quantile.
+    
+    series: pandas series
+    n_bins: int
+    
+    returns series with bin indicators"""
+
+    quantiles = np.linspace(0.0, 1.0, n_bins+1)
+    if weights is None:
+        bins = series.quantile(np.linspace(0.0, 1.0, n_bins+1)).values
+    else:
+        bins = stats.weighted_quantile(series.values, weights.values, quantiles)
+
+    bins[0] = -np.inf
+    bins[-1] = np.inf
+
+    return pd.cut(series, bins, labels=np.arange(len(bins) - 1))
+
 class FullResults:
     """Regression results with index and samples"""
     def __init__(self, results, ix, Xs, zs):
