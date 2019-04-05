@@ -244,8 +244,8 @@ def load(nipa_table=None, nipa_source='xls', **kwargs):
     else:
         raise Exception
 
-def load_flat(nipa_table, data_dir=default_dir+'nipa/', var_list=None,
-              reimport=False, billions=True, **kwargs):
+def load_flat(nipa_table=None, data_dir=default_dir+'nipa/', var_list=None,
+              reimport=False, billions=True, var_index=None, **kwargs):
 
     idx = pd.IndexSlice
 
@@ -272,7 +272,10 @@ def load_flat(nipa_table, data_dir=default_dir+'nipa/', var_list=None,
     else:
         df = pd.read_pickle(pkl_file)
 
-    var_index = get_var_index(nipa_table, **kwargs)
+    if var_index is None:
+        assert nipa_table is not None
+        var_index = get_var_index(nipa_table, **kwargs)
+
     var_index = {key : val[:-1] for key, val in var_index.items()}
 
     if var_list is None:

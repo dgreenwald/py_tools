@@ -274,6 +274,32 @@ def MA(df, lhs_var, rhs_vars, init_lag=1, default_lags=16,
     # Run dt.regression
     return dt.regression(df, lhs, rhs, ix=ix, **kwargs)
 
+def ARMA(series, p, q, freq='QS', ix=None):
+    
+    if ix is None:
+        ix = np.ones(len(series), dtype=bool)
+        
+    df = series.to_frame(name='x')
+    
+    x_lags = add_lags(df, 'x', p)
+    fr = dt.regression(df.loc[ix, :], 'x', x_lags)
+    ix_stage1 = ix.copy()
+    ix_stage1[ix] = fr.ix
+    df.loc[ix_stage1, 'u'] = fr.results.resid
+    
+    u_lags = add_lags(df, 'u', q)
+    fr = dt.regression(df.loc[ix, :], 'x', x_lags + u_lags)
+    ix_stage2 = ix.copy()
+    ix_stage2[ix] = fr.ix
+    
+    fr.ix = ix_stage2
+    
+#    this_ix = ix.copy()
+#    this_ix[ix] = fr.ix
+#    fr.ix = this_ix
+    
+    return fr
+
 def VAR(df_in, var_list, n_var_lags=1, use_const=True):
     """Estimate VAR using OLS"""
 
