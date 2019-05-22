@@ -678,6 +678,14 @@ def detrend_time(df_full, varlist):
 
     return df_full, varlist_detrended
 
+def autocorrelations(df_in, var, lags=20):
+
+    df = df_in[[var]].copy()
+    var_copy = var + '_COPY'
+    df[var_copy] = df[var].copy()
+
+    return lead_lag_correlations(df, var, var_copy, max_leads=0, max_lags=lags)
+
 def lead_lag_correlations(df_in, var1, var2, lags=None,
                           max_leads=8, max_lags=8, make_plot=False,
                           **kwargs):
@@ -708,10 +716,10 @@ def lead_lag_correlations(df_in, var1, var2, lags=None,
         table[ii, 0] = lag
         table[ii, 1] = this_corr
 
-    best_lag = int(table[np.argmax(np.abs(table[:, 1])), 0])
-    best_lag_var2 = 'L({0})_{1}'.format(best_lag, var2)
-
     if make_plot:
+
+        best_lag = int(table[np.argmax(np.abs(table[:, 1])), 0])
+        best_lag_var2 = 'L({0})_{1}'.format(best_lag, var2)
         two_axis(df, var1, best_lag_var2, **kwargs)
 
     return table 

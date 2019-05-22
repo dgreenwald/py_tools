@@ -2,6 +2,7 @@ import os
 import glob
 import numpy as np
 import pandas as pd
+import re
 
 from . import defaults
 default_dir = defaults.base_dir() + 'irs/'
@@ -40,7 +41,7 @@ def load_state_county_year(filename, skiprows, target_cols):
 
 def load_county_year(year, data_dir=default_dir, reimport=False):
 
-    pkl_file = data_dir + 'irs_county_{:d}.pkl'.format(year)
+    pkl_file = data_dir + 'county/irs_county_{:d}.pkl'.format(year)
     if reimport or not os.path.exists(pkl_file):
         
         print("Loading year {}".format(year))
@@ -111,7 +112,7 @@ def import_county_year_from_2011(year, data_dir=default_dir):
     final_map = { key.upper() : val for key, val in col_map.items() } 
 
     short_year = str(year)[2:]
-    df_by_cat = pd.read_csv(data_dir + short_year + 'incyallagi.csv',
+    df_by_cat = pd.read_csv(data_dir + 'county/' + short_year + 'incyallagi.csv',
                      encoding='latin1').rename(columns=final_map)
     df_by_cat = df_by_cat.rename(columns={col : col.lower() for col in df_by_cat.columns})
 
@@ -131,7 +132,7 @@ def import_county_year_from_2011(year, data_dir=default_dir):
 
 def import_county_year_2010(year, data_dir=default_dir):
 
-    year_dir = data_dir + str(year) + 'CountyIncome/'
+    year_dir = data_dir + 'county/' + str(year) + 'CountyIncome/'
 
     names = [
         'statefips', 'state', 'countyfips', 'county_name', 'n_returns',
@@ -163,11 +164,13 @@ def import_county_year_2010(year, data_dir=default_dir):
 
 def import_county_year_to_2009(year, data_dir=default_dir):
 
-    year_dir = data_dir + str(year) + 'CountyIncome/'
+    year_dir = data_dir + 'county/' + str(year) + 'CountyIncome/'
     
     # if year <= 2009:
 
-    names = ['DROP', 'statefips', 'countyfips', 'county', 'n_returns', 'n_exemptions', 'agi', 'wagesal', 'dividends', 'interest']
+    names = ['DROP', 'statefips', 'countyfips', 'county', 'n_returns',
+             'n_exemptions', 'agi', 'wagesal', 'dividends', 'interest']
+
     drop_list = ['DROP']
 
     if year in [1989, 2007]:
@@ -243,7 +246,7 @@ def import_county_year_to_2009(year, data_dir=default_dir):
 
 def load_county(data_dir=default_dir, reimport=False, reimport_year=False):
 
-    pkl_file = data_dir + 'irs_county.pkl'
+    pkl_file = data_dir + 'county/irs_county.pkl'
     if reimport or not os.path.exists(pkl_file):
 
         df = pd.concat((load_county_year(year, reimport=reimport_year) for year in range(1989, 2017)), sort=True)
@@ -256,3 +259,38 @@ def load_county(data_dir=default_dir, reimport=False, reimport_year=False):
         df = pd.read_pickle(pkl_file)
 
     return df
+
+def load_state_zip_year(filename, skiprows):
+
+    print(filename)
+    df = pd.read_excel(filename, skiprows=skiprows, header=None)
+    
+    row_names = df[0].values
+    
+    ix = np.zeros(len(df), dtype=bool)
+    pattern = re.compile(r'\s*\d\d\d\d\d\s*')
+    for ii, name in enumerate(row_names):
+        if pattern.match(name):
+            ix[ii] = True
+            
+    df = df.loc[ix, :]
+
+    return df
+
+def import_zip_year_to_2010(year, data_dir=default_dir):
+
+    year_dir = data_dir + 'zip/' + str(year) + 'ZIPCode/'
+
+    names = ['zip', 'n_returns', 'n_exemptions', 'n_dependents', 'agi']
+
+    for item in ['wagesal', 'interest', 'eitc', 'tax', 'schedule_c', 'schedule_f', 'schedule_a_deductions']:
+
+        names += ['n_' + item, item]
+
+    skiprows = 8
+    df_t = pd.concat([
+        load_state_zip_year(filename, skiprows)
+        for filename in glob.glob(year_dir + '*.xls')
+    ])
+        
+    return df_t
