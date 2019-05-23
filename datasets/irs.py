@@ -8,6 +8,22 @@ from . import defaults
 default_dir = defaults.base_dir() + 'irs/'
 # data_dir = '/home/dan/data/irs/'
 
+def double_list(these_items):
+
+    names = []
+    for item in these_items:
+        names += ['n_' + item, item]
+
+    return names
+
+def triple_list(these_items):
+
+    names = []
+    for item in these_items:
+        names += ['n_' + item, 'agi_' + item, item]
+
+    return names
+
 def compute_fips(df_t):
 
     df_t['countyfips'] = pd.to_numeric(df_t['countyfips'], errors='coerce')
@@ -139,18 +155,16 @@ def import_county_year_2010(year, data_dir=default_dir):
         'n_joint', 'n_prepared', 'n_exemptions', 'n_dependents', 'agi', 
     ]
     
-    for item in ['wagesal', 'interest', 'dividends', 'qualified_dividends', 'business']:
-        names += ['n_' + item, item]
+    names += double_list(['wagesal', 'interest', 'dividends', 'qualified_dividends', 'business'])
 
     names += ['n_farm']
 
-    for item in ['cap_gain', 'retirement', 'pension', 'unemp', 'social', 
+    names += double_list(['cap_gain', 'retirement', 'pension', 'unemp', 'social', 
             'self_emp_ret', 'itemized', 'state_local_inc', 'state_local_sales', 'real_estate_tax', 
             'taxes_paid', 'mort_int_paid', 'contributions', 'taxable_income', 'tax_credits',
             'res_energy_credit', 'child_tax_credit', 'child_dep_care_credit', 'add_child_credit', 'eitc',
             'excess_eitc', 'alt_minimum_tax', 'income_tax', 'tax_liability', 'tax_due_at_filing',
-            'overpayments_refunded']:
-        names += ['n_' + item, item]
+            'overpayments_refunded'])
 
     skiprows = 6
 
@@ -260,20 +274,55 @@ def load_county(data_dir=default_dir, reimport=False, reimport_year=False):
 
     return df
 
-def load_state_zip_year(filename, skiprows):
+def load_state_zip_year(filename, year):
 
     print(filename)
-    df = pd.read_excel(filename, skiprows=skiprows, header=None)
-    
-    row_names = df[0].values
-    
-    ix = np.zeros(len(df), dtype=bool)
+    if year in [1998, 2001, 2002]:
+       skiprows = 8
+    elif year in [2004, 2005, 2006]:
+        skiprows = 11
+    elif year in [2007]:
+        skiprows = 9
+    elif year in [2008]:
+        skiprows = 10
+    elif year in [2009, 2010]:
+        skiprows = 6
+
+    df = pd.read_excel(filename, 
+                      skiprows=skiprows, 
+                       header=None)
     pattern = re.compile(r'\s*\d\d\d\d\d\s*')
-    for ii, name in enumerate(row_names):
-        if pattern.match(name):
-            ix[ii] = True
+    
+    if year <= 2006:
+
+        row_names = df[0].astype(str).values
+        
+        ix = np.zeros(len(df), dtype=bool)
+        for ii, name in enumerate(row_names):
+            if pattern.match(name):
+                ix[ii] = True
             
-    df = df.loc[ix, :]
+        df = df.loc[ix, :]
+
+    else:
+        
+        if year <= 2008:
+            ix_bin = 0
+            ix_zip = 1
+        else:
+            ix_bin = 1
+            ix_zip = 0
+    
+        bin_names = df[ix_bin].astype(str).values
+        zip_names = df[ix_zip].astype(str).values
+
+        ix = np.zeros(len(df), dtype=bool)
+        for ii, (bin_name, zip_name) in enumerate(zip(bin_names, zip_names)):
+            if bin_name[0] != '$' and pattern.match(zip_name):
+                ix[ii] = True
+
+        df = df.loc[ix, :].drop(columns=[ix_bin])
+        df.columns = np.arange(df.shape[1])
 
     return df
 
@@ -281,16 +330,127 @@ def import_zip_year_to_2010(year, data_dir=default_dir):
 
     year_dir = data_dir + 'zip/' + str(year) + 'ZIPCode/'
 
-    names = ['zip', 'n_returns', 'n_exemptions', 'n_dependents', 'agi']
+    if year == 1998:
 
-    for item in ['wagesal', 'interest', 'eitc', 'tax', 'schedule_c', 'schedule_f', 'schedule_a_deductions']:
-
-        names += ['n_' + item, item]
-
-    skiprows = 8
-    df_t = pd.concat([
-        load_state_zip_year(filename, skiprows)
-        for filename in glob.glob(year_dir + '*.xls')
-    ])
+        names = ['zip', 'n_returns', 'n_exemptions', 'n_dependents', 'agi']
+        names += double_list([
+            'wagesal', 'interest', 'eitc', 'tax_liability',
+        ])
         
+        for item in ['schedule_c', 'schedule_f', 'schedule_a']:
+            names += ['n_' + item, 'n_sched_' + item]
+            
+    elif year == 2001:
+
+        names = ['zip', 'n_returns', 'n_exemptions', 'n_dependents', 'agi']
+        names += double_list(['wagesal', 'interest', 'tax_liability'])
+        names += ['n_' + item for item in ['schedule_c', 'schedule_f', 'schedule_a']]
+        
+    elif year == 2002:
+        
+        names = ['zip', 'n_returns', 'n_exemptions', 'n_dependents', 'agi']
+        names += double_list(['wagesal', 'interest', 'tax_liability', 'contributions'])
+        names += ['n_' + item for item in ['schedule_c', 'schedule_f', 'schedule_a']]
+
+    elif year in [2004, 2005, 2006]:
+
+        names = ['zip', 'n_returns', 'n_exemptions', 'n_dependents', 'agi']
+        names += double_list(['wagesal', 'interest', 'dividends', 'cap_gain', 'schedule_c',
+                              'schedule_f', 'ira_deduction', 'pension_deduction'])
+        names += triple_list(['itemized', 'contributions', 'taxes_paids'])
+        
+        names += double_list(['alt_minimum_tax', 'income_tax_before_credits', 'tax_liability', 'eitc'])
+
+        names += ['n_prepared']
+
+    elif year in [2007]:
+
+        names = ['zip', 'n_returns', 'n_joint', 'n_prepared', 'n_exemptions', 'n_dependents', 'agi']
+        names += double_list(['wagesal', 'interest', 'dividends', 'business'])
+        names += ['n_farm']
+        names += double_list([
+            'cap_gain', 'retirement', 'pension', 'unemp', 'social', 'self_emp_ret',
+            'itemized', 'state_local_inc', 'state_local_sales',
+            'real_estate_tax', 'taxes_paid', 'mort_int_paid', 'contributions',
+            'taxable_income', 'tax_credits', 'res_energy_credit',
+            'child_tax_credit', 'child_dep_care_credit', 'eitc', 'excess_eitc',
+            'alt_minimum_tax', 'income_tax', 'tax_liability',
+            'tax_due_at_filing', 'overpayments_refunded',
+        ])
+
+    elif year in [2008]:
+        names = [
+            'zip', 'n_returns', 'n_joint', 'n_prepared', 'n_exemptions',
+            'n_dependents', 'agi', 'wagesal', 'interest', 'dividends',
+            # 'qualified_dividends', 
+            'business', 'cap_gain', 'retirement',
+            'pension', 'unemp', 'social', 'self_emp_ret', 'itemized',
+            'state_local_inc', 'state_local_sales', 'real_estate_tax',
+            'taxes_paid', 'mort_int_paid', 'contributions', 'taxable_income',
+            'tax_credits', 'res_energy_credit', 'child_tax_credit',
+            'child_dep_care_credit', 'eitc', 'excess_eitc',
+            'alt_minimum_tax', 'income_tax', 'tax_liability',
+            'tax_due_at_filing', 'overpayments_refunded',
+        ]
+    elif year in [2009, 2010]:
+
+        names = ['zip', 'n_returns', 'n_joint', 'n_prepared', 'n_exemptions', 'n_dependents', 'agi']
+        names += double_list(['wagesal', 'interest', 'dividends', 'qualified_dividends', 'business'])
+        names += ['n_farm']
+        names += double_list([
+            'cap_gain', 'retirement', 'pension', 'unemp', 'social', 'self_emp_ret',
+            'itemized', 'state_local_inc', 'state_local_sales',
+            'real_estate_tax', 'taxes_paid', 'mort_int_paid', 'contributions',
+            'taxable_income', 'tax_credits', 'res_energy_credit',
+            'child_tax_credit', 'child_dep_care_credit',  'add_child_credit', 'eitc', 'excess_eitc',
+            'alt_minimum_tax', 'income_tax', 'tax_liability',
+            'tax_due_at_filing', 'overpayments_refunded',
+        ])
+
+    if year <= 2006:
+        df_t = pd.concat([
+            load_state_zip_year(filename, year)
+            for filename in glob.glob(year_dir + '*.xls')
+        ])
+    else:
+        print('TESTING')
+        file_list = list(glob.glob(year_dir + '*.xls'))
+        df_t = pd.concat([
+                load_state_zip_year(filename, year)
+                for filename in file_list[:3]
+                ])
+#        df_t = pd.concat([
+#            load_state_zip_year(filename, year)
+#            for filename in glob.glob(year_dir + '*.xls')
+#        ])
+
+    print(df_t.head(10))
+
+    df_t = df_t.loc[:, :len(names)-1]
+    df_t.columns = names
+
+    df_t = df_t.apply(pd.to_numeric, errors='coerce')
+
+    df_t['date'] = str(year) + '-01-01'
+    df_t['date'] = pd.to_datetime(df_t['date'])
+
+    df_t['zip'] = df_t['zip'].astype(np.int64)
+        
+    return df_t
+
+def load_zip_year(year, data_dir=default_dir, reimport=False):
+
+    pkl_file = data_dir + 'zip/irs_zip_{:d}.pkl'.format(year)
+    if reimport or not os.path.exists(pkl_file):
+        
+        print("Loading year {}".format(year))
+        if year <= 2010:
+            df_t = import_zip_year_to_2010(year, data_dir=default_dir)
+        else:
+            raise Exception
+
+        df_t.to_pickle(pkl_file)
+    else:
+        df_t = pd.read_pickle(pkl_file) 
+
     return df_t
