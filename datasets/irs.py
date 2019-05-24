@@ -149,6 +149,8 @@ def import_geo_year_from_2011(year, geo, data_dir=default_dir):
         df_by_cat['zip'] = df_by_cat['zip'].astype(np.int64)
 
     df_t = df_by_cat.groupby([group_var]).sum().drop(['agi_stub'], axis=1).reset_index()
+    if 'count' in df_t:
+        df_t = df_t.drop(columns=['count'])
 
     df_t['date'] = '{0:d}-01-01'.format(year)
 
@@ -371,7 +373,7 @@ def import_zip_year_to_2010(year, data_dir=default_dir):
         file_list = list(glob.glob(year_dir + '*.xls'))
         df_t = pd.concat([
                 load_state_zip_year(filename, year)
-                for filename in file_list[:1]
+                for filename in file_list[:2]
                 ])
     else:
         df_t = pd.concat([
@@ -420,11 +422,13 @@ def load_zip_year(year, data_dir=default_dir, reimport=False):
             bad_ix = np.any(df_t['zip'].values[:, np.newaxis] == bad_zips.values[np.newaxis, :], axis=1)
             print(df_t.loc[bad_ix, :])
     
-        df_t = df_t.groupby('zip').sum().reset_index()
+        df_t = df_t.groupby(['zip', 'date']).sum().reset_index()
 
         df_t.to_pickle(pkl_file)
     else:
-        df_t = pd.read_pickle(pkl_file) 
+        df_t = pd.read_pickle(pkl_file)
+        
+    print(df_t.head(10))
 
     return df_t
 
