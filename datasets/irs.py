@@ -428,13 +428,13 @@ def load_zip_year(year, data_dir=default_dir, reimport=False):
     else:
         df_t = pd.read_pickle(pkl_file)
         
-    print(df_t.head(10))
+#    print(df_t.head(10))
 
     return df_t
 
 def load_zip(data_dir=default_dir, reimport=False, reimport_year=False):
 
-    zip_years = [1998, 2001, 2002] + list(range(2004, 2011))
+    zip_years = [1998, 2001, 2002] + list(range(2004, 2017))
 
     pkl_file = data_dir + 'zip/irs_zip.pkl'
     if reimport or not os.path.exists(pkl_file):
