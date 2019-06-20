@@ -69,13 +69,14 @@ def two_axis(df_in, var1, var2, filepath=None, loc1='upper left',
         # df[var2].plot(ax=ax2, linestyle='-', linewidth=2, label=leglabel2, color=color2,
                       # marker='o', fillstyle='none', markersize=5, mew=1.5, markevery=markevery)
 
-    if single_legend:
-        these_lines = line1 + line2
-        these_labels = [line.get_label() for line in these_lines]
-        ax1.legend(these_lines, these_labels, loc=loc_single, fontsize=legend_font)
-    else:
-        ax1.legend(loc=loc1, fontsize=legend_font)
-        ax2.legend(loc=loc2, fontsize=legend_font)
+    if legend:
+        if single_legend:
+            these_lines = line1 + line2
+            these_labels = [line.get_label() for line in these_lines]
+            ax1.legend(these_lines, these_labels, loc=loc_single, fontsize=legend_font)
+        else:
+            ax1.legend(loc=loc1, fontsize=legend_font)
+            ax2.legend(loc=loc2, fontsize=legend_font)
 
     ax1.set_ylabel(label1, color=color1, fontsize=label_font)
     for tl in ax1.get_yticklabels():
