@@ -14,6 +14,8 @@ from scipy.stats import norm
 import py_tools.data as dt
 from py_tools.datasets import misc
 
+pd.plotting.register_matplotlib_converters()
+
 def save_hist(vals, path, **kwargs):
 
     h = np.histogram(vals, **kwargs)
