@@ -1,7 +1,7 @@
 import os
 import numpy as np
 from scipy.optimize import minimize
-from scipy.misc import logsumexp
+from scipy.special import logsumexp
 from scipy.stats import multivariate_normal as mv
 # import py_tools.numerical as nm
 from py_tools import in_out as io, numerical as nm
