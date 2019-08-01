@@ -256,7 +256,7 @@ def wls_formula(df, formula, weight_var=None, weights=None, ix=None, nw_lags=0,
         ix = np.ones(len(df), dtype=bool)
     
     y, X = patsy.dmatrices(formula, df.loc[ix, :], return_type='dataframe')
-    results = smf.WLS(y, X, weights=weights).fit()
+    results = sm.WLS(y, X, weights=weights).fit()
     results = results.get_robustcov_results('HC0')
 
     results = update_results_cov(results, nw_lags=nw_lags, cluster_groups=cluster_groups)
