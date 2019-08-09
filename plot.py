@@ -218,7 +218,9 @@ def double_hist(df_in1, df_in2=None, label1='Var 1', label2='Var 2', var=None,
                 var1=None, var2=None, bins=None, wvar=None, wvar1=None,
                 wvar2=None, filepath=None, xlabel=None, ylabel=None, xlim=None,
                 ylim=None, legend_font=10, label_font=12, copy_path1=None,
-                copy_path2=None, color1=None, color2=None, **kwargs):
+                copy_path2=None, color1=None, color2=None, x_vertline=None,
+                edgecolor=None, edgecolor1=None, edgecolor2=None,
+                vertline_kwargs={}, kwargs1={}, kwargs2={}, **kwargs):
     """Plots double histogram overlaying var1 from df_in1 and var2 from df_in2"""
 
     if df_in2 is None:
@@ -233,6 +235,13 @@ def double_hist(df_in1, df_in2=None, label1='Var 1', label2='Var 2', var=None,
         assert wvar1 is None and wvar2 is None
         wvar1 = wvar
         wvar2 = wvar
+        
+    if edgecolor is None:
+        edgecolor = 'black'
+    if edgecolor1 is None:
+        edgecolor1 = edgecolor
+    if edgecolor2 is None:
+        edgecolor2 = edgecolor
 
     # if color1 is None:
         # color1 = 'cornflowerblue'
@@ -259,24 +268,29 @@ def double_hist(df_in1, df_in2=None, label1='Var 1', label2='Var 2', var=None,
     if len(df1) == 0 or len(df2) == 0:
         return False
 
-    if wvar2 is not None:
-        w1 = df1[wvar].values
+    if wvar1 is not None:
+        w1 = df1[wvar1].values
     else:
         w1 = np.ones(len(df1))
 
-    if wvar in df2:
-        w2 = df2[wvar].values
+    if wvar2 is not None:
+        w2 = df2[wvar2].values
     else:
         w2 = np.ones(len(df2))
 
     fig = plt.figure()
     matplotlib.rcParams.update({'font.size' : label_font})
+    
+    kwargs1.update(kwargs)
+    kwargs2.update(kwargs)
 
-    plt.hist(df1[var1].values, bins=bins, alpha=0.5, edgecolor='black',
-             weights=w1, label=str(label1), color=color1, **kwargs)
-    plt.hist(df2[var2].values, bins=bins, alpha=0.5, edgecolor='black',
-             weights=w2, label=str(label2), color=color2, **kwargs)
-    plt.legend(fontsize=legend_font)
+    plt.hist(df1[var1].values, bins=bins, alpha=0.5, edgecolor=edgecolor1,
+             weights=w1, label=str(label1), color=color1, **kwargs1)
+    plt.hist(df2[var2].values, bins=bins, alpha=0.5, edgecolor=edgecolor2,
+             weights=w2, label=str(label2), color=color2, **kwargs2)
+    
+    if x_vertline is not None:
+        plt.axvline(x=x_vertline, **vertline_kwargs)
 
     if xlabel is not None:
         plt.xlabel(xlabel, fontsize=label_font)
@@ -287,6 +301,9 @@ def double_hist(df_in1, df_in2=None, label1='Var 1', label2='Var 2', var=None,
         plt.xlim((xlim))
     if ylim is not None:
         plt.ylim((ylim))
+        
+    plt.legend(fontsize=legend_font)
+    plt.tight_layout()
 
     if filepath is not None:
         plt.savefig(filepath)
