@@ -12,7 +12,6 @@ from scipy.stats import norm
 
 # from py_tools.data import clean
 import py_tools.data as dt
-from py_tools.datasets import misc
 
 pd.plotting.register_matplotlib_converters()
 
@@ -24,9 +23,18 @@ def save_hist(vals, path, **kwargs):
 def two_axis(df_in, var1, var2, filepath=None, loc1='upper left', 
              loc2='upper right', loc_single=None, legend_font=10, label_font=12,
              normalize=False, color1='#1f77b4', color2='#ff7f0e', flip1=False,
-             flip2=False, markevery=4, mark2='o', legend=True,
+             flip2=False, legend=True,
              single_legend=False, print_legend_axis=True, labels={},
-             leglabels={}, drop=True):
+             leglabels={}, drop=True, kwargs1={}, kwargs2={}):
+    
+    kwargs1_copy = kwargs1.copy()
+    kwargs1 = {'linewidth' : 2,}
+    kwargs1.update(kwargs1_copy)
+    
+    kwargs2_copy = kwargs2.copy()
+    kwargs2 = {'linewidth' : 2, 'marker' : 'o', 'markevery' : 4,
+               'fillstyle' : 'none', 'markersize' : 5, 'mew' : 1.5}
+    kwargs2.update(kwargs2_copy)
 
     matplotlib.rcParams.update({'font.size' : label_font})
     
@@ -34,8 +42,10 @@ def two_axis(df_in, var1, var2, filepath=None, loc1='upper left',
     if drop:
         df = df.dropna()
 
-    if markevery is None:
-        markevery = math.round(len(df) / 20)
+    for these_kwargs in [kwargs1, kwargs2]:
+        if these_kwargs.get('marker', None) is not None:
+            if these_kwargs.get('markevery', None) is None:
+                these_kwargs['markevery'] = math.round(len(df) / 20)
 
     fig, ax1 = plt.subplots()
 
@@ -49,25 +59,22 @@ def two_axis(df_in, var1, var2, filepath=None, loc1='upper left',
         leglabel2 = leglabel2 + ' (right)'
 
     if flip1:
-        line1 = ax1.plot(df.index, -df[var1], linewidth=2, label=('(-1) x ' + leglabel1), color=color1)        
+        line1 = ax1.plot(df.index, -df[var1], label=('(-1) x ' + leglabel1), color=color1, **kwargs1)        
         # (-df[var1]).plot(ax=ax1, linewidth=2, label=('(-1) x ' + leglabel1), color=color1)
     else:
-        line1 = ax1.plot(df.index, df[var1], linewidth=2, label=leglabel1, color=color1)
+        line1 = ax1.plot(df.index, df[var1], label=leglabel1, color=color1, **kwargs1)
         # df[var1].plot(ax=ax1, linewidth=2, label=leglabel1, color=color1)
 
     ax2 = ax1.twinx()
     if flip2:
-        line2 = ax2.plot(df.index, -df[var2], linestyle='-', linewidth=2, label=('(-1) x ' + leglabel2), 
-                         color=color2, marker=mark2, fillstyle='none', markersize=5, 
-                         mew=1.5, markevery=markevery)
+        line2 = ax2.plot(df.index, -df[var2], label=('(-1) x ' + leglabel2), 
+                         color=color2, **kwargs2)
 
         # (-df[var2]).plot(ax=ax2, linestyle='-', linewidth=2, label=('(-1) x ' + leglabel2), 
                          # color=color2, marker=mark2, fillstyle='none', markersize=5, 
                          # mew=1.5, markevery=markevery)
     else:
-        line2 = ax2.plot(df.index, df[var2], linestyle='-', linewidth=2, label=leglabel2, 
-                         color=color2, marker=mark2, fillstyle='none', markersize=5, 
-                         mew=1.5, markevery=markevery)
+        line2 = ax2.plot(df.index, df[var2], label=leglabel2, color=color2, **kwargs2)
         # df[var2].plot(ax=ax2, linestyle='-', linewidth=2, label=leglabel2, color=color2,
                       # marker='o', fillstyle='none', markersize=5, mew=1.5, markevery=markevery)
 
@@ -214,14 +221,24 @@ def hist(df_in, var, label=None, xlabel=None, ylabel=None, wvar=None,
 
     return True
 
+def compute_hist(df, var, bins, wvar=None):
+
+    df['bin'] = pd.cut(df[var], bins, labels=bins[:-1])
+    hist = df.groupby('bin')[wvar].sum()
+    hist /= np.sum(hist)
+
+    return hist
+
 def double_hist(df_in1, df_in2=None, label1='Var 1', label2='Var 2', var=None,
                 var1=None, var2=None, bins=None, wvar=None, wvar1=None,
                 wvar2=None, filepath=None, xlabel=None, ylabel=None, xlim=None,
                 ylim=None, legend_font=10, label_font=12, copy_path1=None,
-                copy_path2=None, color1=None, color2=None, x_vertline=None,
-                edgecolor=None, edgecolor1=None, edgecolor2=None,
-                vertline_kwargs={}, kwargs1={}, kwargs2={}, **kwargs):
+                copy_path2=None, color1=None, color2=None, edgecolor='black', 
+                alpha=0.5, use_bar=False, kwargs1={}, kwargs2={}, **kwargs):
     """Plots double histogram overlaying var1 from df_in1 and var2 from df_in2"""
+
+    kwargs1.update(kwargs)
+    kwargs2.update(kwargs)
 
     if df_in2 is None:
         df_in2 = df_in1
@@ -230,28 +247,21 @@ def double_hist(df_in1, df_in2=None, label1='Var 1', label2='Var 2', var=None,
         assert var1 is None and var2 is None
         var1 = var
         var2 = var
-
-    if wvar is not None:
-        assert wvar1 is None and wvar2 is None
+        
+    if wvar is None:
+        wvar = '_count'
+        
+    if wvar1 is None:
         wvar1 = wvar
+    if wvar2 is None:
         wvar2 = wvar
         
-    if edgecolor is None:
-        edgecolor = 'black'
-    if edgecolor1 is None:
-        edgecolor1 = edgecolor
-    if edgecolor2 is None:
-        edgecolor2 = edgecolor
-
-    # if color1 is None:
-        # color1 = 'cornflowerblue'
-    # if color2 is None:
-        # color2 = 'orange'
-
-    # if copy_str is not None:
-        # assert copy_path1 is None and copy_path2 is None
-        # copy_path1 = copy_str + '_' + var1 + '.pkl'
-        # copy_path2 = copy_str + '_' + var2 + '.pkl'
+    # if edgecolor is None:
+        # edgecolor = 'black'
+    # if edgecolor1 is None:
+        # edgecolor1 = edgecolor
+    # if edgecolor2 is None:
+        # edgecolor2 = edgecolor
 
     # Normalize
     if matplotlib.__version__ == '2.0.2':
@@ -261,6 +271,11 @@ def double_hist(df_in1, df_in2=None, label1='Var 1', label2='Var 2', var=None,
 
     df1 = dt.clean(df_in1, [var1, wvar1])
     df2 = dt.clean(df_in2, [var2, wvar2])
+    
+    if wvar1 == '_count':
+        df1[wvar1] = 1.0
+    if wvar2 == '_count':
+        df2[wvar2] = 1.0
 
     if var1 not in df1 or var2 not in df2:
         return False
@@ -277,6 +292,9 @@ def double_hist(df_in1, df_in2=None, label1='Var 1', label2='Var 2', var=None,
         w2 = df2[wvar2].values
     else:
         w2 = np.ones(len(df2))
+        
+    if (xlim is None) and (bins is not None):
+        xlim = bins[[0, -1]]
 
     fig = plt.figure()
     matplotlib.rcParams.update({'font.size' : label_font})
@@ -284,13 +302,30 @@ def double_hist(df_in1, df_in2=None, label1='Var 1', label2='Var 2', var=None,
     kwargs1.update(kwargs)
     kwargs2.update(kwargs)
 
-    plt.hist(df1[var1].values, bins=bins, alpha=0.5, edgecolor=edgecolor1,
-             weights=w1, label=str(label1), color=color1, **kwargs1)
-    plt.hist(df2[var2].values, bins=bins, alpha=0.5, edgecolor=edgecolor2,
-             weights=w2, label=str(label2), color=color2, **kwargs2)
-    
-    if x_vertline is not None:
-        plt.axvline(x=x_vertline, **vertline_kwargs)
+    if use_bar:
+        
+        assert bins is not None
+        
+        bin_width = bins[1] - bins[0]
+
+        hist1 = compute_hist(df1, var1, bins, wvar=wvar1)
+        hist2 = compute_hist(df2, var2, bins, wvar=wvar2)
+
+        plt.bar(np.array(hist1.index), hist1.values, width=bin_width,
+                alpha=alpha, edgecolor=edgecolor, align='edge',
+                label=str(label1), color=color1, **kwargs1)
+        plt.bar(np.array(hist2.index), hist2.values, width=bin_width,
+                alpha=alpha, edgecolor=edgecolor, align='edge',
+                label=str(label2), color=color2, **kwargs2)
+
+    else:
+
+        plt.hist(df1[var1].values, bins=bins, alpha=alpha, edgecolor=edgecolor,
+                 weights=w1, label=str(label1), color=color1, **kwargs1)
+        plt.hist(df2[var2].values, bins=bins, alpha=alpha, edgecolor=edgecolor,
+                 weights=w2, label=str(label2), color=color2, **kwargs2)
+
+    plt.legend(fontsize=legend_font)
 
     if xlabel is not None:
         plt.xlabel(xlabel, fontsize=label_font)

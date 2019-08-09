@@ -33,9 +33,10 @@ def load(dataset, all_transactions=True, reimport=False, data_dir=default_dir):
     elif dataset == 'state':
 
         if all_transactions:
-            df = pd.read_table(data_dir + 'HPI_AT_state.txt', names=['state', 'yr', 'qtr', 'hpi'])
+            df = pd.read_csv(data_dir + 'HPI_AT_state.txt', names=['state', 'yr', 'qtr', 'hpi'],
+                             sep='\t')
         else:
-            df = pd.read_table(data_dir + 'HPI_PO_state.txt')
+            df = pd.read_csv(data_dir + 'HPI_PO_state.txt', sep='\t')
             df = df.drop(columns=['Warning'])
 
         df['date'] = df['yr'].astype('str') + '-' + (3*df['qtr'] - 2).astype('str') + '-01'

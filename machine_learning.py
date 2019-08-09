@@ -1,14 +1,13 @@
 from sklearn.model_selection import train_test_split
-from sklearn.ensemble import RandomForestClassifier
 
 import pandas as pd
 import numpy as np
 
-class RFObj:
+class Model:
 
-    def __init__(self, **kwargs):
+    def __init__(self, model):
 
-        self.rf = RandomForestClassifier(**kwargs)
+        self.model = model
         
     def set_data(self, mldata):
 
@@ -18,7 +17,7 @@ class RFObj:
 
         if data is not None:
             self.set_data(data)
-        self.rf.fit(self.mldata.train_features, self.mldata.train_labels)
+        self.model.fit(self.mldata.train_features, self.mldata.train_labels)
 
     def predict(self, test_features=None, test_labels=None, display=False):
 
@@ -26,7 +25,7 @@ class RFObj:
             test_features = self.mldata.test_features
             test_labels = self.mldata.test_labels
 
-        predictions = self.rf.predict(test_features)
+        predictions = self.model.predict(test_features)
         if test_labels is not None:
             errors = np.abs(predictions - test_labels)
             if display: print("Error rate: {:g}".format(np.mean(errors)))
@@ -35,7 +34,7 @@ class RFObj:
 
         return predictions, errors
 
-class MLData:
+class Data:
 
     def __init__(self, train_features, test_features, train_labels, test_labels):
 
@@ -63,4 +62,4 @@ def get_labels_features(df, label_var, feature_vars, categorical_vars=[], **kwar
         df[feature_vars].values, df[label_var].values, **kwargs
     )
 
-    return MLData(train_features, test_features, train_labels, test_labels)
+    return Data(train_features, test_features, train_labels, test_labels)

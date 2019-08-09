@@ -48,7 +48,7 @@ def load(table='shares', reimport=False, data_dir=default_dir):
                 prefix = 'share_{}_cg_'.format(label)
                 df_list.append(pd.read_excel(
                     xls_file, sheet_name=full_table, skiprows=5,
-                    skip_footer=4, header=None,
+                    skipfooter=4, header=None,
                     names=[prefix + name for name in base_names],
                 ))
                 df_list[ii].drop([prefix + 'year', prefix + 'blank'], axis=1, inplace=True)
@@ -77,7 +77,7 @@ def load(table='shares', reimport=False, data_dir=default_dir):
 
             df = pd.read_excel(
                 xls_file, sheet_name='Table A7', skiprows=6,
-                skip_footer=6, header=None,
+                skipfooter=6, header=None,
                 names=names,
             )
 
