@@ -12,7 +12,6 @@ from scipy.stats import norm
 
 # from py_tools.data import clean
 import py_tools.data as dt
-from py_tools.datasets import misc
 
 pd.plotting.register_matplotlib_converters()
 
@@ -256,6 +255,13 @@ def double_hist(df_in1, df_in2=None, label1='Var 1', label2='Var 2', var=None,
         wvar1 = wvar
     if wvar2 is None:
         wvar2 = wvar
+        
+    # if edgecolor is None:
+        # edgecolor = 'black'
+    # if edgecolor1 is None:
+        # edgecolor1 = edgecolor
+    # if edgecolor2 is None:
+        # edgecolor2 = edgecolor
 
     # Normalize
     if matplotlib.__version__ == '2.0.2':
@@ -277,13 +283,13 @@ def double_hist(df_in1, df_in2=None, label1='Var 1', label2='Var 2', var=None,
     if len(df1) == 0 or len(df2) == 0:
         return False
 
-    if wvar2 is not None:
-        w1 = df1[wvar].values
+    if wvar1 is not None:
+        w1 = df1[wvar1].values
     else:
         w1 = np.ones(len(df1))
 
-    if wvar in df2:
-        w2 = df2[wvar].values
+    if wvar2 is not None:
+        w2 = df2[wvar2].values
     else:
         w2 = np.ones(len(df2))
         
@@ -292,6 +298,9 @@ def double_hist(df_in1, df_in2=None, label1='Var 1', label2='Var 2', var=None,
 
     fig = plt.figure()
     matplotlib.rcParams.update({'font.size' : label_font})
+    
+    kwargs1.update(kwargs)
+    kwargs2.update(kwargs)
 
     if use_bar:
         
@@ -327,6 +336,9 @@ def double_hist(df_in1, df_in2=None, label1='Var 1', label2='Var 2', var=None,
         plt.xlim((xlim))
     if ylim is not None:
         plt.ylim((ylim))
+        
+    plt.legend(fontsize=legend_font)
+    plt.tight_layout()
 
     if filepath is not None:
         plt.savefig(filepath)
