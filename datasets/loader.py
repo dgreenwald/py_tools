@@ -112,6 +112,10 @@ def load_dataset(dataset, master_dirs={}, **kwargs):
                 'corp_equities_wealth' : ('b101', 'LM153064105'),
                 'noncorp_business_wealth' : ('b101', 'LM152090205'),
                 'mutual_fund_wealth' : ('b101', 'LM153064205'),
+                'equities_outstanding_incl_fin' : ('b1', 'LM883164105'),
+                'equities_outstanding_market_fin' : ('l108', 'LM793164105'),
+                'net_new_equity_fin' : ('f108', 'FA793164105'),
+                'net_dividends_fin' : ('f3', 'FA796121073'),
             }
 
         full_list = sorted(list(var_index.keys()))
