@@ -291,7 +291,7 @@ class MonteCarlo:
         self.tol = tol
 
         x0_u = self.bound_transform(x0, to_bdd=False)
-        res = minimize(self.min_objfcn, x0_u, tol=self.tol)
+        res = minimize(self.min_objfcn, x0_u, tol=self.tol, method=method)
         self.x_mode = self.bound_transform(res.x, to_bdd=True)
         self.post_mode = -res.fun
         return res

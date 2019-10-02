@@ -67,10 +67,12 @@ def load_dataset(dataset, master_dirs={}, **kwargs):
         df = load(['nipa_11400', 'fof'], reimport=True)
         df['net_payouts'] = (df['FOF_net_dividends'] + df['NIPA_11400_net_interest_corp_nonfin']
                              - df['FOF_net_new_equity'] - df['FOF_net_new_paper'] - df['FOF_net_new_bonds'])
-        neg_ix = df['net_payouts'].values < 0.0
-        if np.any(neg_ix):
-            max_negative_ix = int(np.amax(np.arange(len(df))[neg_ix]))
-            df = df.ix[max_negative_ix + 1:, :]
+        
+        if False: # Not dropping negative payouts anymore
+            neg_ix = df['net_payouts'].values < 0.0
+            if np.any(neg_ix):
+                max_negative_ix = int(np.amax(np.arange(len(df))[neg_ix]))
+                df = df.ix[max_negative_ix + 1:, :]
 
         df = df['net_payouts'].to_frame() 
 
@@ -96,6 +98,7 @@ def load_dataset(dataset, master_dirs={}, **kwargs):
         elif dataset == 'fof_csv':
         
             var_index = {
+                'assets' : ('b103', 'FL102000005'),
                 'liabilities_book' : ('b103', 'FL104190005'),
                 'net_worth_book' : ('b103', 'FL102090005'),
                 'net_worth_market' : ('b103', 'FL102090005'),
@@ -148,7 +151,12 @@ def load_dataset(dataset, master_dirs={}, **kwargs):
                 )
                 df_new.rename(columns=code_index, inplace=True)
 
-                yr, q = (int(string) for string in ut.split_str(df_new.ix[0, 'DATES'], 4))
+                yr_q_str = df_new['DATES'].values[0]
+                yr, q = (int(string) for string in ut.split_str(yr_q_str, 4))
+#                yr, q = (int(string) for string in ut.split_str(df_new.ix[0, 'DATES'], 4))
+                
+                print("TEST CODE TO DROP IX")
+                
                 df_new = ts.quarter_index(df_new, yr, q)
                 # mon = 3 * (q - 1) + 1
                 # ts.date_index(df_new, '{0}/1/{1}'.format(mon, yr))
@@ -177,7 +185,9 @@ def load_dataset(dataset, master_dirs={}, **kwargs):
                 df_new = pd.read_csv(data_dir + infile, usecols=usecols)
                 df_new.rename(columns=code_index, inplace=True)
 
-                yr_q_str = df_new.ix[0, 'date']
+#                yr_q_str = df_new.ix[0, 'date']
+                yr_q_str = df_new['date'].values[0]
+                
                 yr = yr_q_str[:4]
                 q = yr_q_str[-1]
                 df_new = ts.quarter_index(df_new, yr, q)
@@ -192,7 +202,7 @@ def load_dataset(dataset, master_dirs={}, **kwargs):
                     df = df_new
 
         # Drop missing observations
-        df = df.ix['1952-01-01':, :]
+        df = df.loc['1952-01-01':, :]
 
         # Ensure 
         for var in df.columns:
@@ -292,11 +302,17 @@ def load_dataset(dataset, master_dirs={}, **kwargs):
     return df
 
 def clean_nipa(df_t, nipa_quarterly=True):
+    
+    foo = df_t.copy()
+    foo = foo.drop(index=[' ', np.nan])
+    foo = foo.drop(columns=['Line', 'Unnamed: 1'])
 
     df_t = df_t.ix[df_t.index != ' ', :]
     df_t = df_t.ix[pd.notnull(df_t.index), :]
     del df_t['Line']
     del df_t['Unnamed: 1']
+    
+    print("TEST CODE TO DROP IX")
 
     df = df_t.transpose()
     start_date = df.index[0]
