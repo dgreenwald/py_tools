@@ -33,6 +33,28 @@ from mpi4py import MPI
 #        
 #        
 
+
+def robust_cholesky(A, offset=0.0):
+
+    done = False
+    
+    while not done:
+
+        B = A + offset * np.eye(A.shape[0])
+            
+        print(B)
+        try:
+            C = np.linalg.cholesky(B)
+            done = True
+        except:
+            offset = 2.0 * offset + 1e-8
+            B = A + offset * np.eye(A.shape[0])
+            print("Increasing offset to {:g}".format(offset))
+            if offset > 1e+6:
+                raise Exception
+
+    return C, offset
+
 def adapt_jump_scale(acc_rate, adapt_sens, adapt_target, adapt_range):
 
     e_term = np.exp(adapt_sens * (acc_rate - adapt_target))
@@ -84,7 +106,7 @@ def print_mesg(mesg, fid=None):
         fid.write(mesg + '\n')
         fid.flush()
     else:
-        print(mesg)
+        print(mesg, flush=True)
 
 def save_file(x, out_dir, name, suffix=None, pickle=False):
 
@@ -300,23 +322,25 @@ class MonteCarlo:
 
         return nm.bound_transform(vals, self.lb, self.ub, *args, **kwargs)
 
-    def compute_hessian(self, x0=None, cholesky=True, offset=None, **kwargs):
+    def compute_hessian(self, x0=None, cholesky=True, offset=0.0, robust=False,
+                        **kwargs):
 
         if x0 is None:
             x0 = self.x_mode.copy()
 
-        self.H = -nm.hessian(self.posterior, x0)
+        self.H = -nm.hessian(self.posterior, x0, **kwargs)
 
         self.H_inv = np.linalg.pinv(self.H)
         
         if cholesky:
-            
-            if offset is not None:
-                cov = self.H_inv + np.diag(offset * np.ones(len(x0)))
+
+            if robust:
+
+                self.CH_inv, _ = robust_cholesky(self.H_inv, offset=offset)
+
             else:
-                cov = self.H_inv
-                
-            self.CH_inv = np.linalg.cholesky(cov)
+
+                self.CH_inv = np.linalg.cholesky(self.H_inv + offset * np.eye(len(x0)))
 
         return None
 
@@ -329,7 +353,7 @@ class MonteCarlo:
         if self.out_dir[-1] != '/':
             self.out_dir += '/'
 
-        log_file = self.out_dir + 'log'
+        log_file = self.out_dir + title
             
         if self.suffix is not None:
             log_file += '_' + self.suffix
@@ -943,7 +967,7 @@ class SMC(MonteCarlo):
         
     def rank_print(self, mesg):
         if (not self.quiet) and (self.rank == 0):
-            print(mesg)
+            print(mesg, flush=True)
             
     def save(self):
 
