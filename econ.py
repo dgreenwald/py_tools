@@ -150,6 +150,7 @@ def sim_cir(rho, sig, mu=0.0, Nsim=100, e=None, x0=None, bound=False):
         e = np.random.randn(Nsim)
 
     if x0 is None:
+        raise Exception
         sig0 = sig / np.sqrt(1.0 - rho ** 2)
         x[0] = mu + mu * sig0 * e[0] 
     else:

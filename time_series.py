@@ -5,6 +5,8 @@ import re
 from scipy.linalg import solve_discrete_lyapunov
 from tabulate import tabulate
 
+import statsmodels.tsa.arima_model as arima
+
 # from py_tools.debug import disp 
 # import py_tools.data as dt
 import py_tools.data as dt, py_tools.numerical as nm
@@ -274,7 +276,17 @@ def MA(df, lhs_var, rhs_vars, init_lag=1, default_lags=16,
     # Run dt.regression
     return dt.regression(df, lhs, rhs, ix=ix, **kwargs)
 
-def ARMA(series, p, q, freq='QS', ix=None):
+def ARMA(df, var, p, q, freq='QS', display=False):
+    
+    ix = pd.notnull(df[var])
+    series = df.loc[ix, var]
+    mod = arima.ARMA(series, (p, q), freq=freq)
+    res = mod.fit(trend='c')
+    if display: print(res.summary())
+    
+    return dt.FullResults(res, ix=ix, Xs=None, zs=None)
+
+def arma_regression(series, p, q, freq='QS', ix=None):
     
     if ix is None:
         ix = np.ones(len(series), dtype=bool)

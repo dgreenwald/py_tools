@@ -188,6 +188,9 @@ def regression(df_in, lhs, rhs, fes=[], intercept=True, formula_extra=None, ix=N
                trend=None, cluster_var=None, cluster_groups=None, weight_var=None, **kwargs):
     """Run regression from pandas dataframe"""
 
+    if isinstance(rhs, str):
+        rhs = [rhs]
+
     formula = '{0} ~ {1}'.format(lhs, ' + '.join(rhs))
     if fes:
         formula += ' + '.join([''] + ['C({})'.format(fe) for fe in fes])

@@ -531,6 +531,46 @@ def projection(x, se, var_titles, shock_title, p=0.9, n_per_row=4, plot_size=3.0
 
     return None
 
+
+def binscatter(df, xvar, yvar, wvar=None, fit_var=None, labels={}, n_bins=10, 
+               filepath=None, xlim=None, ylim=None, **kwargs):
+        
+#    df = df[keep_vars].copy()
+    
+    n_bins = 10
+    by_bin = dt.compute_binscatter(df, n_bins, xvar, yvar, wvar=wvar)
+    
+    if fit_var is None:
+        fr = dt.regression(df, yvar, [xvar])
+        df.loc[fr.ix, yvar + '_fit'] = fr.results.fittedvalues
+    
+    fig, ax = plt.subplots()
+    
+    ax.plot(df[xvar], df[yvar + '_fit'], color='firebrick', linewidth=2)
+                    
+    ax.scatter(by_bin[xvar].values, by_bin[yvar].values, 
+#               marker='^',
+               color='cornflowerblue',
+#               color='firebrick',
+               s=50.0,
+               edgecolor='black', 
+            )
+    
+    plt.xlabel(labels.get(xvar, xvar))
+    plt.ylabel(labels.get(yvar, yvar))
+    
+    if xlim is not None:
+        plt.xlim(xlim)
+#        plt.ylim(ylim)
+    plt.tight_layout()
+    
+    if filepath is None:
+        plt.show()
+    else:
+        plt.savefig(filepath)
+
+    plt.close(fig)
+
 # From TomAugsburger
 
 #def add_rec_bars(ax, dates=None, alpha=0.25, color='k'):
