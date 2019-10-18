@@ -281,7 +281,7 @@ def ARMA(df, var, p, q, freq='QS', display=False):
     ix = pd.notnull(df[var])
     series = df.loc[ix, var]
     mod = arima.ARMA(series, (p, q), freq=freq)
-    res = mod.fit(trend='c')
+    res = mod.fit(trend='c', disp=-1)
     if display: print(res.summary())
     
     return dt.FullResults(res, ix=ix, Xs=None, zs=None)

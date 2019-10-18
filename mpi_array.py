@@ -1,6 +1,22 @@
 import numpy as np
 from mpi4py import MPI
 
+class MPIPrinter:
+    """Object that holds rank and prints only for rank 0"""
+
+    def __init__(self, flush=True):
+
+        self.flush = flush
+        self.rank = MPI.COMM_WORLD.Get_rank()
+
+    def print(self, mesg, flush=None):
+
+        if self.rank == 0:
+            if flush is None:
+                flush = self.flush
+
+            print(mesg, flush=flush)
+
 class MPIArray:
     """Array that automatically does MPI sharing"""
 
@@ -77,13 +93,18 @@ class MPIArray:
 
         if gather: self.gather()
 
-        out_data = self.root_data[self.ix_root, :]
+        if self.rank == 0:
 
-        if self.vec_flag:
-            return out_data.ravel()
+            out_data = self.root_data[self.ix_root, :]
+
+            if self.vec_flag:
+                return out_data.ravel()
+            else:
+                return out_data.reshape(self.root_shape)
+
         else:
-            return out_data.reshape(self.root_shape)
-        # return self.root_data[self.ix_root, :]
+
+            return None
 
     def get_local_data(self, scatter=False):
 

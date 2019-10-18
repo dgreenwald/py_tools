@@ -82,4 +82,4 @@ class Prior:
         return np.sum([dist.logpdf(val) for dist, val in zip(self.dists, vals) if dist is not None])
 
     def sample(self, n_samp):
-        return np.vstack((dist.rvs(n_samp) for dist in self.dists if dist is not None))
+        return np.vstack(list(dist.rvs(n_samp) for dist in self.dists if dist is not None))
