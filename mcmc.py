@@ -698,10 +698,13 @@ class SMC(MonteCarlo):
         self.quiet = quiet
 
         for istep in range(1, self.Nstep):
+
+            # On last step, force resampling
+            last_step = (istep == self.Nstep - 1)
             
             start = MPI.Wtime()
             
-            self.correct(istep)
+            self.correct(istep, force_resample=last_step)
 
             if self.parallel and self.test_flag:
                 end = MPI.Wtime()
@@ -716,6 +719,7 @@ class SMC(MonteCarlo):
             
             # End-of-iteration tasks
             if self.rank == 0:
+
                 # Save key output
                 if self.save_intermediate:
                     self.save_list(np_list=['draws', 'W', 'post'])
@@ -724,7 +728,20 @@ class SMC(MonteCarlo):
                 if not self.fixed_blocks:
                     self.update_blocks()
 
-    def correct(self, istep):
+                ix_max = np.argmax(self.post[istep, :])
+                post_max = self.post[istep, ix_max]
+
+                self.rank_print("Current mode: " + repr(self.post_mode))
+                self.rank_print("Max posterior: {:g}".format(post_max))
+
+                if (self.post_mode is None) or (post_max > self.post_mode):
+
+                    self.x_mode = self.draws[istep, ix_max]
+                    self.post_mode = post_max
+
+                    self.rank_print("New mode found: {:g}".format(self.post_mode))
+
+    def correct(self, istep, force_resample=False):
 
         if self.rank == 0:
             self.draws[istep, :, :] = self.draws[istep-1, :, :]
@@ -782,7 +799,7 @@ class SMC(MonteCarlo):
         ess = self.Npt / np.mean(W_til ** 2)
         self.rank_print("Step {:d}, ESS = {:g}".format(istep, ess))
             
-        if ess < self.Npt / 2:
+        if force_resample or (ess < self.Npt / 2):
             ix = np.random.choice(self.Npt, size=self.Npt, p=W_til / self.Npt)
             self.draws[istep, :, :] = self.draws[istep, ix, :]
             

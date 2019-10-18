@@ -1,6 +1,22 @@
 import numpy as np
 from mpi4py import MPI
 
+def initialize(x, fake=False):
+
+    if fake:
+        x_mpi = FakeMPIArray(x)
+    else:
+        x_mpi = MPIArray(x)
+
+    x_loc = x_mpi.get_local_data()
+
+    return x_mpi, x_loc
+
+def finalize(x_mpi, x_loc):
+
+    x_mpi.set_local_data(x_loc)
+    return x_mpi.get_root_data()
+
 class MPIPrinter:
     """Object that holds rank and prints only for rank 0"""
 
