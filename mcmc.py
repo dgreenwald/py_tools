@@ -1,6 +1,7 @@
 import os
 import numpy as np
-from scipy.optimize import minimize
+import scipy.optimize as opt
+# from scipy.optimize import minimize
 from scipy.special import logsumexp
 from scipy.stats import multivariate_normal as mv
 # import py_tools.numerical as nm
@@ -308,13 +309,25 @@ class MonteCarlo:
         params = self.bound_transform(unbdd_params, to_bdd=True)
         return -self.posterior(params)
 
-    def find_mode(self, x0, method='bfgs', tol=1e-8, **kwargs):
-        
-        self.tol = tol
+    def find_mode(self, x0, tol=1e-8, basinhopping=False, method='bfgs', **kwargs):
 
         x0_u = self.bound_transform(x0, to_bdd=False)
-        res = minimize(self.min_objfcn, x0_u, tol=self.tol, method=method)
+        if basinhopping:
+            minimizer_kwargs = kwargs.get('minimizer_kwargs', {})
+            if 'method' not in minimizer_kwargs:
+                minimizer_kwargs['method'] = method
+            res = opt.basinhopping(self.min_objfcn, x0_u,
+                                   minimizer_kwargs=minimizer_kwargs, **kwargs)
+        else:
+            res = opt.minimize(self.min_objfcn, x0_u, method=method, tol=tol, **kwargs)
         self.x_mode = self.bound_transform(res.x, to_bdd=True)
+        self.post_mode = -res.fun
+        return res
+
+    def find_mode_de(self, bounds, **kwargs):
+
+        res = opt.differential_evolution(self.min_objfcn, bounds, **kwargs)
+        self.x_mode = res.x
         self.post_mode = -res.fun
         return res
 
@@ -551,7 +564,7 @@ class RWMC(MonteCarlo):
                 if n_print is not None:
                     if (jstep + 1) % n_print == 0:
                         self.print_log("Draw {0:d}. Acceptance rate: {1:4.3f}. Max posterior = {2:4.3f}".format(
-                            jstep, self.acc / istep, self.max_post
+                            jstep + 1, self.acc / istep, self.max_post
                         ))
 
                 if n_recov is not None:
