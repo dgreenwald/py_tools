@@ -1,21 +1,54 @@
 import numpy as np
 from mpi4py import MPI
 
-class MPIPrinter:
-    """Object that holds rank and prints only for rank 0"""
+def rank():
+    
+    return MPI.COMM_WORLD.Get_rank()
 
-    def __init__(self, flush=True):
+def disp(mesg, flush=True, **kwargs):
+    
+    if rank() == 0:
+        print(mesg, flush=flush, **kwargs)
 
-        self.flush = flush
-        self.rank = MPI.COMM_WORLD.Get_rank()
+def time():
 
-    def print(self, mesg, flush=None):
+    return MPI.Wtime()
 
-        if self.rank == 0:
-            if flush is None:
-                flush = self.flush
+def barrier():
+    
+    MPI.Comm.Barrier(MPI.COMM_WORLD)
 
-            print(mesg, flush=flush)
+def initialize(x, fake=False):
+
+    if fake:
+        x_mpi = FakeMPIArray(x)
+    else:
+        x_mpi = MPIArray(x)
+
+    x_loc = x_mpi.get_local_data()
+
+    return x_mpi, x_loc
+
+def finalize(x_mpi, x_loc):
+
+    x_mpi.set_local_data(x_loc)
+    return x_mpi.get_root_data()
+
+#class MPIPrinter:
+#    """Object that holds rank and prints only for rank 0"""
+#
+#    def __init__(self, flush=True):
+#
+#        self.flush = flush
+#        self.rank = MPI.COMM_WORLD.Get_rank()
+#
+#    def print(self, mesg, flush=None):
+#
+#        if self.rank == 0:
+#            if flush is None:
+#                flush = self.flush
+#
+#            print(mesg, flush=flush)
 
 class MPIArray:
     """Array that automatically does MPI sharing"""

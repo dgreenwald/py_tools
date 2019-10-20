@@ -99,6 +99,7 @@ def load_dataset(dataset, master_dirs={}, **kwargs):
         
             var_index = {
                 'assets' : ('b103', 'FL102000005'),
+                'assets_book' : ('b103', 'FL102000115'),
                 'liabilities_book' : ('b103', 'FL104190005'),
                 'net_worth_book' : ('b103', 'FL102090005'),
                 'net_worth_market' : ('b103', 'FL102090005'),

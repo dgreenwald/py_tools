@@ -55,7 +55,7 @@ class Table:
 
     # Important kwargs = booktabs
     def table(self, caption=None, notes=None, position='h!', fontsize='small', 
-              caption_above=True, swp=False, **kwargs):
+              caption_above=True, swp=False, size='', **kwargs):
         """Format contents as latex table"""
 
         table_text = ""
