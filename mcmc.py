@@ -4,7 +4,7 @@ from scipy.optimize import minimize
 from scipy.special import logsumexp
 from scipy.stats import multivariate_normal as mv
 # import py_tools.numerical as nm
-from py_tools import in_out as io, numerical as nm
+from py_tools import in_out as io, numerical as nm, mpi_array as mp
 from py_tools.prior import Prior
 from py_tools.mpi_array import MPIArray
 
@@ -33,6 +33,16 @@ from mpi4py import MPI
 #        
 #        
 
+# def resample_weights(x, w):
+
+    # ws = w / np.sum(w)
+    # N = len(ws)
+
+    # ix = np.random.choice(N, size=N, p=ws)
+    # x_new = x[ix, :]
+    # w_new = np.ones(N, dtype=bool)
+
+    # return x_new, w_new, ix
 
 def robust_cholesky(A, offset=0.0):
 
@@ -161,17 +171,32 @@ def metropolis_step(fcn, x, x_try, post=None, log_u=None, args=()):
     else:
         return (x, post, False)
 
-def importance_sample(fcn, dist, Nsim, args=()):
+def importance_sample(fcn, dist, Nsim, Nx, args=(), parallel=False):
 
-    draws = dist.rvs(Nsim)
-    p_proposal = dist.logpdf(draws)
-
+    # draws = dist.rvs(Nsim)
+    draws = np.zeros((Nsim, Nx))
     post = np.zeros(Nsim)
-    for jj in range(Nsim):
-        post[jj] = fcn(draws[jj, :], *args)
 
+    fake = (not parallel)
+
+    draws_mpi, draws_loc = mp.initialize(draws, fake=fake)
+    post_mpi, post_loc = mp.initialize(post, fake=fake)
+
+    Nloc = len(post_loc)
+    draws_loc = dist.rvs(Nloc)
+    mp.disp("Draws per task: {:d}".format(Nloc))
+    for jj in range(Nloc):
+        post_loc[jj] = fcn(draws_loc[jj, :], *args)
+
+    draws = mp.finalize(draws_mpi, draws_loc)
+    post = mp.finalize(post_mpi, post_loc)
+    
+    if mp.rank() != 0:
+        return None, None
+    
+    # rank 0
+    p_proposal = dist.logpdf(draws)
     log_weights = post - p_proposal
-
     return draws, log_weights
 
 def rwmh(posterior, x_init, jump_scale=1.0, C_list=None, Nstep=1, blocks=None,
@@ -410,7 +435,7 @@ class MonteCarlo:
 
         return None
 
-    def importance_sample(self, Nsim, resample=True, offset=None):
+    def importance_sample(self, Nsim, resample=True, offset=None, **kwargs):
 
         assert self.x_mode is not None
         assert self.H_inv is not None
@@ -421,9 +446,9 @@ class MonteCarlo:
             cov += np.diag(offset * np.ones(self.Nx))
 
         dist = mv(mean=self.x_mode, cov=cov)
-        draws, log_weights = importance_sample(self.posterior, dist, Nsim)
+        draws, log_weights = importance_sample(self.posterior, dist, Nsim, self.Nx, **kwargs)
 
-        if resample:
+        if resample and mp.rank() == 0:
             probs = np.exp(log_weights - np.amax(log_weights))
             probs /= np.sum(probs)
             ix = np.random.choice(Nsim, size=Nsim, p=probs)

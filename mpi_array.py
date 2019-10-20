@@ -1,6 +1,23 @@
 import numpy as np
 from mpi4py import MPI
 
+def rank():
+    
+    return MPI.COMM_WORLD.Get_rank()
+
+def disp(mesg, flush=True, **kwargs):
+    
+    if rank() == 0:
+        print(mesg, flush=flush, **kwargs)
+
+def time():
+
+    return MPI.Wtime()
+
+def barrier():
+    
+    MPI.Comm.Barrier(MPI.COMM_WORLD)
+
 def initialize(x, fake=False):
 
     if fake:
@@ -17,21 +34,21 @@ def finalize(x_mpi, x_loc):
     x_mpi.set_local_data(x_loc)
     return x_mpi.get_root_data()
 
-class MPIPrinter:
-    """Object that holds rank and prints only for rank 0"""
-
-    def __init__(self, flush=True):
-
-        self.flush = flush
-        self.rank = MPI.COMM_WORLD.Get_rank()
-
-    def print(self, mesg, flush=None):
-
-        if self.rank == 0:
-            if flush is None:
-                flush = self.flush
-
-            print(mesg, flush=flush)
+#class MPIPrinter:
+#    """Object that holds rank and prints only for rank 0"""
+#
+#    def __init__(self, flush=True):
+#
+#        self.flush = flush
+#        self.rank = MPI.COMM_WORLD.Get_rank()
+#
+#    def print(self, mesg, flush=None):
+#
+#        if self.rank == 0:
+#            if flush is None:
+#                flush = self.flush
+#
+#            print(mesg, flush=flush)
 
 class MPIArray:
     """Array that automatically does MPI sharing"""
