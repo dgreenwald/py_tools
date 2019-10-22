@@ -120,6 +120,10 @@ def load_dataset(dataset, master_dirs={}, **kwargs):
                 'equities_outstanding_market_fin' : ('l108', 'LM793164105'),
                 'net_new_equity_fin' : ('f108', 'FA793164105'),
                 'net_dividends_fin' : ('f3', 'FA796121073'),
+                'profits_pretax' : ('f103', 'FA106060005'),
+                'corp_taxes' : ('f103', 'FA106231005'),
+                'iva' : ('f103', 'FA105020601'),
+                'foreign_ret_earnings' : ('f103', 'FA106006065'),
             }
 
         full_list = sorted(list(var_index.keys()))

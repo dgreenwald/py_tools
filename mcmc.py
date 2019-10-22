@@ -44,26 +44,32 @@ from mpi4py import MPI
 
     # return x_new, w_new, ix
 
-def robust_cholesky(A, offset=0.0):
-
-    done = False
+#def robust_cholesky(A, offset=0.0):
+#
+#    done = False
+#    
+#    while not done:
+#
+#        B = A + offset * np.eye(A.shape[0])
+#            
+#        print(B)
+#        try:
+#            C = np.linalg.cholesky(B)
+#            done = True
+#        except:
+#            offset = 2.0 * offset + 1e-8
+#            B = A + offset * np.eye(A.shape[0])
+#            print("Increasing offset to {:g}".format(offset))
+#            if offset > 1e+6:
+#                raise Exception
+#
+#    return C, offset
     
-    while not done:
-
-        B = A + offset * np.eye(A.shape[0])
-            
-        print(B)
-        try:
-            C = np.linalg.cholesky(B)
-            done = True
-        except:
-            offset = 2.0 * offset + 1e-8
-            B = A + offset * np.eye(A.shape[0])
-            print("Increasing offset to {:g}".format(offset))
-            if offset > 1e+6:
-                raise Exception
-
-    return C, offset
+def robust_cholesky(A):
+    
+    vals, vecs = np.linalg.eig(A)
+    Dhalf = np.diag(np.sqrt(vals))
+    return vecs @ Dhalf
 
 def adapt_jump_scale(acc_rate, adapt_sens, adapt_target, adapt_range):
 
@@ -347,7 +353,7 @@ class MonteCarlo:
 
         return nm.bound_transform(vals, self.lb, self.ub, *args, **kwargs)
 
-    def compute_hessian(self, x0=None, cholesky=True, offset=0.0, robust=False,
+    def compute_hessian(self, x0=None, cholesky=True, robust=True,
                         **kwargs):
 
         if x0 is None:
@@ -361,11 +367,11 @@ class MonteCarlo:
 
             if robust:
 
-                self.CH_inv, _ = robust_cholesky(self.H_inv, offset=offset)
+                self.CH_inv, _ = robust_cholesky(self.H_inv)
 
             else:
 
-                self.CH_inv = np.linalg.cholesky(self.H_inv + offset * np.eye(len(x0)))
+                self.CH_inv = np.linalg.cholesky(self.H_inv)
 
         return None
 
@@ -448,14 +454,24 @@ class MonteCarlo:
         dist = mv(mean=self.x_mode, cov=cov)
         draws, log_weights = importance_sample(self.posterior, dist, Nsim, self.Nx, **kwargs)
 
-        if resample and mp.rank() == 0:
+        if mp.rank() != 0:
+            
+            return None, None, None
+            
+        probs = np.exp(log_weights - np.amax(log_weights))
+        probs /= np.sum(probs)
+        
+        W_til = Nsim * probs
+        ess = len(W_til) / np.mean(W_til ** 2)
+
+        if resample:
             probs = np.exp(log_weights - np.amax(log_weights))
             probs /= np.sum(probs)
             ix = np.random.choice(Nsim, size=Nsim, p=probs)
             draws = draws[ix, :]
             log_weights = np.zeros(log_weights.shape)
 
-        return draws, log_weights
+        return draws, log_weights, ess
 
 class RWMC(MonteCarlo):
     """Class for Markov Chain Monte Carlo sampler"""
