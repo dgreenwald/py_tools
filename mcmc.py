@@ -380,7 +380,7 @@ class MonteCarlo:
 
             if robust:
 
-                self.CH_inv, _ = robust_cholesky(self.H_inv)
+                self.CH_inv = robust_cholesky(self.H_inv)
 
             else:
 
