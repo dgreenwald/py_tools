@@ -108,6 +108,16 @@ def load(dataset, user='DAN', master_dirs={}, **kwargs):
             'payout_to_equity_yogo' : np.squeeze(mat['payout_equity_ratio_Yogo']),
         }, index=ts.get_date_index('1954-10-01', len(mat['dates_l']), 'QS'))
 
+    elif dataset == 'direct_investment_income':
+
+        sa = kwargs.get('sa', True)
+        if sa:
+            infile = data_dir + 'direct_investment_income_sa.csv'
+        else:
+            infile = data_dir + 'direct_investment_income.csv'
+        df = pd.read_csv(infile)
+        df['Date'] = pd.to_datetime(df['Date'])
+
     elif dataset == 'fhfa':
 
         infile = data_dir + 'HPI_AT_metro.csv'
