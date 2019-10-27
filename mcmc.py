@@ -66,9 +66,10 @@ from mpi4py import MPI
 #
 #    return C, offset
     
-def robust_cholesky(A):
+def robust_cholesky(A, min_eigenvalue=1e-12):
     
     vals, vecs = np.linalg.eig(A)
+    vals = np.maximum(vals, min_eigenvalue)
     Dhalf = np.diag(np.sqrt(vals))
     return vecs @ Dhalf
 
