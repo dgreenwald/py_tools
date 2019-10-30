@@ -65,17 +65,6 @@ from mpi4py import MPI
 #                raise Exception
 #
 #    return C, offset
-
-def diagnostics(draws_list):
-
-    m = len(draws_list)
-    n, k = draws_list[0].shape
-
-    for draws in draws_list:
-        assert draws.shape == (n, k)
-
-    raise Exception
-    return None
     
 def robust_cholesky(A, min_eig=1e-12):
     
@@ -404,15 +393,17 @@ class MonteCarlo:
 
         return metropolis_step(self.posterior, x, x_try, post=post, **kwargs)
 
-    def open_log(self, title='log'):
+    def open_log(self, title='log', log_suffix=None):
 
         if self.out_dir[-1] != '/':
             self.out_dir += '/'
 
         log_file = self.out_dir + title
-            
         if self.suffix is not None:
             log_file += '_' + self.suffix
+
+        if log_suffix is not None:
+            log_suffix = '_' + log_suffix
 
         log_file += '.txt'
 
@@ -424,19 +415,29 @@ class MonteCarlo:
     def close_log(self):
         self.fid.close()
 
-    def save_item(self, name, **kwargs):
+    def save_item(self, name, extra_suffix=None, **kwargs):
+
+        if self.suffix is None:
+            suffix = extra_suffix
+        elif extra_suffix is not None:
+            suffix = self.suffix + '_' + extra_suffix
 
         assert(self.out_dir is not None)
         obj = getattr(self, name)
         if obj is not None:
-            save_file(obj, self.out_dir, name, self.suffix, **kwargs)
+            save_file(obj, self.out_dir, name, suffix, **kwargs)
 
         return None
 
-    def load_item(self, name, **kwargs):
+    def load_item(self, name, extra_suffix=None, **kwargs):
+
+        if self.suffix is None:
+            suffix = extra_suffix
+        elif extra_suffix is not None:
+            suffix = self.suffix + '_' + extra_suffix
 
         assert(self.out_dir is not None)
-        setattr(self, name, load_file(self.out_dir, name, self.suffix, **kwargs))
+        setattr(self, name, load_file(self.out_dir, name, suffix, **kwargs))
 
         return None
     
@@ -501,17 +502,13 @@ class MonteCarlo:
 class RWMC(MonteCarlo):
     """Class for Markov Chain Monte Carlo sampler"""
 
-    def __init__(self, rwmc_chains=None, *args, **kwargs):
+    def __init__(self, *args, **kwargs):
         """Constructor -- need to finish"""
 
         MonteCarlo.__init__(self, *args, **kwargs)
         
         self.np_list = ['x_mode', 'post_mode', 'CH_inv', 'draws', 'post_sim', 'acc_rate']
         self.pkl_list = ['names']
-
-        if rwmc_chains is not None:
-            self.post_sim = np.hstack([chain.post_sim for chain in rwmc_chains])
-            self.draws = np.vstack([chain.draws for chain in rwmc_chains])
 
     def initialize(self, x0=None, jump_scale=None, jump_mult=1.0, stride=1,
                    C=None, C_list=None, blocks='none', bool_blocks=False,
@@ -566,9 +563,11 @@ class RWMC(MonteCarlo):
         self.Nblock = len(self.blocks)
 
     def sample(self, Nsim, n_print=None, n_recov=None, n_save=None, log=True,
-               cov_offset=0.0, min_recov=0, n_retune=None, *args, **kwargs):
+               cov_offset=0.0, min_recov=0, n_retune=None, chain_name=None, 
+               *args, **kwargs):
 
         self.Nsim = Nsim
+        self.chain_name = chain_name
 
         x = self.x0.copy()
         post = self.posterior(x)
@@ -655,7 +654,14 @@ class RWMC(MonteCarlo):
 
     def save_all(self, **kwargs):
 
-        self.save_list(np_list=self.np_list, pkl_list=self.pkl_list)
+        for var in np_list:
+            if var in ['draws', 'post_sim']:
+                self.save_item(var, extra_suffix=self.chain_name)
+            else:
+                self.save_item(var)
+
+        self.save_list(pkl_list=self.pkl_list)
+        # self.save_list(np_list=self.np_list, pkl_list=self.pkl_list)
 
     def load_all(self, **kwargs):
 
