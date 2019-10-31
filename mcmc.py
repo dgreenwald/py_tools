@@ -66,16 +66,16 @@ from mpi4py import MPI
 #
 #    return C, offset
 
-def diagnostics(draws_list):
-
-    m = len(draws_list)
-    n, k = draws_list[0].shape
-
-    for draws in draws_list:
-        assert draws.shape == (n, k)
-
-    raise Exception
-    return None
+#def diagnostics(draws_list):
+#
+#    m = len(draws_list)
+#    n, k = draws_list[0].shape
+#
+#    for draws in draws_list:
+#        assert draws.shape == (n, k)
+#
+#    raise Exception
+#    return None
     
 def robust_cholesky(A, min_eig=1e-12):
     
@@ -352,19 +352,40 @@ class MonteCarlo:
         params = self.bound_transform(unbdd_params, to_bdd=True)
         return -self.posterior(params)
 
-    def find_mode(self, x0, tol=1e-8, basinhopping=False, method='bfgs', **kwargs):
+    def find_mode(self, x0, tol=1e-8, basinhopping=False, method='bfgs',
+                  iterate=False, iter_tol=1e-6, **kwargs):
 
-        x0_u = self.bound_transform(x0, to_bdd=False)
-        if basinhopping:
-            minimizer_kwargs = kwargs.get('minimizer_kwargs', {})
-            if 'method' not in minimizer_kwargs:
-                minimizer_kwargs['method'] = method
-            res = opt.basinhopping(self.min_objfcn, x0_u,
-                                   minimizer_kwargs=minimizer_kwargs, **kwargs)
-        else:
-            res = opt.minimize(self.min_objfcn, x0_u, method=method, tol=tol, **kwargs)
-        self.x_mode = self.bound_transform(res.x, to_bdd=True)
-        self.post_mode = -res.fun
+        post_start = None
+        done = False
+        count = 0
+        while not done:
+
+            count += 1
+            if iterate and (post_start is None):
+                post_start = self.posterior(x0)
+
+            x0_u = self.bound_transform(x0, to_bdd=False)
+            if basinhopping:
+                minimizer_kwargs = kwargs.get('minimizer_kwargs', {})
+                if 'method' not in minimizer_kwargs:
+                    minimizer_kwargs['method'] = method
+                res = opt.basinhopping(self.min_objfcn, x0_u,
+                                       minimizer_kwargs=minimizer_kwargs, **kwargs)
+            else:
+                res = opt.minimize(self.min_objfcn, x0_u, method=method, tol=tol, **kwargs)
+            self.x_mode = self.bound_transform(res.x, to_bdd=True)
+            self.post_mode = -res.fun
+
+            if iterate:
+                mp.disp("Iteration {0:d}: starting posterior = {1:g}, "
+                        "ending posterior = {2:g}".format(count, post_start, self.post_mode))
+                done = np.abs(self.post_mode - post_start) < iter_tol
+                if not done:
+                    x0 = self.x_mode
+                    post_start = self.post_mode
+            else:
+                done = True
+
         return res
 
     def find_mode_de(self, bounds, **kwargs):
@@ -404,15 +425,18 @@ class MonteCarlo:
 
         return metropolis_step(self.posterior, x, x_try, post=post, **kwargs)
 
-    def open_log(self, title='log'):
+    def open_log(self, title='log', suffix=None):
 
+        if suffix is None:
+            suffix = self.suffix
+        
         if self.out_dir[-1] != '/':
             self.out_dir += '/'
 
         log_file = self.out_dir + title
             
-        if self.suffix is not None:
-            log_file += '_' + self.suffix
+        if suffix is not None:
+            log_file += '_' + suffix
 
         log_file += '.txt'
 
@@ -422,45 +446,52 @@ class MonteCarlo:
         print_mesg(mesg, fid=self.fid)
 
     def close_log(self):
-        self.fid.close()
+        if self.fid is not None:
+            self.fid.close()
 
-    def save_item(self, name, **kwargs):
+    def save_item(self, name, suffix=None, **kwargs):
 
+        if suffix is None:
+            suffix = self.suffix
+        
         assert(self.out_dir is not None)
         obj = getattr(self, name)
         if obj is not None:
-            save_file(obj, self.out_dir, name, self.suffix, **kwargs)
+            save_file(obj, self.out_dir, name, suffix, **kwargs)
 
         return None
 
-    def load_item(self, name, **kwargs):
+    def load_item(self, name, suffix=None, **kwargs):
+        
+        if suffix is None:
+            suffix = self.suffix
 
         assert(self.out_dir is not None)
-        setattr(self, name, load_file(self.out_dir, name, self.suffix, **kwargs))
+        setattr(self, name, load_file(self.out_dir, name, suffix, **kwargs))
 
         return None
     
-    def save_list(self, np_list=[], pkl_list=[]):
+    def save_list(self, np_list=[], pkl_list=[], **kwargs):
 
         for var in np_list:
-            self.save_item(var)
+            self.save_item(var, **kwargs)
             
         for var in pkl_list:
-            self.save_item(var, pickle=True)
+            self.save_item(var, pickle=True, **kwargs)
 
         return None
     
-    def load_list(self, np_list=[], pkl_list=[]):
+    def load_list(self, np_list=[], pkl_list=[], **kwargs):
 
         for var in np_list:
             try:
-                self.load_item(var)
+                self.load_item(var, **kwargs)
             except:
                 print("Warning: could not load " + var)
             
         for var in pkl_list:
             try:
-                self.load_item(var, pickle=True)
+                self.load_item(var, pickle=True, **kwargs)
             except:
                 print("Warning: could not load " + var)
 
@@ -566,18 +597,21 @@ class RWMC(MonteCarlo):
         self.Nblock = len(self.blocks)
 
     def sample(self, Nsim, n_print=None, n_recov=None, n_save=None, log=True,
-               cov_offset=0.0, min_recov=0, n_retune=None, *args, **kwargs):
+               cov_offset=0.0, min_recov=0, n_retune=None, chain_no=0,
+               *args, **kwargs):
 
         self.Nsim = Nsim
 
         x = self.x0.copy()
         post = self.posterior(x)
 
+        full_suffix = self.chain_suffix(chain_no)
+
         if self.Nx is None:
             self.Nx = len(x)
 
         if log:
-            self.open_log()
+            self.open_log(suffix=full_suffix)
         else:
             self.fid = None
 
@@ -644,14 +678,52 @@ class RWMC(MonteCarlo):
                 if n_save is not None:
                     if (jstep + 1) % n_save == 0:
                         self.print_log("Saving intermediate output")
-                        self.save_all()
+                        # self.save_all()
+                        self.save_chain(chain_no=chain_no)
+
 
         self.acc_rate = self.acc / Ntot
 
-        if self.fid is not None:
-            self.fid.close()
+        self.close_log()
 
         return None
+
+    def chain_suffix(self, chain_no=0):
+        return self.suffix + '_chain{:d}'.format(chain_no)
+
+    def save_chain(self, chain_no=0):
+
+        full_suffix = self.chain_suffix(chain_no)
+        self.save_list(np_list=['draws', 'post_sim', 'acc_rate'], suffix=full_suffix)
+
+    def load_chain(self, chain_no=0):
+
+        full_suffix = self.chain_suffix(chain_no)
+        self.load_list(np_list=['draws', 'post_sim', 'acc_rate'], suffix=full_suffix)
+
+    def load_chains(self, chains):
+
+        self.draws_list = []
+        self.post_sim_list = []
+        self.acc_rate_list = []
+
+        for chain_no in chains:
+            self.load_chain(chain_no)
+            self.draws_list.append(self.draws)
+            self.post_sim_list.append(self.post_sim)
+            self.acc_rate_list.append(self.acc_rate)    
+            
+        # Reset to not keep any chain loaded
+        self.draws = None
+        self.post_sim = None
+        self.acc_rate = None
+
+    def stack_chains(self, burn_in=0, stride=1):
+
+        draws_all = np.vstack([draws[burn_in::stride, :] for draws in self.draws_list])
+        post_sim_all = np.hstack([post_sim[burn_in::stride] for post_sim in self.post_sim_list])
+        
+        return draws_all, post_sim_all
 
     def save_all(self, **kwargs):
 
