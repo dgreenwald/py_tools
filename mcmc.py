@@ -2,7 +2,7 @@ import os
 import numpy as np
 import scipy.optimize as opt
 # from scipy.optimize import minimize
-from scipy.special import logsumexp
+# from scipy.special import logsumexp
 from scipy.stats import multivariate_normal as mv
 # import py_tools.numerical as nm
 from py_tools import in_out as io, numerical as nm, mpi_array as mp
@@ -621,6 +621,9 @@ class RWMC(MonteCarlo):
         self.draws = np.zeros((self.Nsim, self.Nx))
         self.post_sim = np.zeros(self.Nsim)
         self.acc = 0
+
+        acc_last_retune = 0
+        istep_last_retune = 0
         
         e = [np.random.randn(Nstep, np.sum(block)) for block in self.blocks]
         log_u = np.log(np.random.rand(Nstep, self.Nblock))
@@ -669,11 +672,22 @@ class RWMC(MonteCarlo):
 
                 if n_retune is not None:
                     if (jstep + 1) % n_retune == 0:
+
+                        # Compute acceptance rate since last retuning
+                        acc_since_retune = self.acc - acc_last_retune
+                        steps_since_retune = (istep + 1) - istep_last_retune
+                        acc_rate_since_retune = acc_since_retune / (steps_since_retune * self.Nblock)
+
                         self.print_log("Retuning: old jump scale = {:7.6f}".format(self.jump_scale))
                         self.jump_scale *= adapt_jump_scale(
-                            self.acc_rate, self.adapt_sens, self.adapt_target, self.adapt_range
+                            # self.acc_rate, self.adapt_sens, self.adapt_target, self.adapt_range
+                            acc_rate_since_retune, self.adapt_sens, self.adapt_target, self.adapt_range
                         )
                         self.print_log("Retuning: new jump scale = {:7.6f}".format(self.jump_scale))
+
+                        # Reset acceptance counter since retuning
+                        acc_last_retune = self.acc
+                        istep_last_retune = istep
 
                 if n_save is not None:
                     if (jstep + 1) % n_save == 0:
