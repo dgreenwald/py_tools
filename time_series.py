@@ -671,7 +671,7 @@ def detrend_hamilton(df_full, varlist, p=4, h=8):
 
     return df_full, varlist_detrended, fr_list
 
-def detrend_time(df_full, varlist):
+def detrend_time(df, varlist, time_var=None):
     """Remove a linear time trend from the variables in var_list.  
 
     Returns (df_full, varlist_detrend), where df_full is a dataframe including
@@ -679,16 +679,17 @@ def detrend_time(df_full, varlist):
     of detrended variables.
     """
 
+    if time_var is None:
+        assert 'TIME' not in df
+        df['TIME'] = np.arange(len(df))
+        time_var = 'TIME'
+
     for var in varlist:
 
-        df = df_full[[var]].copy() 
-        df['diff'] = df[var].diff()
-        df['diff'] -= df['diff'].mean()
-        df_full[var + '_detrend'] = np.cumsum(df['diff'])
+        fr = dt.regression(df, var, time_var)
+        df.loc[fr.ix, var + '_detrend_time'] = fr.results.resid
 
-    varlist_detrended = [var + '_detrend' for var in varlist]
-
-    return df_full, varlist_detrended
+    return df
 
 def autocorrelations(df_in, var, lags=20):
 
