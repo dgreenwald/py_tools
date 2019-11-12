@@ -11,7 +11,7 @@ import pandas as pd
 from scipy.stats import norm
 
 # from py_tools.data import clean
-import py_tools.data as dt
+from py_tools import data as dt, stats
 
 pd.plotting.register_matplotlib_converters()
 
@@ -531,30 +531,107 @@ def projection(x, se, var_titles, shock_title, p=0.9, n_per_row=4, plot_size=3.0
 
     return None
 
+#def demean(df, dm_list=[], wvar=None):
+#    
+#    if wvar is None:
+#        weights = np.ones(len(df))
+#    else:
+#        weights = df[wvar].values
+#    
+#    for var in dm_list:
+#        df[var] -= stats.weighted_mean(df[var].values, weights)
+#    
+#    return df
 
-def binscatter(df, xvar, yvar, wvar=None, fit_var=None, labels={}, n_bins=10, 
-               filepath=None, xlim=None, ylim=None, **kwargs):
+def binscatter(df_in, xvar, yvar, wvar=None, fit_var=None, labels={}, n_bins=20, 
+               filepath=None, xlim=None, ylim=None, plot_line=True, 
+               control=[], absorb=[],
+               plot_raw_data=False, **kwargs):
         
-#    df = df[keep_vars].copy()
+    keep_list = [xvar, yvar] + control + absorb
+    if wvar is not None:
+        keep_list.append(wvar)
+    if fit_var is not None:
+        keep_list.append(fit_var)
+        
+    df = df_in.reset_index()
+    df = df[keep_list]
+    df = df.dropna()
     
-    n_bins = 10
+    if wvar is None:
+        weights = np.ones(len(df))
+    else:
+        weights = df[wvar].astype(np.float64).values
+        
+    if control or absorb:
+        
+        x_mean = stats.weighted_mean(df[xvar].values, weights)
+        y_mean = stats.weighted_mean(df[yvar].values, weights)
+        
+        df[xvar] -= x_mean
+        df[yvar] -= y_mean
+        
+        if absorb:
+            
+            df['_weight'] = weights
+            
+            for group in absorb:
+                
+                df['_x_weight'] = df[xvar] * weights
+                df['_y_weight'] = df[yvar] * weights
+                
+                gb = df.groupby(group)
+                for var in ['_weight', '_x_weight', '_y_weight']:
+                    df[var + '_sum'] = gb[var].transform(sum)
+                    
+                df['_x_mean'] = df['_x_weight_sum'] / df['_weight_sum']
+                df['_y_mean'] = df['_y_weight_sum'] / df['_weight_sum']
+                
+                df[xvar] -= df['_x_mean']
+                df[yvar] -= df['_y_mean']
+                
+        if control:
+            for this_var in [xvar, yvar]:
+                fr = dt.regression(df, this_var, control, weight_var=wvar)
+                df[this_var] = np.nan
+                df.loc[fr.ix, this_var] = fr.results.resid
+                
+        df[xvar] += x_mean
+        df[yvar] += y_mean
+        
     by_bin = dt.compute_binscatter(df, n_bins, xvar, yvar, wvar=wvar)
     
-    if fit_var is None:
-        fr = dt.regression(df, yvar, [xvar])
+    if plot_line and (fit_var is None):
+        fr = dt.regression(df, yvar, [xvar], weight_var=wvar)
         df.loc[fr.ix, yvar + '_fit'] = fr.results.fittedvalues
     
     fig, ax = plt.subplots()
     
-    ax.plot(df[xvar], df[yvar + '_fit'], color='firebrick', linewidth=2)
+    if plot_line:
+        ax.plot(df[xvar], df[yvar + '_fit'], color='firebrick', linewidth=2)
                     
-    ax.scatter(by_bin[xvar].values, by_bin[yvar].values, 
-#               marker='^',
-               color='cornflowerblue',
-#               color='firebrick',
-               s=50.0,
-               edgecolor='black', 
-            )
+    if plot_raw_data:
+            
+        weights *= (10.0 / np.mean(weights))
+        
+        ax.scatter(df[xvar].values, df[yvar].values, 
+                   color='cornflowerblue', alpha=0.5,
+                   s=weights,
+                   edgecolor='black', label='Raw Data',
+                )
+            
+        ax.scatter(by_bin[xvar].values, by_bin[yvar].values, 
+                   color='firebrick', marker='*', 
+#                   alpha=0.9,
+                   s=100.0,
+                   edgecolor='black', label='Binscatter',
+                )
+    else:
+        ax.scatter(by_bin[xvar].values, by_bin[yvar].values, 
+                   color='cornflowerblue',
+                   s=50.0,
+                   edgecolor='black', 
+                )
     
     plt.xlabel(labels.get(xvar, xvar))
     plt.ylabel(labels.get(yvar, yvar))

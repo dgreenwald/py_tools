@@ -18,6 +18,8 @@ def compute_binscatter(df_in, n_bins, xvar, yvar, wvar=None):
         wvar='weight'
         df[wvar] = 1.0
         
+    df = df.dropna()
+        
     df['x_bin'] = bin_data(df[xvar], n_bins, weights=df[wvar])
 
     df[xvar] *= df[wvar]
