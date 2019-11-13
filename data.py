@@ -9,6 +9,62 @@ import statsmodels.formula.api as smf
 
 from . import stats
 
+def absorb(df, groups, value_var, weight_var=None, restore_mean=True):
+    """Remove the mean from a variable by group
+
+    Arguments:
+    df -- a dataframe containing the value and group variables.
+    groups -- an iterable of variable names or iterables of names
+    value_var -- the variable to be demeaned
+    weight_var -- the weights to be used for demeaning
+
+    Returns:
+    x -- a Pandas Series containing the demeaned variable
+    """
+
+    # Check that internal variables are not in the dataframe
+    for var in ['_weight', '_x', '_x_weight']:
+        assert var not in df
+
+    # Set a default weight variable if none is specified
+    if weight_var is None:
+        assert '_weight' not in df
+        df['_weight'] = 1.0
+    else:
+        df['_weight'] = df[weight_var].copy()
+
+    # Make sure we cut down to overlapping sample of values and weights
+    df['_x'] = df[value_var].copy()
+    ix = np.any(pd.isnull(df[[value_var, '_weight']]), axis=1)
+    df.loc[ix, ['_weight', '_x']] = np.nan
+
+    # Compute overall mean and remove
+    if restore_mean:
+
+        df['_x_weight'] = df['_x'] * df['_weight']
+        x_mean = np.sum(df['_x_weight']) / np.sum(df['_weight'])
+        df['_x'] -= x_mean
+
+    # Loop through groups demeaning each time
+    for group in groups:
+        
+        gb = df.groupby(group)
+        df['_x_weight'] = df['_x'] * df['_weight']
+        
+        for var in ['_weight', '_x_weight']:
+            df[var + '_sum'] = gb[var].transform(sum)
+            
+        df['_x'] -= (df['_x_weight_sum']) / df['_weight_sum']
+
+    # Restore original mean and output
+    x = df['_x'].copy()
+    if restore_mean:
+        x += x_mean
+        
+    df = df.drop(columns=['_weight', '_x', '_x_weight'])
+
+    return x
+
 def compute_binscatter(df_in, n_bins, xvar, yvar, wvar=None):
 
     df = df_in[[xvar, yvar]].copy()
@@ -48,6 +104,9 @@ def bin_data(series, n_bins, weights=None):
     else:
         bins = stats.weighted_quantile(series.values, weights.values, quantiles)
         
+    bins = np.unique(bins)
+    bins = bins[np.isfinite(bins)]
+
     bins = np.unique(bins)
     bins = bins[np.isfinite(bins)]
 
