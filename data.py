@@ -47,6 +47,9 @@ def bin_data(series, n_bins, weights=None):
         bins = series.quantile(np.linspace(0.0, 1.0, n_bins+1)).values
     else:
         bins = stats.weighted_quantile(series.values, weights.values, quantiles)
+        
+    bins = np.unique(bins)
+    bins = bins[np.isfinite(bins)]
 
     bins[0] = -np.inf
     bins[-1] = np.inf
