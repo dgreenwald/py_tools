@@ -531,18 +531,6 @@ def projection(x, se, var_titles, shock_title, p=0.9, n_per_row=4, plot_size=3.0
 
     return None
 
-#def demean(df, dm_list=[], wvar=None):
-#    
-#    if wvar is None:
-#        weights = np.ones(len(df))
-#    else:
-#        weights = df[wvar].values
-#    
-#    for var in dm_list:
-#        df[var] -= stats.weighted_mean(df[var].values, weights)
-#    
-#    return df
-
 def binscatter(df_in, xvar, yvar, wvar=None, fit_var=None, labels={}, n_bins=20, 
                filepath=None, xlim=None, ylim=None, plot_line=True, 
                control=[], absorb=[],
@@ -565,40 +553,21 @@ def binscatter(df_in, xvar, yvar, wvar=None, fit_var=None, labels={}, n_bins=20,
         
     if control or absorb:
         
-        x_mean = stats.weighted_mean(df[xvar].values, weights)
-        y_mean = stats.weighted_mean(df[yvar].values, weights)
-        
-        df[xvar] -= x_mean
-        df[yvar] -= y_mean
-        
-        if absorb:
-            
-            df['_weight'] = weights
-            
-            for group in absorb:
-                
-                df['_x_weight'] = df[xvar] * weights
-                df['_y_weight'] = df[yvar] * weights
-                
-                gb = df.groupby(group)
-                for var in ['_weight', '_x_weight', '_y_weight']:
-                    df[var + '_sum'] = gb[var].transform(sum)
-                    
-                df['_x_mean'] = df['_x_weight_sum'] / df['_weight_sum']
-                df['_y_mean'] = df['_y_weight_sum'] / df['_weight_sum']
-                
-                df[xvar] -= df['_x_mean']
-                df[yvar] -= df['_y_mean']
-                
-        if control:
-            for this_var in [xvar, yvar]:
+        for this_var in [xvar, yvar]:
+
+            this_mean = stats.weighted_mean(df[this_var].values, weights)
+
+            if absorb:
+                df[this_var] = dt.absorb(df, absorb, this_var, weight_var=wvar, 
+                                    restore_mean=False)
+
+            if control:
                 fr = dt.regression(df, this_var, control, weight_var=wvar)
                 df[this_var] = np.nan
                 df.loc[fr.ix, this_var] = fr.results.resid
-                
-        df[xvar] += x_mean
-        df[yvar] += y_mean
-        
+
+            df[this_var] += this_mean
+
     by_bin = dt.compute_binscatter(df, n_bins, xvar, yvar, wvar=wvar)
     
     if plot_line and (fit_var is None):
