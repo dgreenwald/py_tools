@@ -533,8 +533,8 @@ def projection(x, se, var_titles, shock_title, p=0.9, n_per_row=4, plot_size=3.0
 
 def binscatter(df_in, xvar, yvar, wvar=None, fit_var=None, labels={}, n_bins=20, 
                filepath=None, xlim=None, ylim=None, plot_line=True, 
-               control=[], absorb=[],
-               plot_raw_data=False, **kwargs):
+               control=[], absorb=[], bin_scale=None, raw_scale=10.0,
+               plot_raw_data=False, bin_kwargs={}, raw_kwargs={}, **kwargs):
         
     keep_list = [xvar, yvar] + control + absorb
     if wvar is not None:
@@ -545,7 +545,45 @@ def binscatter(df_in, xvar, yvar, wvar=None, fit_var=None, labels={}, n_bins=20,
     df = df_in.reset_index()
     df = df[keep_list]
     df = df.dropna()
-    
+
+    if plot_raw_data:
+
+        if bin_scale is None:
+            bin_scale = 100.0
+
+        raw_kwargs_new = {
+            'marker' : 'o',
+            'color' : 'cornflowerblue',
+            'alpha' : 0.5,
+            'edgecolor' : 'black',
+            'label' : 'Raw Data',
+        }
+
+        bin_kwargs_new = {
+            'marker' : '*',
+            'color' : 'firebrick',
+            'alpha' : 1.0,
+            'edgecolor' : 'black',
+            'label' : 'Raw Data',
+        }
+    else:
+
+        if bin_scale is None:
+            bin_scale = 50.0
+
+        bin_kwargs_new = {
+            'marker' : 'o',
+            'color' : 'cornflowerblue',
+            'alpha' : 1.0,
+            'edgecolor' : 'black',
+            'label' : 'Raw Data',
+        }
+
+        raw_kwargs_new = {}
+
+    bin_kwargs_new.update(bin_kwargs)
+    raw_kwargs_new.update(raw_kwargs)
+
     if wvar is None:
         weights = np.ones(len(df))
     else:
@@ -581,33 +619,22 @@ def binscatter(df_in, xvar, yvar, wvar=None, fit_var=None, labels={}, n_bins=20,
                     
     if plot_raw_data:
             
-        weights *= (10.0 / np.mean(weights))
+        weights *= (raw_scale / np.mean(weights))
         
         ax.scatter(df[xvar].values, df[yvar].values, 
-                   color='cornflowerblue', alpha=0.5,
-                   s=weights,
-                   edgecolor='black', label='Raw Data',
+                   s=weights, **raw_kwargs_new
                 )
             
-        ax.scatter(by_bin[xvar].values, by_bin[yvar].values, 
-                   color='firebrick', marker='*', 
-#                   alpha=0.9,
-                   s=100.0,
-                   edgecolor='black', label='Binscatter',
+    ax.scatter(by_bin[xvar].values, by_bin[yvar].values, 
+               s=bin_scale, **bin_kwargs_new,
                 )
-    else:
-        ax.scatter(by_bin[xvar].values, by_bin[yvar].values, 
-                   color='cornflowerblue',
-                   s=50.0,
-                   edgecolor='black', 
-                )
-    
     plt.xlabel(labels.get(xvar, xvar))
     plt.ylabel(labels.get(yvar, yvar))
     
     if xlim is not None:
         plt.xlim(xlim)
-#        plt.ylim(ylim)
+    if ylim is not None:
+        plt.ylim(ylim)
     plt.tight_layout()
     
     if filepath is None:

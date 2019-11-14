@@ -23,12 +23,12 @@ def absorb(df, groups, value_var, weight_var=None, restore_mean=True):
     """
 
     # Check that internal variables are not in the dataframe
-    for var in ['_weight', '_x', '_x_weight']:
-        assert var not in df
+    # for var in ['_weight', '_x', '_x_weight']:
+        # assert var not in df
 
     # Set a default weight variable if none is specified
     if weight_var is None:
-        assert '_weight' not in df
+        # assert '_weight' not in df
         df['_weight'] = 1.0
     else:
         df['_weight'] = df[weight_var].copy()

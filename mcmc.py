@@ -678,6 +678,7 @@ class RWMC(MonteCarlo):
                         steps_since_retune = (istep + 1) - istep_last_retune
                         acc_rate_since_retune = acc_since_retune / (steps_since_retune * self.Nblock)
 
+                        self.print_log("Acceptance rate for last {0:d} draws: {1:4.3f}".format(steps_since_retune, acc_rate_since_retune))
                         self.print_log("Retuning: old jump scale = {:7.6f}".format(self.jump_scale))
                         self.jump_scale *= adapt_jump_scale(
                             # self.acc_rate, self.adapt_sens, self.adapt_target, self.adapt_range
