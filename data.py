@@ -248,7 +248,7 @@ def match_xy(X, z, how='inner', ix=None):
     return (ix, Xs, zs)
 
 
-def regression(df_in, lhs, rhs, fes=[], intercept=True, formula_extra=None, ix=None, 
+def regression(df_in, lhs, rhs, fes=[], absorb_groups=[], intercept=True, formula_extra=None, ix=None, 
                trend=None, cluster_var=None, cluster_groups=None, weight_var=None, **kwargs):
     """Run regression from pandas dataframe"""
 
@@ -264,10 +264,21 @@ def regression(df_in, lhs, rhs, fes=[], intercept=True, formula_extra=None, ix=N
         var_list += [weight_var]
     if cluster_var is not None:
         var_list += [cluster_var]
+    for group in absorb_groups:
+        if isinstance(group, str):
+            var_list.append(group)
+        elif isinstance(group, list):
+            var_list += group
+        else:
+            raise Exception
         
     var_list = list(set(var_list))
         
     df = df_in[var_list].copy()
+    
+    if absorb_groups:
+        for var in [lhs] + rhs:
+            df.loc[ix, var] = absorb(df.loc[ix, :], absorb_groups, var, weight_var=weight_var, restore_mean=True)
 
     ix_samp, _ = match_sample(df.values, how='inner')
     if ix is None:
@@ -312,15 +323,15 @@ def regression(df_in, lhs, rhs, fes=[], intercept=True, formula_extra=None, ix=N
 
 def wls_formula(df, formula, weight_var=None, weights=None, ix=None, nw_lags=0,
                 cluster_groups=None, display=False):
-    
-    if weight_var is not None:
-        assert weights is None
-        weights = df[weight_var]
-
-    weights /= np.sum(weights)
 
     if ix is None:
         ix = np.ones(len(df), dtype=bool)
+        
+    if weight_var is not None:
+        assert weights is None
+        weights = df.loc[ix, weight_var]
+
+    weights /= np.sum(weights)
     
     y, X = patsy.dmatrices(formula, df.loc[ix, :], return_type='dataframe')
     results = sm.WLS(y, X, weights=weights).fit()

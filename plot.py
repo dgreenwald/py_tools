@@ -4,6 +4,7 @@ import os
 if os.environ.get('USE_MATPLOTLIB_AGG', 0):
     matplotlib.use('Agg')
 
+import warnings
 import math
 import matplotlib.pyplot as plt
 import numpy as np
@@ -210,6 +211,7 @@ def hist(df_in, var, label=None, xlabel=None, ylabel=None, wvar=None,
         plt.legend(fontsize=legend_font)
 
     if filepath is not None:
+        plt.tight_layout()
         plt.savefig(filepath)
     else:
         plt.show()
@@ -229,19 +231,23 @@ def compute_hist(df, var, bins, wvar=None):
 
     return hist
 
-def double_hist(df_in1, df_in2=None, label1='Var 1', label2='Var 2', var=None,
+def double_hist(df1, df2=None, label1=None, label2=None, var=None,
                 var1=None, var2=None, bins=None, wvar=None, wvar1=None,
                 wvar2=None, filepath=None, xlabel=None, ylabel=None, xlim=None,
                 ylim=None, legend_font=10, label_font=12, copy_path1=None,
                 copy_path2=None, color1=None, color2=None, edgecolor='black', 
-                alpha=0.5, use_bar=False, kwargs1={}, kwargs2={}, **kwargs):
-    """Plots double histogram overlaying var1 from df_in1 and var2 from df_in2"""
+                alpha=0.5, use_bar=False, labels={}, kwargs1={}, kwargs2={}, x_vertline=None,
+                vertline_kwargs={}, **kwargs):
+    """Plots double histogram overlaying var1 from df1 and var2 from df2
+
+    Arguments:
+    """
 
     kwargs1.update(kwargs)
     kwargs2.update(kwargs)
 
-    if df_in2 is None:
-        df_in2 = df_in1
+    if df2 is None:
+        df2 = df1
 
     if var is not None:
         assert var1 is None and var2 is None
@@ -255,6 +261,12 @@ def double_hist(df_in1, df_in2=None, label1='Var 1', label2='Var 2', var=None,
         wvar1 = wvar
     if wvar2 is None:
         wvar2 = wvar
+
+    if label1 is None:
+        label1 = labels.get(var1, var1)
+
+    if label2 is None:
+        label2 = labels.get(var2, var2)
         
     # if edgecolor is None:
         # edgecolor = 'black'
@@ -269,29 +281,29 @@ def double_hist(df_in1, df_in2=None, label1='Var 1', label2='Var 2', var=None,
     else:
         kwargs['density'] = True
 
-    df1 = dt.clean(df_in1, [var1, wvar1])
-    df2 = dt.clean(df_in2, [var2, wvar2])
+    _df1 = dt.clean(df1, [var1, wvar1])
+    _df2 = dt.clean(df2, [var2, wvar2])
     
     if wvar1 == '_count':
-        df1[wvar1] = 1.0
+        _df1[wvar1] = 1.0
     if wvar2 == '_count':
-        df2[wvar2] = 1.0
+        _df2[wvar2] = 1.0
 
-    if var1 not in df1 or var2 not in df2:
+    if var1 not in _df1 or var2 not in _df2:
         return False
 
-    if len(df1) == 0 or len(df2) == 0:
+    if len(_df1) == 0 or len(_df2) == 0:
         return False
 
     if wvar1 is not None:
-        w1 = df1[wvar1].values
+        w1 = _df1[wvar1].values
     else:
-        w1 = np.ones(len(df1))
+        w1 = np.ones(len(_df1))
 
     if wvar2 is not None:
-        w2 = df2[wvar2].values
+        w2 = _df2[wvar2].values
     else:
-        w2 = np.ones(len(df2))
+        w2 = np.ones(len(_df2))
         
     if (xlim is None) and (bins is not None):
         xlim = bins[[0, -1]]
@@ -308,8 +320,8 @@ def double_hist(df_in1, df_in2=None, label1='Var 1', label2='Var 2', var=None,
         
         bin_width = bins[1] - bins[0]
 
-        hist1 = compute_hist(df1, var1, bins, wvar=wvar1)
-        hist2 = compute_hist(df2, var2, bins, wvar=wvar2)
+        hist1 = compute_hist(_df1, var1, bins, wvar=wvar1)
+        hist2 = compute_hist(_df2, var2, bins, wvar=wvar2)
 
         plt.bar(np.array(hist1.index), hist1.values, width=bin_width,
                 alpha=alpha, edgecolor=edgecolor, align='edge',
@@ -320,10 +332,13 @@ def double_hist(df_in1, df_in2=None, label1='Var 1', label2='Var 2', var=None,
 
     else:
 
-        plt.hist(df1[var1].values, bins=bins, alpha=alpha, edgecolor=edgecolor,
+        plt.hist(_df1[var1].values, bins=bins, alpha=alpha, edgecolor=edgecolor,
                  weights=w1, label=str(label1), color=color1, **kwargs1)
-        plt.hist(df2[var2].values, bins=bins, alpha=alpha, edgecolor=edgecolor,
+        plt.hist(_df2[var2].values, bins=bins, alpha=alpha, edgecolor=edgecolor,
                  weights=w2, label=str(label2), color=color2, **kwargs2)
+
+    if x_vertline is not None:
+        plt.axvline(x=x_vertline, **vertline_kwargs)
 
     plt.legend(fontsize=legend_font)
 
@@ -348,9 +363,9 @@ def double_hist(df_in1, df_in2=None, label1='Var 1', label2='Var 2', var=None,
     plt.close(fig)
 
     if copy_path1 is not None:
-        save_hist(df1[var1].values, copy_path1, density=True, bins=bins, weights=w1)
+        save_hist(_df1[var1].values, copy_path1, density=True, bins=bins, weights=w1)
     if copy_path2 is not None:
-        save_hist(df2[var2].values, copy_path1, density=True, bins=bins, weights=w2)
+        save_hist(_df2[var2].values, copy_path1, density=True, bins=bins, weights=w2)
 
     return True
 
