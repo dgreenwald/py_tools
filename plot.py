@@ -546,12 +546,21 @@ def projection(x, se, var_titles, shock_title, p=0.9, n_per_row=4, plot_size=3.0
 
     return None
 
-def binscatter(df_in, xvar, yvar, wvar=None, fit_var=None, labels={}, n_bins=20, 
+def binscatter(df_in, xvar, yvars, wvar=None, fit_var=None, labels={}, n_bins=20, 
                filepath=None, xlim=None, ylim=None, plot_line=True, 
                control=[], absorb=[], bin_scale=None, raw_scale=10.0,
-               plot_raw_data=False, bin_kwargs={}, raw_kwargs={}, **kwargs):
+               plot_raw_data=False, bin_kwargs={}, raw_kwargs={}, line_kwargs={},
+               **kwargs):
         
-    keep_list = [xvar, yvar] + control + absorb
+    combined = len(yvars) > 1
+    
+    if isinstance(yvars, str):
+        yvars = [yvars]
+        
+    if isinstance(absorb, str):
+        absorb = [absorb]
+    
+    keep_list = [xvar] + yvars + control + absorb
     if wvar is not None:
         keep_list.append(wvar)
     if fit_var is not None:
@@ -560,44 +569,58 @@ def binscatter(df_in, xvar, yvar, wvar=None, fit_var=None, labels={}, n_bins=20,
     df = df_in.reset_index()
     df = df[keep_list]
     df = df.dropna()
+    
+    bin_kwargs_new = {
+        'alpha' : 1.0,
+        'edgecolor' : 'black',
+        'zorder' : 1,
+    }
+    
+    line_kwargs_new = {
+            'linewidth' : 2,
+            'zorder' : 0,
+            'color' : 'firebrick',
+            }
+    
+    raw_kwargs_new = {
+        'marker' : 'o',
+        'color' : 'cornflowerblue',
+        'alpha' : 0.5,
+        'edgecolor' : 'black',
+        'label' : 'Raw Data',
+    }
 
     if plot_raw_data:
 
         if bin_scale is None:
             bin_scale = 100.0
 
-        raw_kwargs_new = {
-            'marker' : 'o',
-            'color' : 'cornflowerblue',
-            'alpha' : 0.5,
-            'edgecolor' : 'black',
-            'label' : 'Raw Data',
-        }
-
-        bin_kwargs_new = {
+        bin_kwargs_new.update({
             'marker' : '*',
             'color' : 'firebrick',
-            'alpha' : 1.0,
-            'edgecolor' : 'black',
-            'label' : 'Raw Data',
-        }
+            'label' : 'Binscatter',
+        })
     else:
 
         if bin_scale is None:
             bin_scale = 50.0
 
-        bin_kwargs_new = {
+        bin_kwargs_new.update({
             'marker' : 'o',
             'color' : 'cornflowerblue',
-            'alpha' : 1.0,
-            'edgecolor' : 'black',
-            'label' : 'Raw Data',
-        }
+            'label' : '_nolabel',
+        })
 
         raw_kwargs_new = {}
+        
+    if combined:
+        line_kwargs_new.update({
+                'linestyle' : '--',
+                })
 
     bin_kwargs_new.update(bin_kwargs)
     raw_kwargs_new.update(raw_kwargs)
+    line_kwargs_new.update(line_kwargs)
 
     if wvar is None:
         weights = np.ones(len(df))
@@ -606,7 +629,7 @@ def binscatter(df_in, xvar, yvar, wvar=None, fit_var=None, labels={}, n_bins=20,
         
     if control or absorb:
         
-        for this_var in [xvar, yvar]:
+        for this_var in [xvar] + yvars:
 
             this_mean = stats.weighted_mean(df[this_var].values, weights)
 
@@ -621,30 +644,55 @@ def binscatter(df_in, xvar, yvar, wvar=None, fit_var=None, labels={}, n_bins=20,
 
             df[this_var] += this_mean
 
-    by_bin = dt.compute_binscatter(df, n_bins, xvar, yvar, wvar=wvar)
-    
-    if plot_line and (fit_var is None):
-        fr = dt.regression(df, yvar, [xvar], weight_var=wvar)
-        df.loc[fr.ix, yvar + '_fit'] = fr.results.fittedvalues
-    
     fig, ax = plt.subplots()
-    
-    if plot_line:
-        ax.plot(df[xvar], df[yvar + '_fit'], color='firebrick', linewidth=2)
-                    
-    if plot_raw_data:
-            
-        weights *= (raw_scale / np.mean(weights))
+    for iy, yvar in enumerate(yvars):
         
-        ax.scatter(df[xvar].values, df[yvar].values, 
-                   s=weights, **raw_kwargs_new
-                )
+        if combined:
+            this_color = 'C{:d}'.format(iy)
+            bin_kwargs_new.update({
+                    'color' : this_color,
+                    'label' : labels.get(yvar, yvar),
+                    })
+            line_kwargs_new.update({
+                    'color' : this_color,
+                    })
+        
+        by_bin = dt.compute_binscatter(df, n_bins, xvar, yvar, wvar=wvar)
+        
+        if plot_line and (fit_var is None):
+            fr = dt.regression(df, yvar, [xvar], weight_var=wvar)
+            df.loc[fr.ix, yvar + '_fit'] = fr.results.fittedvalues
+        
+        if plot_line:
+            x = df[xvar].values
+            y_fit = df[yvar + '_fit'].values
+            imin = np.argmin(x)
+            imax = np.argmax(x)
+            x_line = np.array((x[imin], x[imax]))
+            y_line = np.array((y_fit[imin], y_fit[imax]))
+            ax.plot(x_line, y_line, **line_kwargs_new)
+#            ax.plot(df[xvar], df[yvar + '_fit'], color=line_color, linewidth=2,
+#                    linestyle=linestyle, zorder=0)
+                        
+        if plot_raw_data:
+                
+            weights *= (raw_scale / np.mean(weights))
             
-    ax.scatter(by_bin[xvar].values, by_bin[yvar].values, 
-               s=bin_scale, **bin_kwargs_new,
-                )
+            ax.scatter(df[xvar].values, df[yvar].values, 
+                       s=weights, **raw_kwargs_new
+                    )
+            
+        ax.scatter(by_bin[xvar].values, by_bin[yvar].values, 
+                   s=bin_scale, **bin_kwargs_new,
+                    )
+    
     plt.xlabel(labels.get(xvar, xvar))
-    plt.ylabel(labels.get(yvar, yvar))
+    
+    if combined:
+        plt.legend()
+    else:
+        yvar = yvars[0]
+        plt.ylabel(labels.get(yvar, yvar))
     
     if xlim is not None:
         plt.xlim(xlim)
