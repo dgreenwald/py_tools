@@ -259,6 +259,7 @@ def double_hist(df1, df2=None, label1=None, label2=None, var=None,
         
     if wvar1 is None:
         wvar1 = wvar
+        
     if wvar2 is None:
         wvar2 = wvar
 
@@ -550,12 +551,14 @@ def binscatter(df_in, xvar, yvars, wvar=None, fit_var=None, labels={}, n_bins=20
                filepath=None, xlim=None, ylim=None, plot_line=True, 
                control=[], absorb=[], bin_scale=None, raw_scale=10.0,
                plot_raw_data=False, bin_kwargs={}, raw_kwargs={}, line_kwargs={},
+               legend_font=10, label_font=12, use_legend=True,
                **kwargs):
         
-    combined = len(yvars) > 1
+    matplotlib.rcParams.update({'font.size' : label_font})
     
     if isinstance(yvars, str):
         yvars = [yvars]
+    combined = len(yvars) > 1
         
     if isinstance(absorb, str):
         absorb = [absorb]
@@ -574,12 +577,14 @@ def binscatter(df_in, xvar, yvars, wvar=None, fit_var=None, labels={}, n_bins=20
         'alpha' : 1.0,
         'edgecolor' : 'black',
         'zorder' : 1,
+        'label' : 'Binscatter',
     }
     
     line_kwargs_new = {
             'linewidth' : 2,
             'zorder' : 0,
             'color' : 'firebrick',
+            'label' : '_nolabel',
             }
     
     raw_kwargs_new = {
@@ -598,7 +603,6 @@ def binscatter(df_in, xvar, yvars, wvar=None, fit_var=None, labels={}, n_bins=20
         bin_kwargs_new.update({
             'marker' : '*',
             'color' : 'firebrick',
-            'label' : 'Binscatter',
         })
     else:
 
@@ -608,7 +612,6 @@ def binscatter(df_in, xvar, yvars, wvar=None, fit_var=None, labels={}, n_bins=20
         bin_kwargs_new.update({
             'marker' : 'o',
             'color' : 'cornflowerblue',
-            'label' : '_nolabel',
         })
 
         raw_kwargs_new = {}
@@ -616,6 +619,10 @@ def binscatter(df_in, xvar, yvars, wvar=None, fit_var=None, labels={}, n_bins=20
     if combined:
         line_kwargs_new.update({
                 'linestyle' : '--',
+                })
+    else:
+        raw_kwargs_new.update({
+                'label' : 'Raw Data',
                 })
 
     bin_kwargs_new.update(bin_kwargs)
@@ -648,6 +655,7 @@ def binscatter(df_in, xvar, yvars, wvar=None, fit_var=None, labels={}, n_bins=20
     for iy, yvar in enumerate(yvars):
         
         if combined:
+            assert not plot_raw_data
             this_color = 'C{:d}'.format(iy)
             bin_kwargs_new.update({
                     'color' : this_color,
@@ -688,9 +696,10 @@ def binscatter(df_in, xvar, yvars, wvar=None, fit_var=None, labels={}, n_bins=20
     
     plt.xlabel(labels.get(xvar, xvar))
     
-    if combined:
-        plt.legend()
-    else:
+    if use_legend:
+        plt.legend(fontsize=legend_font)
+        
+    if not combined:
         yvar = yvars[0]
         plt.ylabel(labels.get(yvar, yvar))
     
