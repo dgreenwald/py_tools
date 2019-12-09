@@ -13,6 +13,25 @@ import py_tools.data as dt, py_tools.numerical as nm
 # from py_tools.datasets import loader
 # import py_tools.utilities as ut
 
+def panel_resampler(df, time_var, freq):
+
+    to_drop = [name for name in df.index.names if name != time_var]
+    return df.reset_index().drop(columns=to_drop).set_index(time_var).asfreq(freq)
+
+def to_panel(df, panel_vars, time_var, freq):
+
+    if isinstance(panel_vars, str):
+        panel_vars = [panel_vars]
+
+    if df.index.name != [None]:
+        df = df.reset_index()
+
+    return df.set_index(panel_vars + [time_var]).groupby(panel_vars).apply(panel_resampler, time_var, freq)
+
+def panel_shift(df, panel_vars, periods=1):
+
+    return df.groupby(panel_vars).shift(periods=periods)
+
 def merge_date(df1, df2, how='outer', **kwargs):
 
     return pd.merge(df1, df2, left_index=True, right_index=True, how=how, **kwargs)
