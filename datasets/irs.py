@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 import re
 
-from . import defaults
+from . import defaults, crosswalk
 default_dir = defaults.base_dir() + 'irs/'
 
 def double_list(these_items):
@@ -448,4 +448,58 @@ def load_zip(data_dir=default_dir, reimport=False, reimport_year=False):
 
         df = pd.read_pickle(pkl_file)
 
+    return df
+
+def load_zip3_from_county(data_dir=default_dir, reimport=False, county_kwargs={},
+                          crosswalk_kwargs={}):
+    
+    pkl_file = data_dir + 'zip/irs_zip3_from_county.pkl'
+    if reimport or not os.path.exists(pkl_file):
+        
+        # Load county data and crosswalk then merge
+        these_county_kwargs = {'data_dir' : data_dir}
+        these_county_kwargs.update(county_kwargs)
+        
+        df = load_county(**county_kwargs)
+        cw = crosswalk.county_to_zip(zip_level=3, **crosswalk_kwargs)
+        df = pd.merge(df.reset_index(), cw, on='fips', how='right')
+        
+        # Scale variables
+        for var in df:
+            if var not in ['fips', 'date', 'zip3', 'factor']:
+                df[var] = pd.to_numeric(df[var], errors='coerce') * df['factor']
+                
+        df = df.drop(columns=['fips', 'factor'])
+        df = df.groupby(['zip3', 'date']).sum(min_count=1)
+
+        df.to_pickle(pkl_file)
+        
+    else:
+        
+        df = pd.read_pickle(pkl_file)
+        
+    return df
+
+def load_zip3_from_zip(data_dir=default_dir, reimport=False, zip_kwargs={}):
+    
+    pkl_file = data_dir + 'zip/irs_zip3_from_zip.pkl'
+    if reimport or not os.path.exists(pkl_file):
+        
+        # Load ZIP data
+        these_zip_kwargs = {'data_dir' : data_dir}
+        these_zip_kwargs.update(zip_kwargs)
+        
+        df = load_zip(**zip_kwargs).reset_index()
+        
+        # Sum by ZIP-3
+        df['zip3'] = df['zip'].astype(str).str[:-2].astype(np.int)
+        df = df.drop(columns=['zip'])
+        df = df.groupby(['zip3', 'date']).sum(min_count=1)
+        
+        df.to_pickle(pkl_file)
+        
+    else:
+        
+        df = pd.read_pickle(pkl_file)
+        
     return df
