@@ -26,42 +26,54 @@ def absorb(df, groups, value_var, weight_var=None, restore_mean=True):
     # for var in ['_weight', '_x', '_x_weight']:
         # assert var not in df
 
+    var_list = [value_var]
+    if weight_var is not None:
+        var_list.append(weight_var)
+    for group in groups:
+        if isinstance(group, str):
+            var_list.append(group)
+        else:
+            var_list += group
+
+    var_list = [var for var in var_list if var in df]
+    _df = df[var_list].copy()
+
     # Set a default weight variable if none is specified
     if weight_var is None:
-        # assert '_weight' not in df
-        df['_weight'] = 1.0
+        # assert '_weight' not in _df
+        _df['_weight'] = 1.0
     else:
-        df['_weight'] = df[weight_var].copy()
+        _df['_weight'] = _df[weight_var].copy()
 
     # Make sure we cut down to overlapping sample of values and weights
-    df['_x'] = df[value_var].copy()
-    ix = np.any(pd.isnull(df[[value_var, '_weight']]), axis=1)
-    df.loc[ix, ['_weight', '_x']] = np.nan
+    _df['_x'] = _df[value_var].copy()
+    ix = np.any(pd.isnull(_df[[value_var, '_weight']]), axis=1)
+    _df.loc[ix, ['_weight', '_x']] = np.nan
 
     # Compute overall mean and remove
     if restore_mean:
 
-        df['_x_weight'] = df['_x'] * df['_weight']
-        x_mean = np.sum(df['_x_weight']) / np.sum(df['_weight'])
-        df['_x'] -= x_mean
+        _df['_x_weight'] = _df['_x'] * _df['_weight']
+        x_mean = np.sum(_df['_x_weight']) / np.sum(_df['_weight'])
+        _df['_x'] -= x_mean
 
     # Loop through groups demeaning each time
     for group in groups:
         
-        gb = df.groupby(group)
-        df['_x_weight'] = df['_x'] * df['_weight']
+        gb = _df.groupby(group)
+        _df['_x_weight'] = _df['_x'] * _df['_weight']
         
         for var in ['_weight', '_x_weight']:
-            df[var + '_sum'] = gb[var].transform(sum)
+            _df[var + '_sum'] = gb[var].transform(sum)
             
-        df['_x'] -= (df['_x_weight_sum']) / df['_weight_sum']
+        _df['_x'] -= (_df['_x_weight_sum']) / _df['_weight_sum']
 
     # Restore original mean and output
-    x = df['_x'].copy()
+    x = _df['_x'].copy()
     if restore_mean:
         x += x_mean
         
-    df = df.drop(columns=['_weight', '_x', '_x_weight'])
+    # _df = _df.drop(columns=['_weight', '_x', '_x_weight'])
 
     return x
 
@@ -248,7 +260,7 @@ def match_xy(X, z, how='inner', ix=None):
     return (ix, Xs, zs)
 
 
-def regression(df_in, lhs, rhs, fes=[], absorb_groups=[], intercept=True, formula_extra=None, ix=None, 
+def regression(df, lhs, rhs, fes=[], absorb_groups=[], intercept=True, formula_extra=None, ix=None, 
                trend=None, cluster_var=None, cluster_groups=None, weight_var=None, **kwargs):
     """Run regression from pandas dataframe"""
 
@@ -274,28 +286,35 @@ def regression(df_in, lhs, rhs, fes=[], absorb_groups=[], intercept=True, formul
         
     var_list = list(set(var_list))
         
-    df = df_in[var_list].copy()
-    
-    if absorb_groups:
-        for var in [lhs] + rhs:
-            df.loc[ix, var] = absorb(df.loc[ix, :], absorb_groups, var, weight_var=weight_var, restore_mean=True)
+    this_list = []
+    for var in var_list:
+        if var in df:
+            this_list.append(var)
+        else:
+            assert var in df.index.names
 
-    ix_samp, _ = match_sample(df.values, how='inner')
+    _df = df[this_list].copy()
+    
+    ix_samp, _ = match_sample(_df.values, how='inner')
     if ix is None:
-#        ix, _ = match_sample(df.values, how='inner')
+#        ix, _ = match_sample(_df.values, how='inner')
         ix = ix_samp.copy()
     
     ix_both = np.logical_and(ix, ix_samp)
+
+    if absorb_groups:
+        for var in [lhs] + rhs:
+            _df.loc[ix_both, var] = absorb(_df.loc[ix_both, :], absorb_groups, var, weight_var=weight_var, restore_mean=True)
         
-    Xs = df.loc[ix_both, rhs].values
-    zs = df.loc[ix_both, lhs].values
+    Xs = _df.loc[ix_both, rhs].values
+    zs = _df.loc[ix_both, lhs].values
 
     if trend is not None:
         if trend in ['linear', 'quadratic']:
-            df['t'] = np.arange(len(df))
+            _df['t'] = np.arange(len(_df))
             formula += ' + t '
         if trend == 'quadratic':
-            df['t2'] = np.arange(len(df)) ** 2
+            _df['t2'] = np.arange(len(_df)) ** 2
             formula += ' + t2 '
 
     if formula_extra is not None:
@@ -307,7 +326,7 @@ def regression(df_in, lhs, rhs, fes=[], absorb_groups=[], intercept=True, formul
         Xs = np.hstack((np.ones((Xs.shape[0], 1)), Xs))
 
     if cluster_var is not None:
-        cluster_groups = get_cluster_groups(df, cluster_var)
+        cluster_groups = get_cluster_groups(_df, cluster_var)
 
     if cluster_groups is not None:
         these_groups = cluster_groups[ix_both]
@@ -315,9 +334,9 @@ def regression(df_in, lhs, rhs, fes=[], absorb_groups=[], intercept=True, formul
         these_groups = None
 
     if weight_var is None:
-        fr = formula_regression(df, formula, ix=ix, cluster_groups=these_groups, **kwargs)
+        fr = formula_regression(_df, formula, ix=ix, cluster_groups=these_groups, **kwargs)
     else:
-        fr = wls_formula(df, formula, weight_var=weight_var, ix=ix, cluster_groups=these_groups, **kwargs)
+        fr = wls_formula(_df, formula, weight_var=weight_var, ix=ix, cluster_groups=these_groups, **kwargs)
 
     return FullResults(fr.results, ix=ix, Xs=Xs, zs=zs)
 

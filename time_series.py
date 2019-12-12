@@ -691,6 +691,25 @@ def detrend_time(df, varlist, time_var=None):
 
     return df
 
+def get_time_trend(df, var, time_var=None):
+
+    if time_var is None:
+        assert 'TIME' not in df
+        df['TIME'] = np.arange(len(df))
+        time_var = 'TIME'
+
+    fr = dt.regression(df, var, time_var)
+
+    trend = pd.Series(index=df.index)
+    trend.loc[fr.ix] = fr.results.fittedvalues
+    # trend.loc[~fr.ix] = np.nan
+
+    cycle = pd.Series(index=df.index)
+    cycle.loc[fr.ix] = fr.results.resid
+    # cycle.loc[~fr.ix] = np.nan
+
+    return trend, cycle
+
 def autocorrelations(df_in, var, lags=20):
 
     df = df_in[[var]].copy()

@@ -552,10 +552,10 @@ def binscatter(df_in, xvar, yvars, wvar=None, fit_var=None, labels={}, n_bins=20
                plot_raw_data=False, bin_kwargs={}, raw_kwargs={}, line_kwargs={},
                **kwargs):
         
-    combined = len(yvars) > 1
-    
     if isinstance(yvars, str):
         yvars = [yvars]
+
+    combined = len(yvars) > 1
         
     if isinstance(absorb, str):
         absorb = [absorb]
@@ -696,6 +696,13 @@ def binscatter(df_in, xvar, yvars, wvar=None, fit_var=None, labels={}, n_bins=20
     
     if xlim is not None:
         plt.xlim(xlim)
+    elif not (plot_raw_data):
+        bin_min = np.amin(by_bin[xvar].values)
+        bin_max = np.amax(by_bin[xvar].values)
+        tot_range = bin_max - bin_min
+        xlim = (bin_min - 0.05 * tot_range, bin_max + 0.05 * tot_range)
+        plt.xlim(xlim)
+
     if ylim is not None:
         plt.ylim(ylim)
     plt.tight_layout()
