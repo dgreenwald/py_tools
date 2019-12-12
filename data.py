@@ -9,6 +9,10 @@ import statsmodels.formula.api as smf
 
 from . import stats
 
+def lowercase(df):
+    
+    return df.rename(columns={var : var.lower() for var in df.columns})
+
 def absorb(df, groups, value_var, weight_var=None, restore_mean=True):
     """Remove the mean from a variable by group
 

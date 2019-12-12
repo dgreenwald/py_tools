@@ -31,13 +31,23 @@ def weighted_mean(values_in, weights_in):
 
     return (num / denom)
 
-def weighted_std(values_in, weights_in):
-
+def weighted_var(values_in, weights_in):
+    
     residuals = values_in - weighted_mean(values_in, weights_in)
     num = np.dot(residuals**2, weights_in)
     denom = np.sum(weights_in)
+    
+    return num / denom
 
-    return np.sqrt(num / denom)
+def weighted_std(values_in, weights_in):
+
+#    residuals = values_in - weighted_mean(values_in, weights_in)
+#    num = np.dot(residuals**2, weights_in)
+#    denom = np.sum(weights_in)
+#
+#    return np.sqrt(num / denom)
+    
+    return np.sqrt(weighted_var(values_in, weights_in))
 
 def std_norm_z_star(p_val, two_sided=True):
 
