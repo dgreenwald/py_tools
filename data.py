@@ -81,7 +81,7 @@ def absorb(df, groups, value_var, weight_var=None, restore_mean=True):
 
     return x
 
-def compute_binscatter(df_in, n_bins, xvar, yvar, wvar=None):
+def compute_binscatter(df_in, yvar, xvar, wvar=None, n_bins=10):
 
     df = df_in[[xvar, yvar]].copy()
     if wvar is not None:
