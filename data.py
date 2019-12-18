@@ -264,7 +264,7 @@ def match_xy(X, z, how='inner', ix=None):
     return (ix, Xs, zs)
 
 
-def regression(df, lhs, rhs, fes=[], absorb_groups=[], intercept=True, formula_extra=None, ix=None, 
+def regression(df, lhs, rhs, fes=[], absorb_vars=[], intercept=True, formula_extra=None, ix=None, 
                trend=None, cluster_var=None, cluster_groups=None, weight_var=None, **kwargs):
     """Run regression from pandas dataframe"""
 
@@ -280,7 +280,7 @@ def regression(df, lhs, rhs, fes=[], absorb_groups=[], intercept=True, formula_e
         var_list += [weight_var]
     if cluster_var is not None:
         var_list += [cluster_var]
-    for group in absorb_groups:
+    for group in absorb_vars:
         if isinstance(group, str):
             var_list.append(group)
         elif isinstance(group, list):
@@ -306,9 +306,9 @@ def regression(df, lhs, rhs, fes=[], absorb_groups=[], intercept=True, formula_e
     
     ix_both = np.logical_and(ix, ix_samp)
 
-    if absorb_groups:
+    if absorb_vars:
         for var in [lhs] + rhs:
-            _df.loc[ix_both, var] = absorb(_df.loc[ix_both, :], absorb_groups, var, weight_var=weight_var, restore_mean=True)
+            _df.loc[ix_both, var] = absorb(_df.loc[ix_both, :], absorb_vars, var, weight_var=weight_var, restore_mean=True)
         
     Xs = _df.loc[ix_both, rhs].values
     zs = _df.loc[ix_both, lhs].values
@@ -679,3 +679,30 @@ def sum_regression_params(positions, *args, **kwargs):
     e_vec[positions] = 1.0
 
     return weight_regression_params(e_vec, *args, **kwargs)
+
+def collapse(df, method='mean', var_list=None, by=[], wvar=None):
+    
+    assert by
+    assert method in ['mean', 'sum']
+    assert wvar is not None # just do groupby otherwise
+    
+    if var_list is None:
+        var_list = [var for var in df.columns 
+                    if (var not in (by + [wvar])) and pd.api.types.is_numeric_dtype(df[var])]
+        
+    assert wvar not in var_list
+        
+    keep_vars = list(set(var_list + by + [wvar]))
+    _df = df[keep_vars].copy()
+
+    for var in var_list:
+        if (var not in by) and (var != wvar):
+            _df[var] *= _df[wvar]
+            
+    collapsed = _df.groupby(by)[var_list + [wvar]].sum()
+    if method == 'mean':
+        for var in var_list:
+            collapsed[var] /= collapsed[wvar]
+        
+    return collapsed
+    
