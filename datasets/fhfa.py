@@ -5,7 +5,8 @@ from py_tools import time_series as ts
 from . import defaults
 default_dir = defaults.base_dir() + 'fhfa/'
 
-def load(dataset, all_transactions=True, reimport=False, data_dir=default_dir):
+def load(dataset, all_transactions=True, reimport=False, data_dir=default_dir,
+         overwrite_stata=False):
 
     if dataset == 'metro':
 
@@ -74,5 +75,18 @@ def load(dataset, all_transactions=True, reimport=False, data_dir=default_dir):
             df.to_pickle(pkl_file)
         else:
             df = pd.read_pickle(pkl_file)
+
+        df = df.rename(columns={'Three-Digit ZIP Code' : 'zip3'})
+
+    stata_file = data_dir + dataset
+    if all_transactions:
+        stata_file += '_at'
+    else:
+        stata_file += '_purch'
+
+    stata_file += '.dta'
+
+    if overwrite_stata or not os.path.exists(stata_file):
+        df.to_stata(stata_file)
 
     return df
