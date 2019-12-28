@@ -4,7 +4,7 @@ import os
 if os.environ.get('USE_MATPLOTLIB_AGG', 0):
     matplotlib.use('Agg')
 
-import warnings
+# import warnings
 import math
 import matplotlib.pyplot as plt
 import numpy as np
@@ -705,15 +705,30 @@ def binscatter(df_in, yvars, xvar, wvar=None, fit_var=None, labels={}, n_bins=20
     
     if xlim is not None:
         plt.xlim(xlim)
-    elif not (plot_raw_data):
-        bin_min = np.amin(by_bin[xvar].values)
-        bin_max = np.amax(by_bin[xvar].values)
-        tot_range = bin_max - bin_min
-        xlim = (bin_min - 0.05 * tot_range, bin_max + 0.05 * tot_range)
-        plt.xlim(xlim)
+    else:
+        if plot_raw_data:
+            xlim = stats.weighted_quantile(df[xvar].values, df[wvar].values, [0.005, 0.995])
+            plt.xlim(xlim)
+        else:
+            bin_min = np.amin(by_bin[xvar].values)
+            bin_max = np.amax(by_bin[xvar].values)
+            tot_range = bin_max - bin_min
+            xlim = (bin_min - 0.05 * tot_range, bin_max + 0.05 * tot_range)
+            plt.xlim(xlim)
 
     if ylim is not None:
         plt.ylim(ylim)
+    else:
+        if plot_raw_data:
+            ylim = stats.weighted_quantile(df[yvar].values, df[wvar].values, [0.005, 0.995])
+            plt.ylim(ylim)
+        else:
+            bin_min = np.amin(by_bin[yvar].values)
+            bin_max = np.amax(by_bin[yvar].values)
+            tot_range = bin_max - bin_min
+            ylim = (bin_min - 0.1 * tot_range, bin_max + 0.1 * tot_range)
+            plt.ylim(ylim)
+
     plt.tight_layout()
     
     if filepath is None:

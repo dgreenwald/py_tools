@@ -8,7 +8,7 @@ default_dir = defaults.base_dir() + 'fhfa/'
 def load(dataset, all_transactions=True, reimport=False, data_dir=default_dir,
          overwrite_stata=False):
 
-    if dataset == 'metro':
+    if dataset in ['metro', 'msa']:
 
         if not all_transactions: raise Exception
 

@@ -21,7 +21,7 @@ def load_pop(level, year, data_dir=default_dir):
 
     infile = year_dir + 'nhgis0001_ds146_2000_' + level_str + '.csv'
 
-    df = pd.read_csv(infile)
+    df = pd.read_csv(infile, encoding='latin1')
     df = df.rename(columns={name : name.lower() for name in df.columns})
     df = df.rename(columns={
         'fl5001' : 'pop',
