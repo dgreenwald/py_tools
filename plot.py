@@ -576,13 +576,13 @@ def binscatter(df_in, yvars, xvar, wvar=None, fit_var=None, labels={}, n_bins=20
     bin_kwargs_new = {
         'alpha' : 1.0,
         'edgecolor' : 'black',
-        'zorder' : 1,
+        'zorder' : 2,
         'label' : 'Binscatter',
     }
     
     line_kwargs_new = {
             'linewidth' : 2,
-            'zorder' : 0,
+            'zorder' : 1,
             'color' : 'firebrick',
             'label' : '_nolabel',
             }
@@ -703,31 +703,35 @@ def binscatter(df_in, yvars, xvar, wvar=None, fit_var=None, labels={}, n_bins=20
         yvar = yvars[0]
         plt.ylabel(labels.get(yvar, yvar))
     
-    if xlim is not None:
-        plt.xlim(xlim)
-    else:
-        if plot_raw_data:
-            xlim = stats.weighted_quantile(df[xvar].values, df[wvar].values, [0.005, 0.995])
+    if xlim != 'default':
+        if xlim is not None:
             plt.xlim(xlim)
         else:
-            bin_min = np.amin(by_bin[xvar].values)
-            bin_max = np.amax(by_bin[xvar].values)
-            tot_range = bin_max - bin_min
-            xlim = (bin_min - 0.05 * tot_range, bin_max + 0.05 * tot_range)
-            plt.xlim(xlim)
+            if plot_raw_data:
+                xlim = stats.weighted_quantile(df[xvar].values, df[wvar].values, [0.005, 0.995])
+                plt.xlim(xlim)
+            else:
+                bin_min = np.amin(by_bin[xvar].values)
+                bin_max = np.amax(by_bin[xvar].values)
+                tot_range = bin_max - bin_min
+                xlim = (bin_min - 0.05 * tot_range, bin_max + 0.05 * tot_range)
+                if all([np.isfinite(val) for val in xlim]):
+                    plt.xlim(xlim)
 
-    if ylim is not None:
-        plt.ylim(ylim)
-    else:
-        if plot_raw_data:
-            ylim = stats.weighted_quantile(df[yvar].values, df[wvar].values, [0.005, 0.995])
+    if ylim != 'default':
+        if ylim is not None:
             plt.ylim(ylim)
         else:
-            bin_min = np.amin(by_bin[yvar].values)
-            bin_max = np.amax(by_bin[yvar].values)
-            tot_range = bin_max - bin_min
-            ylim = (bin_min - 0.1 * tot_range, bin_max + 0.1 * tot_range)
-            plt.ylim(ylim)
+            if plot_raw_data:
+                ylim = stats.weighted_quantile(df[yvar].values, df[wvar].values, [0.005, 0.995])
+                plt.ylim(ylim)
+            else:
+                bin_min = np.amin(by_bin[yvar].values)
+                bin_max = np.amax(by_bin[yvar].values)
+                tot_range = bin_max - bin_min
+                ylim = (bin_min - 0.1 * tot_range, bin_max + 0.1 * tot_range)
+                if all([np.isfinite(val) for val in ylim]):
+                    plt.ylim(ylim)
 
     plt.tight_layout()
     
