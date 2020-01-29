@@ -62,9 +62,9 @@ class Table:
 
         if swp:
             table_text += r"""
-%TCIMACRO{\TeXButton{B}{\begin{table}[h!] \centering}}%
+%TCIMACRO{\TeXButton{B}{\begin{table}[{}] \centering}}%
 %BeginExpansion
-"""
+""".format(position)
 
         table_text += r'\begin{table}'
 

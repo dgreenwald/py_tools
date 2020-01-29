@@ -562,8 +562,15 @@ def binscatter(df_in, yvars, xvar, wvar=None, fit_var=None, labels={}, n_bins=20
         
     if isinstance(absorb, str):
         absorb = [absorb]
+        
+    absorb_list = []
+    for item in absorb:
+        if isinstance(item, str):
+            absorb_list.append(item)
+        else:
+            absorb_list += item
     
-    keep_list = [xvar] + yvars + control + absorb
+    keep_list = [xvar] + yvars + control + absorb_list
     if wvar is not None:
         keep_list.append(wvar)
     if fit_var is not None:
