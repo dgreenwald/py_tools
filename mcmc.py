@@ -34,56 +34,6 @@ from mpi4py import MPI
 #        
 #        
 
-# def resample_weights(x, w):
-
-    # ws = w / np.sum(w)
-    # N = len(ws)
-
-    # ix = np.random.choice(N, size=N, p=ws)
-    # x_new = x[ix, :]
-    # w_new = np.ones(N, dtype=bool)
-
-    # return x_new, w_new, ix
-
-#def robust_cholesky(A, offset=0.0):
-#
-#    done = False
-#    
-#    while not done:
-#
-#        B = A + offset * np.eye(A.shape[0])
-#            
-#        print(B)
-#        try:
-#            C = np.linalg.cholesky(B)
-#            done = True
-#        except:
-#            offset = 2.0 * offset + 1e-8
-#            B = A + offset * np.eye(A.shape[0])
-#            print("Increasing offset to {:g}".format(offset))
-#            if offset > 1e+6:
-#                raise Exception
-#
-#    return C, offset
-
-#def diagnostics(draws_list):
-#
-#    m = len(draws_list)
-#    n, k = draws_list[0].shape
-#
-#    for draws in draws_list:
-#        assert draws.shape == (n, k)
-#
-#    raise Exception
-#    return None
-    
-def robust_cholesky(A, min_eig=1e-12):
-    
-    vals, vecs = np.linalg.eig(A)
-    vals = np.maximum(vals, min_eig)
-    Dhalf = np.diag(np.sqrt(vals))
-    return vecs @ Dhalf
-
 def adapt_jump_scale(acc_rate, adapt_sens, adapt_target, adapt_range):
 
     e_term = np.exp(adapt_sens * (acc_rate - adapt_target))
@@ -413,7 +363,7 @@ class MonteCarlo:
 
             if robust:
 
-                self.CH_inv = robust_cholesky(self.H_inv)
+                self.CH_inv = nm.robust_cholesky(self.H_inv)
 
             else:
 
