@@ -53,19 +53,21 @@ def load(year, q, dataset, reimport=False, data_dir=None, columns=None,
         raise Exception
 
     # Convert variables from string to numeric
-    numerical_list = ['orig_int_rate', 'orig_upb', 'orig_term', 'orig_ltv',
-                      'orig_cltv', 'orig_dti', 'credit_score']
-    for col in df.columns:
-        if col in numerical_list:
-            df[col] = pd.to_numeric(df[col], errors='coerce')
-            
-    date_list = ['orig_date', 'first_pay_date']
-    for col in df.columns:
-        if col in date_list:
-            df[col] = pd.to_datetime(df[col], errors='coerce')
+    if df is not None:
 
-    # Save as parquet
-    df.to_parquet(parquet_file, compression=compression)
+        numerical_list = ['orig_int_rate', 'orig_upb', 'orig_term', 'orig_ltv',
+                          'orig_cltv', 'orig_dti', 'credit_score']
+        for col in df.columns:
+            if col in numerical_list:
+                df[col] = pd.to_numeric(df[col], errors='coerce')
+                
+        date_list = ['orig_date', 'first_pay_date']
+        for col in df.columns:
+            if col in date_list:
+                df[col] = pd.to_datetime(df[col], errors='coerce')
+
+        # Save as parquet
+        df.to_parquet(parquet_file, compression=compression)
 
     return df
 

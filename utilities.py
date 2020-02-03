@@ -1,3 +1,4 @@
+import os
 from collections import Mapping
 import itertools
 import numpy as np
@@ -156,3 +157,17 @@ def cartesian_matrices(A, B):
         C[kk, :, :] = cartesian((A[ii, :], B[jj, :]))
 
     return C
+
+def get_env(name, default, prefix='', upper=True, dtype=None):
+
+    # ipdb.set_trace()
+    fullname = prefix + name
+    if upper:
+        fullname = fullname.upper()
+
+    val = os.environ.get(fullname, default)
+
+    if dtype is not None:
+        val = dtype(val)
+
+    return val

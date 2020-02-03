@@ -97,7 +97,7 @@ def compute_binscatter(df_in, yvar, xvar, wvar=None, n_bins=10):
     df[xvar] *= df[wvar]
     df[yvar] *= df[wvar]
     
-    by_bin = df.groupby('x_bin')[xvar, yvar, wvar].sum()
+    by_bin = df.groupby('x_bin')[[xvar, yvar, wvar]].sum()
     by_bin[xvar] /= by_bin[wvar]
     by_bin[yvar] /= by_bin[wvar]
     
