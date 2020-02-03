@@ -68,3 +68,13 @@ def std_norm_bands(p_val):
     z_ub = norm.ppf(p_ub)
 
     return (z_lb, z_ub)
+
+def draw_norm(Sig):
+
+    C = np.linalg.cholesky(Sig)
+    return np.dot(C, np.random.randn(Sig.shape[0]))
+
+def draw_norm_multi(Sig, n):
+
+    C = np.linalg.cholesky(Sig)
+    return np.dot(np.random.randn(n, Sig.shape[0]), C.T)

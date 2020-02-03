@@ -4,24 +4,13 @@ from scipy.stats import multivariate_normal as mvn
 
 import copy
 
+from py_tools import numerical as nm, stats as st
+
 def init_to_val(shape, val):
 
     x = np.empty(shape)
     x[:] = val
     return x
-
-def draw_norm(Sig):
-
-    C = np.linalg.cholesky(Sig)
-    return np.dot(C, np.random.randn(Sig.shape[0]))
-
-def draw_norm_multi(Sig, n):
-
-    C = np.linalg.cholesky(Sig)
-    return np.dot(np.random.randn(n, Sig.shape[0]), C.T)
-
-def rsolve(b, A):
-    return np.linalg.solve(A.T, b.T).T
 
 class StateSpaceModel:
     """State space model.
@@ -61,7 +50,11 @@ class StateSpaceModel:
             x_bar = np.linalg.solve(np.eye(self.Nx) - self.A, c)
             self.b -= np.dot(Z, x_bar) 
 
-        self.RQR = np.dot(self.R, np.dot(self.Q, self.R.T))
+        self.QR = self.Q @ self.R.T
+        self.RQR = self.R @ self.QR
+
+        self.CQT = np.linalg.cholesky(self.Q).T
+        self.CHT = nm.robust_cholesky(self.H, min_eig=0.0).T
         
     def unconditional_cov(self):
         
@@ -70,16 +63,30 @@ class StateSpaceModel:
         except:
             return None
 
-    def simulate(self, x_1=None, Nt=None, shocks=None, ix=None, use_b=True):
+    def simulate(self, x_1=None, Nt=None, shocks=None, meas_err=None, ix=None,
+                 use_b=True):
 
         if shocks is None:
-            assert Nt is not None
-            CQ = np.linalg.cholesky(self.Q)
-            shocks = np.dot(CQ, np.random.randn(self.Ne, Nt)).T
+            if meas_err is None:
+                assert Nt is not None
+            else:
+                Nt = meas_err.shape[0]
         else:
-            assert Nt is None
-            Nt, _ = shocks.shape
+            Nt = shocks.shape[0] + 1
+
+        if shocks is None:
+            # CQ = np.linalg.cholesky(self.Q)
+            # shocks = np.dot(CQ, np.random.randn(self.Ne, Nt)).T
+            shocks = self.draw_shocks(Nt - 1)
         
+        if meas_err is None:
+            # CH = np.linalg.cholesky(self.H)
+            # meas_err = np.dot(CH, np.random.randn(self.Ny, Nt)).T
+            meas_err = self.draw_meas_err(Nt)
+
+        assert shocks.shape == (Nt - 1, self.Ne)
+        assert meas_err.shape == (Nt, self.Ny)
+
         if x_1 is None:
             Sig0 = self.unconditional_cov()
             C = np.linalg.cholesky(Sig0)
@@ -98,14 +105,21 @@ class StateSpaceModel:
         for tt in range(Nt):
 
             ix_t = ix[tt, :]
-            y_sim[tt, ix_t] = np.dot(self.Z[ix_t, :], x_t)
+            y_sim[tt, ix_t] = np.dot(self.Z[ix_t, :], x_t) + meas_err[tt, ix_t]
             if use_b: 
                 y_sim[tt, ix_t] += self.b[ix_t]
             x_sim[tt, :] = x_t
 
-            x_t = np.dot(self.A, x_t) + np.dot(self.R, shocks[tt, :])
+            if tt < Nt - 1:
+                x_t = np.dot(self.A, x_t) + np.dot(self.R, shocks[tt, :])
 
         return (y_sim, x_sim)
+
+    def draw_shocks(self, Nt):
+        return np.dot(np.random.randn(Nt, self.Ne), self.CQT)
+
+    def draw_meas_err(self, Nt):
+        return np.dot(np.random.randn(Nt, self.Ny), self.CHT)
 
 class StateSpaceEstimates:
     """Estimated states from applying state space model to particular dataset
@@ -146,7 +160,7 @@ class StateSpaceEstimates:
         # Item for smoother
         self.r = None
 
-    def kalman_filter(self, x_init=None, P_init=None):
+    def kalman_filter(self, x_init=None, P_init=None, overwrite_r=True):
         """Run the Kalman filter on the data y.
         
         Inputs:
@@ -155,7 +169,10 @@ class StateSpaceEstimates:
             x_init: Length Nx mean of initial x distribution
             P_init: (Nx x Nx) covariance matrix of initial x distribution
         """
-        
+
+        if overwrite_r:
+            self.r = None
+
         if x_init is not None:
             self.x_init = x_init
         if P_init is not None:
@@ -188,8 +205,9 @@ class StateSpaceEstimates:
             Z_t = self.ssm.Z[ix_t, :]
             err_t = self.y_til[tt, ix_t] - np.dot(Z_t, x_pred_t)
 
+            H_t = self.ssm.H[ix_t, :][:, ix_t]
             PZ = np.dot(P_pred_t, Z_t.T)
-            F_t = np.dot(Z_t, PZ) + self.ssm.H[ix_t, :][:, ix_t]
+            F_t = np.dot(Z_t, PZ) + H_t
             
             try:
                 self.log_like += mvn.logpdf(err_t, mean=np.zeros(np.sum(ix_t)), cov=F_t) 
@@ -198,7 +216,7 @@ class StateSpaceEstimates:
                 return None
             
             # Update step (DK style)
-            ZFi_t = rsolve(Z_t.T, F_t)
+            ZFi_t = nm.rsolve(Z_t.T, F_t)
             AP_t = np.dot(self.ssm.A, P_pred_t)
             K_t = np.dot(AP_t, ZFi_t)
             G_t = self.ssm.A - np.dot(K_t, Z_t)
@@ -247,10 +265,10 @@ class StateSpaceEstimates:
 
         return None
 
-    def state_smoother(self):
+    def state_smoother(self, disturbance_smooth=False):
         
-        # if self.r is None:
-        self.disturbance_smoother()
+        if (self.r is None) or (disturbance_smooth):
+            self.disturbance_smoother()
 
         self.x_smooth = np.zeros((self.Nt, self.Nx))
 
@@ -264,15 +282,51 @@ class StateSpaceEstimates:
                                           + np.dot(self.ssm.RQR, self.r[tt, :]))
 
         return None
-    
-    def draw_states(self):
+
+    def shock_smoother(self, disturbance_smooth=False):
+
+        if (self.r is None) or disturbance_smooth:
+            self.disturbance_smoother()
+
+        self.shocks_smooth = self.r[1:, :] @ self.ssm.QR.T
+        return None
+
+    def meas_err_smoother(self, disturbance_smooth=False):
+        """NEED TO TEST THIS"""
+        
+        if (self.r is None) or disturbance_smooth:
+            self.disturbance_smoother()
+
+        self.meas_err_smooth = init_to_val((self.Nt, self.Ny), np.nan)
+
+        # Recursively compute values
+        for tt in range(self.Nt):
+
+            ix_t = self.ix[tt, :]
+            H_t = self.ssm.H[ix_t, :][:, ix_t]
+            Z_t = self.ssm.Z[ix_t, :]
+            F_t = (Z_t @ (self.P_pred[tt, :, :] @ Z_t.T))
+
+            HFi_t = nm.rsolve(H_t, F_t)
+
+            self.meas_err_smooth[tt, ix_t] = HFi_t @ self.err[tt, ix_t] - (H_t @ self.K[tt, :, ix_t]) @ self.r[tt, :]
+
+        return None
+
+    def draw_states(self, draw_shocks=False, draw_meas_err=False):
 
         # Draw shocks
-        shocks = draw_norm_multi(self.ssm.Q, self.Nt)
-        x_1 = self.x_init + draw_norm(self.P_init)
+        shocks = self.ssm.draw_shocks(self.Nt - 1)
+        meas_err = self.ssm.draw_meas_err(self.Nt)
+
+        # shocks = st.draw_norm_multi(self.ssm.Q, self.Nt)
+        # meas_err = st.draw_norm_multi(self.ssm.H, self.Nt)
+        x_1 = self.x_init + st.draw_norm(self.P_init)
 
         # Simulate using random draws
-        y_plus, x_plus = self.ssm.simulate(x_1, shocks=shocks, ix=self.ix, use_b=False)
+        y_plus, x_plus = self.ssm.simulate(
+            x_1, shocks=shocks, meas_err=meas_err, ix=self.ix, use_b=False
+        )
 
         # Create artificial observations
         y_star = self.y_til - y_plus
@@ -280,7 +334,17 @@ class StateSpaceEstimates:
         # Get smoothed values
         sse_til = StateSpaceEstimates(self.ssm_til, y_star)
         sse_til.kalman_filter(x_init=self.x_init, P_init=self.P_init)
-        sse_til.disturbance_smoother()
-        sse_til.state_smoother()
+        # sse_til.disturbance_smoother()
+        sse_til.state_smoother(disturbance_smooth=True)
 
-        return x_plus + sse_til.x_smooth
+        self.x_draw = x_plus + sse_til.x_smooth
+
+        if draw_shocks:
+            sse_til.shock_smoother()
+            self.shocks_draw = shocks + sse_til.shocks_smooth
+
+        if draw_meas_err:
+            sse_til.meas_err_smoother()
+            self.meas_err_draw = meas_err + sse_til.meas_err_smooth
+
+        return None

@@ -1,6 +1,12 @@
 import numpy as np
 import itertools
 
+def quad_form(A, X):
+    return np.dot(A.T, np.dot(X, A))
+
+def rsolve(b, A):
+    return np.linalg.solve(A.T, b.T).T
+
 def gradient(f, x, args=(), step=1e-5):
 
     grad = None
@@ -26,9 +32,6 @@ def gradient(f, x, args=(), step=1e-5):
         grad[ii, :] = df_i
 
     return grad
-
-def quad_form(A, X):
-    return np.dot(A.T, np.dot(X, A))
 
 def hessian(f, x_in, eps=1e-4):
     
@@ -118,6 +121,13 @@ def bound_transform(vals, lb, ub, to_bdd=True):
         trans_vals[ix_ub_only] = -np.log(ub[ix_ub_only] - vals[ix_ub_only])
 
     return trans_vals
+
+def robust_cholesky(A, min_eig=1e-12):
+    
+    vals, vecs = np.linalg.eig(A)
+    vals = np.maximum(vals, min_eig)
+    Dhalf = np.diag(np.sqrt(vals))
+    return vecs @ Dhalf
 
 def my_chol(A_in):
     
