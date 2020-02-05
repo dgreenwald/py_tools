@@ -15,9 +15,9 @@ from py_tools import in_out
 def concat(collapser_list, check=True):
     
     col0 = collapser_list[0]
-    var_list = col0.var_list
+    var_list = col0.var_list.copy()
     weight_var = col0.weight_var
-    by_list = col0.by_list
+    by_list = col0.by_list.copy()
     
     if check:
         for col in collapser_list[1:]:
@@ -25,84 +25,130 @@ def concat(collapser_list, check=True):
             assert col.weight_var == weight_var
             assert col.by_list == by_list
     
-    df = pd.concat([col.df for col in collapser_list], axis=0)
+    dfc = pd.concat([col.dfc for col in collapser_list], axis=0)
     
-    return Collapser(df, var_list=var_list, weight_var=weight_var, by_list=by_list)
+    col = Collapser(dfc=dfc, var_list=var_list, weight_var=weight_var, 
+                     by_list=by_list)
+    col.collapse(by_list, inplace=True)
+    return col
+
+def load_collapser(filename, add_suffix=True, by_list=[], weight_var=None):
+        
+    col = Collapser(by_list=by_list, weight_var=weight_var)
+    col.load(filename, add_suffix=add_suffix)
+    return col
+
+def create_suffix(by_list, weight_var):
+    
+    return '_'.join([''] + by_list + ['wtd_by', weight_var])
 
 class Collapser:
     
     """Class for flexibly collapsing data sets"""
     
-    def __init__(self, df=None, var_list=None, weight_var=None, by_list=None):
+    def __init__(self, df=None, var_list=[], weight_var=None, by_list=[], 
+                 dfc=None, **kwargs):
     
-        
-        self.df = None
-        self.var_list = None
-        self.weight_var = None
-        self.by_list = None
+        assert (df is None) or (dfc is None)
         
         if df is not None:
-            self.set(df, var_list, weight_var, by_list=by_list)
+            self.set_data(df, var_list, weight_var, by_list=by_list, inplace=True, 
+                     **kwargs)
+        else:
+            self.dfc = dfc
+            self.var_list = var_list
+            self.weight_var = weight_var
+            self.by_list = by_list
     
-    def set(self, df, var_list, weight_var, by_list=None):
+    def set_data(self, df, var_list, weight_var, by_list, collapse=True,
+            inplace=True, scale=False):
         
-        self.df = pd.DataFrame(index=df.index.copy())
+        copy_list = [var for var in by_list if var not in df.index.names]
+        if copy_list:
+            self.dfc = df[copy_list].copy()
+        else:
+            self.dfc = pd.DataFrame(index=df.index.copy())
+        
         self.var_list = var_list
         self.weight_var = weight_var
         self.by_list = by_list
         
-        if df is not None:
-            self.df = pd.DataFrame(index=df.index.copy())
+        if not self.var_list:
+            self.var_list = [var for var in df.columns if var not in self.by_list]
+            
+        if self.weight_var is None:
+            weight = np.ones(len(df))
+        else:
+            weight = df[self.weight_var].copy()
+            
+        if scale:
+            weight = weight / np.mean(weight)
             
         for var in self.var_list:
-            self.df[var + '_num'] = df[var] * df[self.weight_var]
-            self.df[var + '_denom'] = pd.notnull(df[var]).astype(np.int) * df[self.weight_var]
             
-        if self.by_list is not None:
-            self.collapse(self.by_list)
+            self.dfc[var + '_num'] = df[var] * weight
+            self.dfc[var + '_denom'] = pd.notnull(df[var]).astype(np.int) * weight
             
-    def get(self):
+        if collapse:
+            return self.collapse(self.by_list, inplace=inplace)
+            
+    def get_data(self):
         
-        df_out = pd.DataFrame(index=self.df.index.copy())
+        df_out = pd.DataFrame(index=self.dfc.index.copy())
         for var in self.var_list:
-            df_out[var] = self.df[var + '_num'] / self.df[var + '_denom']
+            df_out[var] = self.dfc[var + '_num'] / self.dfc[var + '_denom']
             
         return df_out
             
-    def collapse(self, by_list, weight_var=None):
+    def collapse(self, by_list, inplace=False):
         
-        if self.by_list is not None:
-            self.df = self.df.reset_index()
-
-        self.by_list = by_list
-        self.df = self.df.groupby(by_list).sum()
+        dfc_new = self.dfc.groupby(by_list).sum()
+        if inplace:
+            self.dfc = dfc_new
+            self.by_list = by_list
+            return None
+        else:
+            return Collapser(dfc=dfc_new, var_list=self.var_list.copy(), 
+                             weight_var=self.weight_var, by_list=by_list)
         
-        return None
+    def save(self, filename, add_suffix=True, fmt='parquet'):
         
-    def save(self, filename, fmt='parquet'):
+        if add_suffix:
+            suffix = create_suffix(self.by_list, self.weight_var)
+        else:
+            suffix = ''
+            
+        fullname = filename + suffix
         
         if fmt == 'parquet':
-            self.df.to_parquet(filename + '_data.parquet')
+            self.dfc.to_parquet(fullname + '_data.parquet')
         elif fmt == 'pickle':
-            self.df.to_pickle(filename + '_data.pkl')
+            self.dfc.to_pickle(fullname + '_data.pkl')
         else:
             raise Exception
         
         for item in ['var_list', 'weight_var', 'by_list']:
-            in_out.save_pickle(filename + '_' + item + '.pkl', getattr(self, item))
+            in_out.save_pickle(getattr(self, item), fullname + '_' + item + '.pkl')
 
         return None
     
-    def load(self, filename, fmt='parquet'):
+    def load(self, filename, add_suffix=True, fmt='parquet'):
+        
+        if add_suffix:
+            suffix = create_suffix(self.by_list, self.weight_var)
+        else:
+            suffix = ''
+            
+        fullname = filename + suffix
         
         if fmt == 'parquet':
-            self.df = pd.read_parquet(filename + '_data.parquet')
+            self.dfc = pd.read_parquet(fullname + '_data.parquet')
         elif fmt == 'pickle':
-            self.df = pd.read_pickle(filename + '_data.pkl')
+            self.dfc = pd.read_pickle(fullname + '_data.pkl')
         else:
             raise Exception
         
         for item in ['var_list', 'weight_var', 'by_list']:
-            setattr(self, item, in_out.load_pickle(filename + '_' + item + '.pkl'))
+            setattr(self, item, in_out.load_pickle(fullname + '_' + item + '.pkl'))
 
         return None
