@@ -111,6 +111,34 @@ class Collapser:
             return Collapser(dfc=dfc_new, var_list=self.var_list.copy(), 
                              weight_var=self.weight_var, by_list=by_list)
         
+    def resample(self, by_list, time_var, freq, inplace=False):
+        
+        dfc_new = self.dfc.groupby(by_list).resample(freq, level=time_var).sum()
+        by_list_new = list(dfc_new.index.names)
+        
+        if inplace:
+            self.dfc = dfc_new
+            self.by_list = by_list_new
+            return None
+        else:
+            return Collapser(dfc=dfc_new, var_list=self.var_list.copy(), 
+                             weight_var=self.weight_var, by_list=by_list_new)
+        
+    def loc(self, sliced, copy=False):
+        
+        dfc_sliced = self.dfc.loc[sliced, :]
+        if copy:
+            dfc_new = dfc_sliced.copy()
+        else:
+            dfc_new = dfc_sliced
+            
+        return Collapser(dfc=dfc_new, var_list=self.var_list.copy(),
+                         weight_var=self.weight_var, by_list=self.by_list.copy())
+    
+    def get_weight(self, var):
+        
+        return self.dfc[var + '_denom'].values
+        
     def save(self, filename, add_suffix=True, fmt='parquet'):
         
         if add_suffix:
@@ -151,4 +179,12 @@ class Collapser:
         for item in ['var_list', 'weight_var', 'by_list']:
             setattr(self, item, in_out.load_pickle(fullname + '_' + item + '.pkl'))
 
+        return None
+    
+    def rename(self, name_map):
+        
+        self.dfc = self.dfc.rename(columns=name_map)
+        self.dfc.index.names = [name_map.get(var, var) for var in self.dfc.index.names]
+        self.by_list = [name_map.get(var, var) for var in self.by_list]
+        
         return None
