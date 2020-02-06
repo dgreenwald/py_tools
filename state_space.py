@@ -288,6 +288,10 @@ class StateSpaceEstimates:
         if (self.r is None) or disturbance_smooth:
             self.disturbance_smoother()
 
+        # empty_row = np.empty((1, self.ssm.Ne))
+        # empty_row.fill(np.nan)
+        # self.shocks_smooth = np.vstack((empty_row, self.r[1:, :] @ self.ssm.QR.T))
+            
         self.shocks_smooth = self.r[1:, :] @ self.ssm.QR.T
         return None
 
@@ -341,7 +345,7 @@ class StateSpaceEstimates:
 
         if draw_shocks:
             sse_til.shock_smoother()
-            self.shocks_draw = shocks + sse_til.shocks_smooth
+            self.shock_draw = shocks + sse_til.shocks_smooth
 
         if draw_meas_err:
             sse_til.meas_err_smoother()
