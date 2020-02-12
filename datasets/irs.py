@@ -190,7 +190,7 @@ def import_county_year_to_2009(year, data_dir=default_dir):
 
     year_dir = data_dir + 'county/' + str(year) + 'CountyIncome/'
 
-    names = ['DROP', 'statefips', 'countyfips', 'county', 'n_returns',
+    names = ['DROP', 'statefips', 'countyfips', 'county_name', 'n_returns',
              'n_exemptions', 'agi', 'wagesal', 'dividends', 'interest']
 
     drop_list = ['DROP']

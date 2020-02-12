@@ -195,8 +195,17 @@ class Collapser:
     
     def rename(self, name_map):
         
-        self.dfc = self.dfc.rename(columns=name_map)
         self.dfc.index.names = [name_map.get(var, var) for var in self.dfc.index.names]
         self.by_list = [name_map.get(var, var) for var in self.by_list]
+        self.var_list = [name_map.get(var, var) for var in self.var_list]
+        self.weight_var = name_map.get(self.weight_var, self.weight_var)
+        
+        name_map_dfc = {}
+        for suffix in ['num', 'denom']:
+            name_map_dfc.update({
+                key + '_' + suffix : val + '_' + suffix for key, val in name_map.items()
+                })
+        
+        self.dfc = self.dfc.rename(columns=name_map_dfc)
         
         return None
