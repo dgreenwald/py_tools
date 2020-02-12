@@ -42,6 +42,13 @@ def create_suffix(by_list, weight_var):
     
     return '_'.join([''] + by_list + ['wtd_by', weight_var])
 
+def collapse(df, by_list, var_list=[], weight_var=None, weight_suffix=False):
+    
+    coll = Collapser(df, var_list=var_list, by_list=by_list, 
+                     weight_var=weight_var)
+    
+    return coll.get_data(weight_suffix=weight_suffix)
+
 class Collapser:
     
     """Class for flexibly collapsing data sets"""
@@ -92,11 +99,16 @@ class Collapser:
         if collapse:
             return self.collapse(self.by_list, inplace=inplace)
             
-    def get_data(self):
+    def get_data(self, weight_suffix=False):
+        
+        if weight_suffix:
+            suffix = '_' + self.weight_var
+        else:
+            suffix = ''
         
         df_out = pd.DataFrame(index=self.dfc.index.copy())
         for var in self.var_list:
-            df_out[var] = self.dfc[var + '_num'] / self.dfc[var + '_denom']
+            df_out[var + suffix] = self.dfc[var + '_num'] / self.dfc[var + '_denom']
             
         return df_out
             
