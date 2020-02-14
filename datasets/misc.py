@@ -9,8 +9,9 @@ import py_tools.time_series as ts
 from . import defaults
 default_dir = defaults.base_dir('DAN')
 
-def load(dataset, user='DAN', master_dirs={}, **kwargs):
-    """Load data from one-off file"""
+def load(dataset, user='DAN', master_dirs={}, reimport=False, 
+         save_pickle=True, **kwargs):
+    
     default_dir = defaults.base_dir(user)
     dirs = master_dirs.copy()
     if 'base' not in dirs:
@@ -19,6 +20,18 @@ def load(dataset, user='DAN', master_dirs={}, **kwargs):
         # dirs['base'] = home_dir + '/Dropbox/data/'
 
     data_dir = dirs['base'] + 'misc/'
+    
+    pkl_file = data_dir + dataset + '.pkl'
+    if reimport or (not os.path.exists(pkl_file)):
+        df = load_from_source(dataset, data_dir, **kwargs)
+        df.to_pickle(pkl_file)
+    else:
+        df = pd.read_pickle(pkl_file)
+        
+    return df
+
+def load_from_source(dataset, data_dir, **kwargs):
+    """Load data from one-off file"""
 
     if dataset == 'bls_labor_share':
 
@@ -181,6 +194,24 @@ def load(dataset, user='DAN', master_dirs={}, **kwargs):
 
         df['date'] = pd.to_datetime(df['date'])
         df.set_index('date')
+        
+    elif dataset == 'martin_epbound':
+        
+        infile = data_dir + 'martin_epbound.xls'
+        dates = pd.read_excel(infile, skiprows=0, header=None, 
+                              names=['year', 'month', 'day'], 
+                              sheet_name='Sheet1')
+        
+        ep_names = ['epbound_' + suffix for suffix in ['1mo', '2mo', '3mo', '6mo', '12mo']]
+        values = pd.read_excel(infile, skiprows=0, header=None, names=ep_names,
+                               sheet_name='Sheet2')
+        
+        df = pd.concat((dates, values), axis=1)
+        df['date'] = (df['year'].astype(str) + '-' + df['month'].astype(str) 
+                      + '-' + df['day'].astype(str))
+        df['date'] = pd.to_datetime(df['date'], errors='coerce')
+        df = df.drop(columns=['year', 'month', 'day'])
+        df = df.set_index('date')
         
     elif dataset == 'ns_mp_shocks':
         # Nakamura and Steinsson shocks
