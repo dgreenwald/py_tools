@@ -6,6 +6,7 @@ Created on Sat Mar  5 07:46:14 2016
 """
 
 import numpy as np
+import scipy.sparse as sp
 from . import walker
 # from walker import WalkerRandomSampling
 
@@ -52,10 +53,16 @@ def update_value(V):
     v = V[np.arange(V.shape[0]), indices]
     return indices, v
     
-def get_transition(indices):
+def get_transition(indices, sparse=False):
     
     n = len(indices)
-    transition = np.zeros((n, n))
+    
+    if sparse:
+        transition = sp.lil_matrix((n, n))
+        transition = transition.to_csr()
+    else:
+        transition = np.zeros((n, n))
+        
     transition[np.arange(n), indices] = 1
     return transition
     

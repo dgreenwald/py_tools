@@ -7,8 +7,10 @@ Created on Sat Mar  5 07:09:18 2016
 
 import matplotlib.pyplot as plt
 import numpy as np
+import scipy.sparse as sp
 
 import py_tools.econ as ec
+from py_tools.utilities import tic, toc
 
 class DiscreteModel:
     """Object for discrete modeling. 
@@ -29,24 +31,60 @@ class DiscreteModel:
 
     """
 
-    def __init__(self, bet, flow_list, x_grid, z_grid, Pz):
+    def __init__(self, bet, flow_list, x_grid, z_grid, Pz, index_list=None,
+                 sparse=False):
         """Constructor"""
+        
         self.bet = bet
         self.flow_list = flow_list
         self.x_grid = x_grid
         self.z_grid = z_grid
         self.Pz = Pz
+        self.sparse = sparse
 
-        # Initial calculations
+        # Sizes
         self.Nx, self.kx = self.x_grid.shape
         self.Nz, self.kz = self.z_grid.shape
+        
+        self.z_states = np.repeat(np.arange(self.Nz), self.Nx)
+        self.x_states = np.tile(np.arange(self.Nx), self.Nz)
 
+        # Discounted transition probs for exogenous states
         self.bP = self.bet * self.Pz
+        
+        # Discounted transition probs for combined states
         self.bP1 = np.kron(self.bP, np.ones((self.Nx, 1)))
+        
+        if self.sparse:
+            self.Pzs = sp.csr_matrix(self.Pz)
+            self.bPs = sp.csr_matrix(self.bP)
+            self.bP1 = sp.kron(self.bPs, np.ones((self.Nx, 1)))
+        else:
+            self.bP1 = np.kron(self.bP, np.ones((self.Nx, 1)))
 
         # Initializations
         self.v_list = self.Nz * [np.zeros((self.Nx, 1))]
-        self.index_list = self.Nz * [np.zeros((self.Nx, 1)).astype(int)]
+        
+        if index_list is None:
+            self.index_list = self.Nz * [np.arange(self.Nx).astype(int)]
+        else:
+            self.index_list = index_list
+            
+        # Check for nans
+        opt_flow = self.get_opt_flow()
+        assert np.all(np.isfinite(opt_flow))
+        
+        # self.flow_mat = np.concatenate([flow_i[np.newaxis, :, :] for flow_i in self.flow_list], axis=0)
+        # self.index_mat = np.concatenate([index[np.newaxis, :] for index in self.index_list], axis=0)
+        
+    def get_opt_flow(self):
+        
+        opt_flow_list = [self.flow_list[ii][np.arange(self.Nx), 
+                                            np.squeeze(self.index_list[ii])][:, np.newaxis] 
+                         for ii in range(self.Nz)]
+        
+        opt_flow = np.vstack(opt_flow_list)
+        return opt_flow
 
     def solve(self):
         """Solve model"""
@@ -56,46 +94,104 @@ class DiscreteModel:
 
         R = np.vstack(self.flow_list)
         indices = np.vstack(self.index_list)
+        
+        # Temp code
+        self.Pzs = sp.csr_matrix(self.Pz)
+        self.bPs = sp.csr_matrix(self.bP)
+        self.bP1s = sp.kron(self.bPs, np.ones((self.Nx, 1)))
+        self.Ixz = sp.eye(self.Nx * self.Nz)
+        # end
 
         while not done:
             
             it += 1
+            
             indices_old = indices
             
             # Howard improvement step
-            transition_list = [ec.get_transition(index) for index in self.index_list]
-            bP_trans_list = [np.kron(self.bP[ii, :], transition_list[ii]) for ii in range(self.Nz)]
-            bP_trans = np.vstack(bP_trans_list)
+            opt_flow = self.get_opt_flow()
             
-            opt_flow_list = [self.flow_list[ii][np.arange(self.Nx), 
-                                                np.squeeze(self.index_list[ii])][:, np.newaxis] 
-                             for ii in range(self.Nz)]
-            opt_flow = np.vstack(opt_flow_list)
+            print("Dense:")
+            start = tic()
+            bP_trans = self.get_P_trans(discount=True, sparse=self.sparse)
             v = np.linalg.solve((np.eye(self.Nx * self.Nz) - bP_trans), opt_flow)
-            self.v_list = np.split(v, self.Nz)
+            toc(start)
+            
+            V = v.reshape((self.Nz, self.Nx))
+            
+            # Sparse version
+            print("Sparse:")
+            # start = tic()
+            bP_trans_sparse = self.get_P_trans(discount=True, sparse=True)
+            vs = sp.linalg.spsolve(self.Ixz - bP_trans_sparse, opt_flow)
+            # toc(start)
+            
+            # print("Sparse2:")
+            # start = tic()
+            # bP_trans_sparse = self.get_P_trans(discount=True, sparse=True)
+            # vs = sp.linalg.spsolve(self.Ixz - bP_trans_sparse, opt_flow)
+            # toc(start)
             
             # Update step
-            v_next = np.vstack([vi.T for vi in self.v_list])
-            W = np.dot(self.bP1, v_next)
-            V = R + W
-            indices, v = ec.update_value(V)
+            W = np.dot(self.bP1, V)
+            Q = R + W
+            indices, v = ec.update_value(Q)
             self.index_list = np.split(indices, self.Nz)
+            
+            # toc(start)
             
             done = np.all(indices_old == indices)
             
         print('Converged in {} iterations'.format(it))
 
-        self.V = v.reshape((self.Nx, self.Nz), order='F')
-        self.I = indices.reshape((self.Nx, self.Nz), order='F')
+        self.V = v.reshape((self.Nz, self.Nx))
+        self.I = indices.reshape((self.Nz, self.Nx))
         
         return None
+    
+    def get_P_trans(self, discount=False, sparse=False):
+        
+        transition_list = [ec.get_transition(index, sparse=self.sparse) for index in self.index_list]
+        
+        if sparse:
+            
+            if discount:
+                this_P = self.bPs
+            else:
+                this_P = self.Pzs
+            
+            P_trans_list = [sp.kron(this_P[ii, :], transition_list[ii]) for ii in range(self.Nz)]
+            P_trans = sp.vstack(P_trans_list)
+            
+        else:
+            
+            if discount:
+                this_P = self.bP
+            else:
+                this_P = self.Pz
+            
+            P_trans_list = [np.kron(this_P[ii, :], transition_list[ii]) for ii in range(self.Nz)]
+            P_trans = np.vstack(P_trans_list)
+            
+        return P_trans
+    
+    def compute_stationary_dist(self):
+        
+        transition_list = [ec.get_transition(index) for index in self.index_list]
+        P_trans = np.vstack([np.kron(self.Pz[ii, :], transition_list[ii]) for ii in range(self.Nz)])
+        vals, vecs = np.linalg.eig(P_trans.T)
+        self.pi_star = vecs[:, 0] / np.sum(vecs[:, 0])
+        
+        # check = P_trans.T @ self.pi_star
+        return None
 
-    def sim(self, Nsim):
+    def sim(self, Nsim, ix0=0, iz0=0):
+        
         """Simulate from solution"""
-        z_ix_sim = ec.sim_discrete(self.Pz, Nsim)
+        z_ix_sim = ec.sim_discrete(self.Pz, Nsim, i0=iz0)
         z_sim = self.z_grid[z_ix_sim, :]
 
-        x_ix_sim = ec.sim_policy(self.index_list, z_ix_sim)
+        x_ix_sim = ec.sim_policy(self.index_list, z_ix_sim, i0=ix0)
         x_sim = self.x_grid[x_ix_sim, :]
         return (x_sim, z_sim)
 
