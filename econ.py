@@ -59,7 +59,7 @@ def get_transition(indices, sparse=False):
     
     if sparse:
         transition = sp.lil_matrix((n, n))
-        transition = transition.to_csr()
+        transition = transition.tocsr()
     else:
         transition = np.zeros((n, n))
         

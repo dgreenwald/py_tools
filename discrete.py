@@ -31,8 +31,7 @@ class DiscreteModel:
 
     """
 
-    def __init__(self, bet, flow_list, x_grid, z_grid, Pz, index_list=None,
-                 sparse=False):
+    def __init__(self, bet, flow_list, x_grid, z_grid, Pz, index_list=None):
         """Constructor"""
         
         self.bet = bet
@@ -40,7 +39,7 @@ class DiscreteModel:
         self.x_grid = x_grid
         self.z_grid = z_grid
         self.Pz = Pz
-        self.sparse = sparse
+        # self.sparse = sparse
 
         # Sizes
         self.Nx, self.kx = self.x_grid.shape
@@ -48,22 +47,22 @@ class DiscreteModel:
         
         self.z_states = np.repeat(np.arange(self.Nz), self.Nx)
         self.x_states = np.tile(np.arange(self.Nx), self.Nz)
+        
+        # Sparse identity  matrix
+        self.Ixz = sp.eye(self.Nx * self.Nz)
 
         # Discounted transition probs for exogenous states
         self.bP = self.bet * self.Pz
         
+        # Create sparse matrices
+        self.Pzs = sp.csr_matrix(self.Pz)
+        self.bPs = sp.csr_matrix(self.bP)
+        
         # Discounted transition probs for combined states
         self.bP1 = np.kron(self.bP, np.ones((self.Nx, 1)))
-        
-        if self.sparse:
-            self.Pzs = sp.csr_matrix(self.Pz)
-            self.bPs = sp.csr_matrix(self.bP)
-            self.bP1 = sp.kron(self.bPs, np.ones((self.Nx, 1)))
-        else:
-            self.bP1 = np.kron(self.bP, np.ones((self.Nx, 1)))
 
         # Initializations
-        self.v_list = self.Nz * [np.zeros((self.Nx, 1))]
+        # self.v_list = self.Nz * [np.zeros((self.Nx, 1))]
         
         if index_list is None:
             self.index_list = self.Nz * [np.arange(self.Nx).astype(int)]
@@ -99,7 +98,7 @@ class DiscreteModel:
         self.Pzs = sp.csr_matrix(self.Pz)
         self.bPs = sp.csr_matrix(self.bP)
         self.bP1s = sp.kron(self.bPs, np.ones((self.Nx, 1)))
-        self.Ixz = sp.eye(self.Nx * self.Nz)
+        
         # end
 
         while not done:
@@ -111,20 +110,18 @@ class DiscreteModel:
             # Howard improvement step
             opt_flow = self.get_opt_flow()
             
-            print("Dense:")
-            start = tic()
-            bP_trans = self.get_P_trans(discount=True, sparse=self.sparse)
-            v = np.linalg.solve((np.eye(self.Nx * self.Nz) - bP_trans), opt_flow)
-            toc(start)
-            
-            V = v.reshape((self.Nz, self.Nx))
+            # print("Dense:")
+            # start = tic()
+            # bP_trans = self.get_P_trans(discount=True, sparse=self.sparse)
+            # v = np.linalg.solve((np.eye(self.Nx * self.Nz) - bP_trans), opt_flow)
+            # toc(start)
             
             # Sparse version
             print("Sparse:")
-            # start = tic()
+            start = tic()
             bP_trans_sparse = self.get_P_trans(discount=True, sparse=True)
-            vs = sp.linalg.spsolve(self.Ixz - bP_trans_sparse, opt_flow)
-            # toc(start)
+            v = sp.linalg.spsolve(self.Ixz - bP_trans_sparse, opt_flow)
+            toc(start)
             
             # print("Sparse2:")
             # start = tic()
@@ -133,6 +130,7 @@ class DiscreteModel:
             # toc(start)
             
             # Update step
+            V = v.reshape((self.Nz, self.Nx))
             W = np.dot(self.bP1, V)
             Q = R + W
             indices, v = ec.update_value(Q)
@@ -149,9 +147,9 @@ class DiscreteModel:
         
         return None
     
-    def get_P_trans(self, discount=False, sparse=False):
+    def get_P_trans(self, discount=False, sparse=True):
         
-        transition_list = [ec.get_transition(index, sparse=self.sparse) for index in self.index_list]
+        transition_list = [ec.get_transition(index, sparse=False) for index in self.index_list]
         
         if sparse:
             
@@ -175,12 +173,20 @@ class DiscreteModel:
             
         return P_trans
     
-    def compute_stationary_dist(self):
+    def compute_stationary_dist(self, tol=1e-6):
         
-        transition_list = [ec.get_transition(index) for index in self.index_list]
-        P_trans = np.vstack([np.kron(self.Pz[ii, :], transition_list[ii]) for ii in range(self.Nz)])
-        vals, vecs = np.linalg.eig(P_trans.T)
-        self.pi_star = vecs[:, 0] / np.sum(vecs[:, 0])
+        # transition_list = [ec.get_transition(index) for index in self.index_list]
+        # P_trans = np.vstack([np.kron(self.Pz[ii, :], transition_list[ii]) for ii in range(self.Nz)])
+        
+        P_trans = self.get_P_trans(discount=False, sparse=True)
+        vals, vecs = sp.linalg.eigs(P_trans.T)
+        
+        assert np.abs(np.real(vals[0]) - 1.0) < tol
+        # ix = np.argmax(np.abs(vals))
+        
+        self.pi_star = np.real(vecs[:, 0])
+        self.pi_star = self.pi_star / np.sum(self.pi_star)
+        # self.pi_star = vecs[:, 0] / np.sum(vecs[:, 0])
         
         # check = P_trans.T @ self.pi_star
         return None
