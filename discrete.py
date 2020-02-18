@@ -12,6 +12,58 @@ import scipy.sparse as sp
 import py_tools.econ as ec
 from py_tools.utilities import tic, toc
 
+def to_2d(x):
+    
+    if len(x.shape) == 1:
+        return x[:, np.newaxis]
+    elif len(x.shape) == 2:
+        return x
+    else:
+        return None
+
+def combine_grids(x, y):
+    
+    x_2d = to_2d(x)
+    y_2d = to_2d(y)
+    
+    assert (x_2d is not None) and (y_2d is not None)
+    
+    x_stack = np.repeat(x_2d, len(y), axis=0)
+    y_stack = np.tile(y_2d, (len(x), 1))
+    
+    return np.hstack((x_stack, y_stack))
+
+def combine_grids_from_list(grids_list):
+    
+    stack = to_2d(grids_list[0])
+    assert stack is not None
+    
+    for ii in range(1, len(grids_list)):
+        stack = combine_grids(stack, grids_list[ii])
+        
+    return stack
+
+def combine_markov_chains(grids_list, P_list):
+    
+    stack = grids_list[0]
+    P_stack = P_list[0]
+    
+    for ii in range(1, len(grids_list)):
+        stack = combine_grids(stack, grids_list[ii])
+        P_stack = np.kron(P_stack, P_list[ii])
+        
+    return stack, P_stack
+
+def drop_low_probs(P, tol=1e-6):
+    
+    P_new = P.copy()
+    ix = P_new < tol
+    P_new[ix] = 0
+    P_sum = np.sum(P_new, axis=1)
+    P_new = P_new / P_sum[:, np.newaxis]
+    
+    return P_new
+
 class DiscreteModel:
     """Object for discrete modeling. 
     
@@ -31,28 +83,29 @@ class DiscreteModel:
 
     """
 
-    def __init__(self, bet, flow_list, x_grid, z_grid, Pz, index_list=None):
+    def __init__(self, bet, flow_list, x_grid, z_grid, Pz, index_list=None,
+                 P_tol=1e-6):
         """Constructor"""
         
-        self.bet = bet
+        self.bet = np.array(bet)
         self.flow_list = flow_list
         self.x_grid = x_grid
         self.z_grid = z_grid
-        self.Pz = Pz
+        self.Pz = drop_low_probs(Pz, tol=P_tol)
         # self.sparse = sparse
 
         # Sizes
         self.Nx, self.kx = self.x_grid.shape
         self.Nz, self.kz = self.z_grid.shape
         
-        self.z_states = np.repeat(np.arange(self.Nz), self.Nx)
-        self.x_states = np.tile(np.arange(self.Nx), self.Nz)
+        # self.z_states = np.repeat(np.arange(self.Nz), self.Nx)
+        # self.x_states = np.tile(np.arange(self.Nx), self.Nz)
         
         # Sparse identity  matrix
         self.Ixz = sp.eye(self.Nx * self.Nz)
 
         # Discounted transition probs for exogenous states
-        self.bP = self.bet * self.Pz
+        self.bP = self.bet[:, np.newaxis] * self.Pz
         
         # Create sparse matrices
         self.Pzs = sp.csr_matrix(self.Pz)

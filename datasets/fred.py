@@ -19,6 +19,9 @@ def load(codes=None, code_names={},
 
     if codes is None:
         codes = list(code_names.keys())
+        
+    if isinstance(codes, str):
+        codes = [codes]
 
     stored_series_file = data_dir + 'series.pkl'
     if os.path.isfile(stored_series_file):
