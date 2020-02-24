@@ -660,11 +660,13 @@ class RWMC(MonteCarlo):
 
         full_suffix = self.chain_suffix(chain_no)
         self.save_list(np_list=['draws', 'post_sim', 'acc_rate'], suffix=full_suffix)
+        self.save_list(np_list=['jump_scale'], suffix=full_suffix)
 
     def load_chain(self, chain_no=0):
 
         full_suffix = self.chain_suffix(chain_no)
         self.load_list(np_list=['draws', 'post_sim', 'acc_rate'], suffix=full_suffix)
+        self.load_list(np_list=['jump_scale'], suffix=full_suffix)
 
     def load_chains(self, chains):
 

@@ -21,6 +21,19 @@ def save_hist(vals, path, **kwargs):
     h = np.histogram(vals, **kwargs)
     dt.to_pickle(h, path)
 
+def save_hist_npy(vals, base_path, **kwargs):
+
+    hist, bin_edges = np.histogram(vals, **kwargs)
+    np.save(base_path + 'hist.npy', hist) 
+    np.save(base_path + 'bin_edges.npy', bin_edges) 
+
+def load_hist_npy(base_path):
+
+    hist = np.load(base_path + 'hist.npy') 
+    bin_edges = np.load(base_path + 'bin_edges.npy') 
+
+    return hist, bin_edges
+
 def two_axis(df_in, var1, var2, filepath=None, loc1='upper left', 
              loc2='upper right', loc_single=None, legend_font=10, label_font=12,
              normalize=False, color1='#1f77b4', color2='#ff7f0e', flip1=False,
@@ -219,7 +232,7 @@ def hist(df_in, var, label=None, xlabel=None, ylabel=None, wvar=None,
     plt.close(fig)
 
     if copy_path is not None:
-        save_hist(df[var].values, copy_path, density=True, bins=bins, weights=w)
+        save_hist_npy(df[var].values, copy_path, density=True, bins=bins, weights=w)
 
     return True
 

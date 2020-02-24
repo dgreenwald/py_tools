@@ -5,6 +5,7 @@ from scipy.stats import multivariate_normal as mvn
 import copy
 
 from py_tools import numerical as nm, stats as st
+from py_tools.utilities import tic, toc
 
 def init_to_val(shape, val):
 
@@ -40,13 +41,19 @@ class StateSpaceModel:
         self.Nx, self.Ne = R.shape
         self.Ny, _ = Z.shape
 
+        # Check sizes
+        assert all([var == self.Nx for var in [self.A.shape[0], self.A.shape[1], self.Z.shape[1]]])
+        assert all([var == self.Ne for var in [self.Q.shape[0], self.Q.shape[1]]])
+
         # Set constant terms if needed
         if b is None:
             self.b = np.zeros(self.Ny)
         else:
+            assert len(b) == self.Ny
             self.b = b
 
         if c is not None:
+            assert len(c) == self.Nx
             x_bar = np.linalg.solve(np.eye(self.Nx) - self.A, c)
             self.b -= np.dot(Z, x_bar) 
 
@@ -121,6 +128,103 @@ class StateSpaceModel:
     def draw_meas_err(self, Nt):
         return np.dot(np.random.randn(Nt, self.Ny), self.CHT)
 
+    def decompose_by_shock(self, shocks, states, start_ix=0):
+
+        shock_components_samp, det_component_samp = self.decompose_by_shock_init(
+            shocks[start_ix:, :], states[start_ix, :]
+        )
+
+        if start_ix > 0:
+            shock_components = np.concatenate((np.zeros((self.Ne, start_ix, self.Nx)),
+                                          shock_components_samp), axis=1)
+            det_component = np.concatenate((states[:start_ix, :], 
+                                          det_component_samp), axis=0)
+            return shock_components, det_component
+        else:
+            return shock_components_samp, det_component_samp
+
+    def decompose_by_shock_init(self, shocks, x1):
+
+        Nt = shocks.shape[0] + 1
+
+        # Compute deterministic component
+        det_component = np.zeros((Nt, self.Nx))
+        det_component[0, :] = x1
+            
+        for tt in range(1, Nt):
+            det_component[tt, :] = self.A @ det_component[tt-1, :]
+
+        # Compute shock components
+        shock_components = np.zeros((Nt, self.Nx, self.Ne))
+        Ri_shock_list = [shocks[:, ishock][:, np.newaxis] @ self.R[:, ishock][np.newaxis, :] 
+                         for ishock in range(self.Ne)]
+        R_shocks = np.concatenate([x[:, :, np.newaxis] for x in Ri_shock_list], axis=2)
+
+        for tt in range(Nt - 1):
+            shock_components[tt + 1, :, :] = self.A @ shock_components[tt, :, :] + R_shocks[tt, :, :]
+
+        shock_components = np.moveaxis(shock_components, [0, 1, 2], [1, 2, 0])
+        
+        return shock_components, det_component
+
+    def decompose_y_by_shock(self, shocks, states, y=None, start_ix=0):
+
+        if y is None:
+            y = states @ self.Z.T + self.b[np.newaxis, :]
+
+        shock_components_samp, det_component_samp = self.decompose_by_shock_init(
+            shocks[start_ix:, :], states[start_ix, :]
+        )
+
+        y_shock_components_samp = np.concatenate([
+            shock_components_samp[ishock, :, :] @ self.Z.T
+            for ishock in range(self.Ne)
+        ])
+
+        y_det_component_samp = det_component @ self.Z.T
+
+        y_shock_only_samp = y_shock_components_samp + y_det_component_samp
+        y_shock_removed_samp = y - y_shock_components_samp
+
+        if start_ix > 0:
+
+            this_y = y[np.newaxis, :start_ix, :]
+
+            y_shock_only = np.concatenate((this_y, y_shock_only_samp), axis=0)
+            y_shock_removed = np.concatenate((this_y, y_shock_removed_samp), axis=0)
+
+            return y_shock_only, y_shock_removed
+
+        else:
+
+            return y_shock_only_samp, y_shock_removed_samp
+
+    def decompose_y_by_state(self, states, y=None, start_ix=0):
+
+        if y is None:
+            y = states @ self.Z.T + self.b[np.newaxis, :]
+
+        y_state_components_samp = np.concatenate([
+            (states[start_ix:, istate] @ self.Z[:, istate].T)[np.newaxis, :, :]
+            for istate in range(self.Nx)
+        ], axis=0)
+
+        y_state_only_samp = y_state_components_samp + self.b[np.newaxis, np.newaxis, :]
+        y_state_removed_samp = y[np.newaxis, start_ix:, :] - y_state_components_samp
+
+        if start_ix > 0:
+
+            this_y = y[np.newaxis, :start_ix, :]
+
+            y_state_only = np.concatenate((this_y, y_state_only_samp), axis=0)
+            y_state_removed = np.concatenate((this_y, y_state_removed_samp), axis=0)
+
+            return y_state_only, y_state_removed
+
+        else:
+
+            return y_state_only_samp, y_state_removed_samp
+
 class StateSpaceEstimates:
     """Estimated states from applying state space model to particular dataset
     
@@ -129,20 +233,12 @@ class StateSpaceEstimates:
 
     def __init__(self, ssm, y, x_init=None, P_init=None):
 
-        self.y = y
-        self.Nt, self.Ny = self.y.shape
-        self.ix = np.isfinite(self.y)
+        self.set_data(y)
+        self.set_ssm(ssm)
 
-        self.ssm = ssm
-        self.Nx, _ = self.ssm.A.shape
-        
-        # Create version with no constant
-        self.ssm_til = copy.deepcopy(ssm)
-        self.ssm_til.b = np.zeros(ssm.b.shape)
-        
         # Data net of constant
-        self.y_til = self.y - self.ssm.b[np.newaxis, :]
-        
+        # self.y_til = self.y - self.ssm.b[np.newaxis, :]
+
         # Set initializations
         if x_init is None:
             x_init = np.zeros(self.Nx)
@@ -160,7 +256,24 @@ class StateSpaceEstimates:
         # Item for smoother
         self.r = None
 
-    def kalman_filter(self, x_init=None, P_init=None, overwrite_r=True):
+    def set_data(self, y):
+        """Read in a new set of observables"""
+
+        self.y = y
+        self.Nt, self.Ny = self.y.shape
+        self.ix = np.isfinite(self.y)
+
+    def set_ssm(self, ssm):
+
+        self.ssm = ssm
+        self.Nx, self.Ne = self.ssm.R.shape
+        assert self.Ny == ssm.Ny
+
+        # Observables net of constant
+        self.y_til = self.y - self.ssm.b[np.newaxis, :]
+
+    def kalman_filter(self, x_init=None, P_init=None, overwrite_r=True,
+                      y_til=None):
         """Run the Kalman filter on the data y.
         
         Inputs:
@@ -178,6 +291,12 @@ class StateSpaceEstimates:
         if P_init is not None:
             self.P_init = P_init
 
+        if y_til is None:
+            self.base_data_results = True
+            y_til = self.y_til
+        else:
+            self.base_data_results = False
+            
         x_pred_t = self.x_init
         P_pred_t = self.P_init
 
@@ -203,7 +322,7 @@ class StateSpaceEstimates:
             # Get error and update likelihood
             ix_t = self.ix[tt, :]
             Z_t = self.ssm.Z[ix_t, :]
-            err_t = self.y_til[tt, ix_t] - np.dot(Z_t, x_pred_t)
+            err_t = y_til[tt, ix_t] - np.dot(Z_t, x_pred_t)
 
             H_t = self.ssm.H[ix_t, :][:, ix_t]
             PZ = np.dot(P_pred_t, Z_t.T)
@@ -288,7 +407,7 @@ class StateSpaceEstimates:
         if (self.r is None) or disturbance_smooth:
             self.disturbance_smoother()
 
-        # empty_row = np.empty((1, self.ssm.Ne))
+        # empty_row = np.empty((1, self.Ne))
         # empty_row.fill(np.nan)
         # self.shocks_smooth = np.vstack((empty_row, self.r[1:, :] @ self.ssm.QR.T))
             
@@ -332,23 +451,32 @@ class StateSpaceEstimates:
             x_1, shocks=shocks, meas_err=meas_err, ix=self.ix, use_b=False
         )
 
-        # Create artificial observations
+        # Create "star" observables as diff between old and random
         y_star = self.y_til - y_plus
 
-        # Get smoothed values
-        sse_til = StateSpaceEstimates(self.ssm_til, y_star)
-        sse_til.kalman_filter(x_init=self.x_init, P_init=self.P_init)
-        # sse_til.disturbance_smoother()
-        sse_til.state_smoother(disturbance_smooth=True)
-
-        self.x_draw = x_plus + sse_til.x_smooth
+        # Run Kalman filter and smoother
+        self.kalman_filter(x_init=self.x_init, P_init=self.P_init, y_til=y_star)
+        self.state_smoother(disturbance_smooth=True)
+        
+        # State draw is difference between random states and smoothed "star" states
+        self.state_draw = x_plus + self.x_smooth
 
         if draw_shocks:
-            sse_til.shock_smoother()
-            self.shock_draw = shocks + sse_til.shocks_smooth
+            self.shock_smoother()
+            self.shock_draw = shocks + self.shocks_smooth
 
         if draw_meas_err:
-            sse_til.meas_err_smoother()
-            self.meas_err_draw = meas_err + sse_til.meas_err_smooth
+            self.meas_err_smoother()
+            self.meas_err_draw = meas_err + self.meas_err_smooth
 
         return None
+
+    def get_shock_components(self, redraw_shocks=False, start_ix=0):
+
+        # Set shock series to use
+        if redraw_shocks or (self.shock_draw is None):
+            self.state_smoother(draw_shocks=True)
+
+        return self.ssm.decompose_by_shock(self.shock_draw, self.state_draw,
+                                           start_ix=start_ix)
+
