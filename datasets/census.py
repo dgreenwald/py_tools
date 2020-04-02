@@ -35,7 +35,7 @@ def load_pop(level, year, data_dir=default_dir):
         df = df.rename(columns={'zctaa' : 'zip'})
         df = df[['zip', 'pop', 'hh']]
     elif level == 'zip3':
-        df = df.rename(columns={'zip3a' : 'zip3'}).groupby('zip3')['pop', 'hh'].sum().reset_index()
+        df = df.rename(columns={'zip3a' : 'zip3'}).groupby('zip3')[['pop', 'hh']].sum().reset_index()
     elif level == 'state':
         state_codes = misc.load('state_codes').rename(columns={'state_abbr' : 'state'})
         df = df[['statea', 'pop', 'hh']]

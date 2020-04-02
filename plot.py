@@ -761,6 +761,11 @@ def binscatter(df_in, yvars, xvar, wvar=None, fit_var=None, labels={}, n_bins=20
         plt.savefig(filepath)
 
     plt.close(fig)
+    
+def state_scatter_inner(ax, this_df, yvar, xvar):
+    for ii, state in enumerate(this_df.index):
+        ax.annotate(state, (this_df.loc[state, xvar], this_df.loc[state, yvar]))
+    return None
 
 # From TomAugsburger
 

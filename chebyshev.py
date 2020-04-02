@@ -17,6 +17,19 @@ def poly(x, n):
 
     return T.T
 
+def gradient(x, n):
+    
+    T = poly(x, n).T
+    dT = np.zeros((n, len(x)))
+    
+    if n > 1:
+        dT[1, :] = 1.0
+        
+    for jj in range(2, n):
+        dT[jj, :] = 2.0 * T[jj-1, :] + 2.0 * x * dT[jj-1, :] - dT[jj-2, :]
+        
+    return dT.T
+
 def tensor(X, n_vec):
     """Each row of X should be one observation
     n_vec should contain the levels for each variable"""
@@ -43,11 +56,22 @@ def recurse_tensor(X, TX, n_vec, level):
 class ChebFcn:
     """Chebyshev polynomial approximation"""
     
-    def __init__(self, n):
+    def __init__(self, n, lb=-1.0, ub=1.0):
 
         self.n = n
         self.grid = grid(n)
         self.basis = poly(self.grid, self.n)
+        
+        self.lb = lb
+        self.ub = ub
+
+        self.a_to_grid = -(self.ub + self.lb) / (self.ub - self.lb)
+        self.b_to_grid = 2.0 / (self.ub - self.lb)
+
+        self.a_from_grid = 0.5 * (self.ub + self.lb)
+        self.b_from_grid = (self.ub - self.lb) / 2.0
+
+        self.scaled_grid = self.scale_from_grid(self.grid)
         
     def grid(self):
         
@@ -59,13 +83,35 @@ class ChebFcn:
         
     def fit_fcn(self, fcn):
         
-        vals = fcn(self.grid)
+        vals = fcn(self.scaled_grid)
         self.fit_vals(vals)
         
-    def evaluate(self, x):
+    def evaluate(self, x_in):
         
-        Tx = poly(x, self.n)
+        x_scaled = self.scale_x(x_in)
+        Tx = poly(x_scaled, self.n)
         return np.dot(Tx, self.coeffs)
+    
+    def gradient(self, x_in):
+        
+        x_scaled = self.scale_x(x_in)
+        dTx = gradient(x_scaled, self.n)
+        return np.dot(dTx, self.coeffs)
+        
+    def scale_x(self, x_in):
+        
+        x = x_in.copy()
+        x = np.minimum(x, self.ub)
+        x = np.maximum(x, self.lb)
+        return self.scale_to_grid(x)
+    
+    def scale_to_grid(self, vals):
+
+        return self.a_to_grid + (self.b_to_grid * vals)
+
+    def scale_from_grid(self, vals):
+
+        return self.a_from_grid + (self.b_from_grid * vals)
     
 class TensorChebFcn:
     

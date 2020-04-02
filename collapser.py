@@ -112,9 +112,21 @@ class Collapser:
             
         return df_out
             
-    def collapse(self, by_list, inplace=False):
+    def collapse(self, by_list=None, inplace=False):
         
-        dfc_new = self.dfc.groupby(by_list).sum()
+        
+        singleton = (by_list is None)
+        if singleton:
+            dfc_old = self.dfc.copy()
+            dfc_old['TEMP'] = 0
+            by_list = ['TEMP']
+        else:
+            dfc_old = self.dfc
+        
+        dfc_new = dfc_old.groupby(by_list).sum()
+        if singleton:
+            dfc_new = dfc_new.reset_index().drop(columns=['TEMP'])
+            
         if inplace:
             self.dfc = dfc_new
             self.by_list = by_list

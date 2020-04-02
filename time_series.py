@@ -295,12 +295,12 @@ def MA(df, lhs_var, rhs_vars, init_lag=1, default_lags=16,
     # Run dt.regression
     return dt.regression(df, lhs, rhs, ix=ix, **kwargs)
 
-def ARMA(df, var, p, q, freq='QS', display=False):
+def ARMA(df, var, p, q, freq='QS', trend='c', display=False):
     
     ix = pd.notnull(df[var])
     series = df.loc[ix, var]
     mod = arima.ARMA(series, (p, q), freq=freq)
-    res = mod.fit(trend='c', disp=-1)
+    res = mod.fit(trend=trend, disp=-1)
     if display: print(res.summary())
     
     return dt.FullResults(res, ix=ix, Xs=None, zs=None)
@@ -690,7 +690,7 @@ def detrend_hamilton(df_full, varlist, p=4, h=8):
 
     return df_full, varlist_detrended, fr_list
 
-def detrend_time(df, varlist, time_var=None):
+def detrend_time(df, varlist, time_var=None, suffix='detrend_time'):
     """Remove a linear time trend from the variables in var_list.  
 
     Returns (df_full, varlist_detrend), where df_full is a dataframe including
@@ -706,7 +706,7 @@ def detrend_time(df, varlist, time_var=None):
     for var in varlist:
 
         fr = dt.regression(df, var, time_var)
-        df.loc[fr.ix, var + '_detrend_time'] = fr.results.resid
+        df.loc[fr.ix, var + '_' + suffix] = fr.results.resid
 
     return df
 
