@@ -1,3 +1,5 @@
+import itertools
+
 import numpy as np
 import pandas as pd
 # import pickle
@@ -16,6 +18,19 @@ def cat(num):
 def to_float(df, var):
     if df[var].dtype == 'object':
         df[var] = pd.to_numeric(df[var], errors='coerce').astype(np.float64)
+    return df
+
+def load_all(dataset, **kwargs):
+
+    df_list = []
+    for year, q in itertools.product(range(2000, 2019), range(1, 5)):
+
+        print("Loading {0:d} Q{1:d}".format(year, q))
+
+        df_t = load(year, q, dataset, **kwargs)
+        df_list.append(df_t)
+
+    df = pd.concat(df_list, axis=0)
     return df
 
 def load(year, q, dataset, reimport=False, data_dir=None, columns=None,
