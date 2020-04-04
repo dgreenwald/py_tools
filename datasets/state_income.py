@@ -34,6 +34,34 @@ def load(data_dir=default_dir, reimport=False):
 
     return si_long
 
+def load_fred(data_dir=default_dir, reimport=False):
+    
+    pkl_file = data_dir + 'state_pc_income_fred.pkl'
+    
+    if reimport or (not os.path.exists(pkl_file)):
+    
+        state_codes = misc.load('state_codes')
+        ix = ~state_codes['state_abbr'].isin(['AS', 'GU', 'PR', 'VI'])
+        state_codes = state_codes.loc[ix, :]
+        
+        code_names = {
+                '{}PCPI'.format(abbr) : abbr for abbr in state_codes['state_abbr'].values
+                }
+        
+        df_wide = fred.load(code_names=code_names, reimport=reimport)
+        df_wide = df_wide.reset_index().rename(columns={'DATE' : 'date'})
+        df = pd.melt(df_wide, id_vars='date', value_vars=df_wide.columns[1:], 
+                     var_name='state', value_name='pc_income')
+        df = df.set_index(['state', 'date']).sort_index()
+        
+        df.to_pickle(pkl_file)
+        
+    else:
+        
+        df = pd.read_pickle(pkl_file)
+        
+    return df
+
 def load_median(data_dir=default_dir, reimport=False, fred_reimport=True):
     
     pkl_file = data_dir + 'state_median_income.pkl'

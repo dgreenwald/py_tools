@@ -13,6 +13,13 @@ import py_tools.data as dt, py_tools.numerical as nm
 # from py_tools.datasets import loader
 # import py_tools.utilities as ut
 
+# def year_q_to_date(year, qtr):
+#     """Converts series x of years into series of dates"""
+    
+#     month = 3 * qtr - 2
+#     date_str = year.astype(str) + '-' + month.astype(str) + '-01'
+#     return pd.to_datetime(date_str, errors='coerce')
+
 def panel_resampler(df, time_var, freq):
 
     to_drop = [name for name in df.index.names if name != time_var]
@@ -59,13 +66,18 @@ def quarter_index(df, yr, q):
 def month_index(df, yr, mon):
     return date_index(df, '{0}/1/{1}'.format(mon, yr))
 
+def date_from_year(year):
+    """Converts series of years into series of dates"""
+    date_str = year.astype(str) + '-01-01'
+    return pd.to_datetime(date_str, errors='coerce')
+
 def date_from_qtr(yr, q):
     mon = 3 * (q - 1) + 1
     return date_from_month(yr, mon)
 
 def date_from_month(yr, mon):
     date = yr.astype(str) + '-' + mon.astype(str) + '-01'
-    return pd.to_datetime(date)
+    return pd.to_datetime(date, errors='coerce')
 
 def resample(df, methods_vars, freq='QS'):
     df_resamp = None
