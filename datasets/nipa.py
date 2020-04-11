@@ -6,7 +6,9 @@ import py_tools.time_series as ts
 from . import defaults
 default_dir = defaults.base_dir()
 
-def get_var_index(nipa_table, nipa_vintage='1706', add_prefix=False):
+idx = pd.IndexSlice
+
+def get_var_index(nipa_table, nipa_vintage='1706', add_prefix=False, **kwargs):
 
     if nipa_table == '10105':
         
@@ -245,15 +247,15 @@ def load(nipa_table=None, nipa_source='xls', **kwargs):
         raise Exception
 
 def load_flat(nipa_table=None, data_dir=default_dir+'nipa/', var_list=None,
-              reimport=False, billions=True, var_index=None, **kwargs):
+              reimport=False, billions=True, var_index=None, nipa_vintage='1807',
+              **kwargs):
 
-    idx = pd.IndexSlice
-
-    pkl_file = data_dir + 'NipaDataQ_20180717.pkl' 
+    vintage_dir = data_dir + nipa_vintage + '/'
+    pkl_file = vintage_dir + 'nipadataQ.pkl'
 
     if not os.path.exists(pkl_file) or reimport:
-        infile = 'NipaDataQ_20180717.txt'
-        df = pd.read_csv(data_dir + infile).rename(columns={'%SeriesCode' : 'Series'})
+        infile = 'nipadataQ.txt'
+        df = pd.read_csv(vintage_dir + infile).rename(columns={'%SeriesCode' : 'Series'})
         
         # Convert numbers
         df['Value'] = df['Value'].str.replace(',', '')
@@ -274,7 +276,8 @@ def load_flat(nipa_table=None, data_dir=default_dir+'nipa/', var_list=None,
 
     if var_index is None:
         assert nipa_table is not None
-        var_index = get_var_index(nipa_table, **kwargs)
+        var_index = get_var_index(nipa_table, nipa_vintage=nipa_vintage, 
+                                  **kwargs)
 
     var_index = {key : val[:-1] for key, val in var_index.items()}
 

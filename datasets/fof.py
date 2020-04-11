@@ -82,8 +82,9 @@ def load_csv(data_dir=default_dir):
     return df.rename(columns={'FA_income' : 'income', 'FA_gross_income' : 'gross_income', 
                               'FL_debt' : 'debt', 'FL_value' : 'value'})[['income', 'debt', 'value']]
 
-def load_table(table, data_dir=default_dir):
+def load_table(table, data_dir=default_dir, fof_vintage='1901', **kwargs):
     
-    infile = data_dir + 'all_csv/csv/' + table + '.csv'
+    infile = data_dir + 'all_csv/{0}/csv/{1}.csv'.format(fof_vintage, table)
     df = pd.read_csv(infile)
+    
     return df

@@ -6,7 +6,7 @@ import pandas as pd
 import py_tools.time_series as ts
 import py_tools.utilities as ut
 
-from py_tools.datasets import fred, nipa, origins
+from py_tools.datasets import fred, nipa, origins, fof
 
 from . import defaults
 
@@ -177,7 +177,7 @@ def load_dataset(dataset, master_dirs={}, **kwargs):
 
         elif dataset == 'fof_csv':
 
-            data_dir = dirs['base'] + 'fof/all_csv/csv/'
+            data_dir = dirs['base'] + 'fof/'
 
             for table  in unique_tables:
 
@@ -186,8 +186,9 @@ def load_dataset(dataset, master_dirs={}, **kwargs):
 
                 usecols = ['date'] + these_codes
 
-                infile = table + '.csv'
-                df_new = pd.read_csv(data_dir + infile, usecols=usecols)
+                df_new = fof.load_table(table, data_dir=data_dir, **kwargs)
+                # infile = table + '.csv'
+                # df_new = pd.read_csv(data_dir + infile, usecols=usecols)
                 df_new.rename(columns=code_index, inplace=True)
 
 #                yr_q_str = df_new.ix[0, 'date']
@@ -202,7 +203,10 @@ def load_dataset(dataset, master_dirs={}, **kwargs):
                 df_new.drop(['date'], axis=1, inplace=True)
 
                 if df is not None:
-                    df = pd.merge(df, df_new, left_index=True, right_index=True)
+                    keep_cols = [var for var in df_new if var not in df]
+                    # drop_cols = [var for var in df_new if var in df]
+                    # if drop_cols: print(drop_cols)
+                    df = pd.merge(df, df_new[keep_cols], left_index=True, right_index=True)
                 else:
                     df = df_new
 
@@ -306,32 +310,32 @@ def load_dataset(dataset, master_dirs={}, **kwargs):
 
     return df
 
-def clean_nipa(df_t, nipa_quarterly=True):
+# def clean_nipa(df_t, nipa_quarterly=True):
     
-    foo = df_t.copy()
-    foo = foo.drop(index=[' ', np.nan])
-    foo = foo.drop(columns=['Line', 'Unnamed: 1'])
+#     foo = df_t.copy()
+#     foo = foo.drop(index=[' ', np.nan])
+#     foo = foo.drop(columns=['Line', 'Unnamed: 1'])
 
-    df_t = df_t.ix[df_t.index != ' ', :]
-    df_t = df_t.ix[pd.notnull(df_t.index), :]
-    del df_t['Line']
-    del df_t['Unnamed: 1']
+#     df_t = df_t.ix[df_t.index != ' ', :]
+#     df_t = df_t.ix[pd.notnull(df_t.index), :]
+#     del df_t['Line']
+#     del df_t['Unnamed: 1']
     
-    print("TEST CODE TO DROP IX")
+#     print("TEST CODE TO DROP IX")
 
-    df = df_t.transpose()
-    start_date = df.index[0]
+#     df = df_t.transpose()
+#     start_date = df.index[0]
 
-    if nipa_quarterly:
-        yr = int(np.floor(start_date))
-        q = int(10 * (start_date - yr) + 1)
-        mon = int(3 * (q - 1) + 1)
+#     if nipa_quarterly:
+#         yr = int(np.floor(start_date))
+#         q = int(10 * (start_date - yr) + 1)
+#         mon = int(3 * (q - 1) + 1)
 
-        ts.date_index(df, '{0}/1/{1}'.format(mon, yr))
-    else:
-        ts.date_index(df, '1/1/{0}'.format(int(start_date)), freq='AS')
+#         ts.date_index(df, '{0}/1/{1}'.format(mon, yr))
+#     else:
+#         ts.date_index(df, '1/1/{0}'.format(int(start_date)), freq='AS')
 
-    return df
+#     return df
 
 def get_suffix(dataset, **kwargs):
 
