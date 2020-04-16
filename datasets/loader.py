@@ -1,3 +1,7 @@
+"""
+Loader function for origins data. Should really be moved to origins folder.
+"""
+
 # import ipdb
 import numpy as np
 import os
