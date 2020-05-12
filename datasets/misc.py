@@ -120,6 +120,35 @@ def load_from_source(dataset, data_dir, **kwargs):
             'DP_yogo' : np.squeeze(mat['Adiv_me_yogo']), 
             'payout_to_equity_yogo' : np.squeeze(mat['payout_equity_ratio_Yogo']),
         }, index=ts.get_date_index('1954-10-01', len(mat['dates_l']), 'QS'))
+        
+    elif dataset == 'dlm_price_rent':
+        
+        pkl_file = data_dir + 'dlm_price_rent.pkl'
+        
+        if not os.path.exists(pkl_file):
+            
+            names=['date', 'rent', 'price_cs', 'rent_price_cs', 'price_fhfa', 'rent_price_fhfa']
+            
+            infile = data_dir + 'RENT-PRICE-RATIO.2018q2.xlsx'
+            df = pd.read_excel(infile, sheet_name='rent-price data', skiprows=2,
+                               header=None, names=names)
+            
+            df['date'] = (np.round(10 * df['date'])).astype(int)
+            year = df['date'].astype(str).str[:4].astype(int)
+            qtr = df['date'].astype(str).str[-1].astype(int)
+            df['date'] = ts.date_from_qtr(year, qtr)
+            df = df.set_index('date').sort_index()
+            
+            df['price_rent_cs'] = 1.0 / df['rent_price_cs']
+            df['price_rent_fhfa'] = 1.0 / df['rent_price_fhfa']
+            
+            df.to_pickle(pkl_file)
+            
+        else:
+            
+            df = pd.read_pickle(pkl_file)
+            
+        return df
 
     elif dataset == 'direct_investment_income':
 

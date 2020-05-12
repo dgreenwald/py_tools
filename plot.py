@@ -426,20 +426,26 @@ def var_irfs(irfs, var_list, shock_list=None, titles={}, filepath=None,
 
     return None 
 
-def plot_series(df_in, var_names, directory='', filename=None, labels={},
+def plot_series(df_in, var_names, filepath=None, directory=None, filename=None, labels={},
                 linestyles={}, markers={}, colors={}, markevery=8,
                 markersize=5, mew=2, fillstyle='none', fontsize=12,
-                plot_type='pdf', ylabel=None, sample='outer', title=None,
-                save=True, single_legend=True, vertline_ix=None,
+                # plot_type='pdf', 
+                plot_type=None,
+                ylabel=None, sample='outer', title=None, 
+                single_legend=True, vertline_ix=None,
                 vertline_kwargs={}, linewidths={}, ylim=None):
 
     matplotlib.rcParams.update({'font.size' : fontsize})
+    
+    if (directory is not None) or (filename is not None) or (plot_type is not None):
+        print("Switch to new filepath input format")
+        raise Exception
 
-    if directory != '' and directory[-1] != '/':
-        directory += '/'
+    # if directory != '' and directory[-1] != '/':
+    #     directory += '/'
 
-    if filename is None:
-        filename = '_'.join(var_names)
+    # if filename is None:
+    #     filename = '_'.join(var_names)
 
     fig = plt.figure()
 
@@ -492,8 +498,8 @@ def plot_series(df_in, var_names, directory='', filename=None, labels={},
         plt.title(title)
 
     plt.tight_layout()
-    if save:
-        plt.savefig('{0}{1}.{2}'.format(directory, filename, plot_type))
+    if filepath is not None:
+        plt.savefig(filepath)
     else:
         plt.show()
 

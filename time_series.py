@@ -719,8 +719,10 @@ def detrend_time(df, varlist, time_var=None, suffix='detrend_time'):
 
         fr = dt.regression(df, var, time_var)
         df.loc[fr.ix, var + '_' + suffix] = fr.results.resid
+        
+    varlist_detrend = [var + '_' + suffix for var in varlist]
 
-    return df
+    return df, varlist
 
 def get_time_trend(df, var, time_var=None):
 

@@ -1,4 +1,5 @@
 import os
+import re
 
 import numpy as np
 import pandas as pd
@@ -11,19 +12,26 @@ def load(geo, data_dir=default_dir, dataset='Zhvi_AllHomes', reimport=False):
     
     geo = geo.capitalize()
     
+    pattern = re.compile(r'\d\d\d\d-\d\d')
+    
     pkl_file = data_dir + 'pkl/{0}_{1}.pkl'.format(geo, dataset)
     if reimport or (not os.path.exists(pkl_file)):
     
         df_wide = load_csv(data_dir=data_dir, dataset=dataset, geo=geo)
+        value_vars = [col for col in df_wide.columns if pattern.match(col)]
+        id_vars = [col for col in df_wide.columns if not pattern.match(col)]
         
-        if geo == 'State':
-            id_vars = ['RegionName']
-            value_vars = df_wide.columns[3:]
-        elif geo in ['Zip', 'County']:
-            id_vars = df_wide.columns[:7]
-            value_vars = df_wide.columns[7:]
+        # if geo in ['State', 'Metro']:
+        #     id_vars = ['RegionName']
+        #     # value_vars = df_wide.columns[3:]
+        # elif geo in ['Zip', 'County']:
+        #     id_vars = df_wide.columns[:7]
+        #     # value_vars = df_wide.columns[7:]
             
         df = pd.melt(df_wide, id_vars=id_vars, value_vars=value_vars)
+        # df = df.rename(columns={
+        #     col : col.lower() for col in df.columns
+        #     })
         df = df.rename(columns={
                 'variable' : 'date',
                 'value' : dataset
@@ -44,6 +52,9 @@ def load(geo, data_dir=default_dir, dataset='Zhvi_AllHomes', reimport=False):
         elif geo == 'Zip':
             df = df.rename(columns={'RegionName' : 'ZIP'})
             df = df.set_index(['ZIP', 'date'])
+        elif geo == 'Metro':
+            df = df.rename(columns={'RegionName' : 'metro'})
+            df = df.set_index(['metro', 'date'])
         
         df = df.sort_index()
         df.to_pickle(pkl_file)

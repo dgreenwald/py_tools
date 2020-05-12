@@ -1,5 +1,5 @@
 import re
-from collections import Mapping, OrderedDict
+from collections import Mapping, OrderedDict, UserDict
 
 class MySet(set):
     """Set plus addition operator"""
@@ -73,6 +73,27 @@ class PresetDict(dict):
     def overwrite_update(self, other):
         
         super().update(other)
+        
+class UniqueList(UserDict):
+    
+    def __init__(self, iterable=None):
+        self.data = []
+        if iterable is not None:
+            for x in iterable:
+                if x not in self.data:
+                    self.data.append(x)
+
+    def __add__(self, other):
+        unique = UniqueList([x for x in other if x not in self.data])
+        return self.data + unique.data
+
+    def __radd__(self, other):
+        unique = UniqueList([x for x in other if x not in self.data])
+        return self.data + unique.data
+    
+    def __iadd__(self, other):
+        unique = UniqueList([x for x in other if x not in self.data])
+        return self.data.__iadd__(unique.data)
 
 #def override_preset_dict(preset, other):
 #    """Update preset dict, replacing even if value already set"""
