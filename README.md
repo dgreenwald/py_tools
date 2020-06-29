@@ -4,7 +4,7 @@ This repo contains various routines and tools developed by Dan Greenwald for a n
 
 ## Setup
 
-After cloning the repo, the following changes must be made to your `.bashrc' or equivalent file.
+After cloning the repo, the following changes must be made to your `.bashrc` or equivalent file.
 
 ```bash
 export PYTHONPATH=$PYTHONPATH:/path/to/directory/below/py_tools
