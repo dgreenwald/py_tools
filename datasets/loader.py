@@ -102,6 +102,7 @@ def load_dataset(dataset, master_dirs={}, **kwargs):
         elif dataset == 'fof_csv':
         
             var_index = {
+                'nonfin_assets' : ('b103', 'LM102010005'),
                 'assets' : ('b103', 'FL102000005'),
                 'assets_book' : ('b103', 'FL102000115'),
                 'liabilities_book' : ('b103', 'FL104190005'),

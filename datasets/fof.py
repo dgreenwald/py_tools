@@ -11,6 +11,7 @@ def load(dataset, usecols=None, data_dir=default_dir, fof_vintage='2003'):
     if dataset == 'corporate':
         
         var_index = {
+            'nonfin_assets' : ('b103', 'LM102010005'),
             'assets' : ('b103', 'FL102000005'),
             'assets_book' : ('b103', 'FL102000115'),
             'liabilities_book' : ('b103', 'FL104190005'),
@@ -52,6 +53,28 @@ def load(dataset, usecols=None, data_dir=default_dir, fof_vintage='2003'):
             'disposable_income' : ('f101', 'FA156012005'),
             'gross_income' : ('f101', 'FA156010001'),
             'personal_taxes' : ('f101', 'FA156210005'),
+            }
+        
+    elif dataset == 'financial':
+        
+        var_index = {
+            'assets' : ('l108', 'FL704090005'),
+            'liabilities' : ('l108', 'FL794190005'),
+            'equity' : ('l108', 'LM793164105'),
+            'loans' : ('l108', 'FL794023005'),
+            'checkable_deposits' : ('l108', 'FL794023005'),
+            'time_savings_deposits' : ('l108', 'FL794023005'),
+            'money_market_shares' : ('l108', 'FL794023005'),
+            }
+        
+    elif dataset == 'banks':
+        
+        var_index = {
+            'assets' : ('l110', 'FL704090005'),
+            'liabilities' : ('l110', 'FL704190005'),
+            'loans' : ('l110', 'FL704023005'),
+            'checkable_deposits' : ('l110', 'FL703127005'),
+            'time_savings_deposits' : ('l110', 'FL703130005'),
             }
         
     else:
