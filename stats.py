@@ -1,5 +1,5 @@
 import numpy as np
-from scipy.stats import norm
+from scipy.stats import norm, lognorm
 
 def weighted_quantile(values_in, weights_in, quantiles, sort=True):
 
@@ -78,3 +78,7 @@ def draw_norm_multi(Sig, n):
 
     C = np.linalg.cholesky(Sig)
     return np.dot(np.random.randn(n, Sig.shape[0]), C.T)
+
+def my_lognorm(mu, sig):
+    
+    return lognorm(s=sig, scale=np.exp(mu))
