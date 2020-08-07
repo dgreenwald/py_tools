@@ -7,9 +7,11 @@ default_dir = defaults.base_dir() + 'fof/'
 # data_dir = '/home/dan/Dropbox/data/fof/'
 
 def load(dataset, usecols=None, data_dir=default_dir, fof_vintage='2003'):
+    """Load pre-packaged set of variables"""
     
     if dataset == 'corporate':
         
+        # Format: 'name' : ('table', 'variable')
         var_index = {
             'nonfin_assets' : ('b103', 'LM102010005'),
             'assets' : ('b103', 'FL102000005'),
@@ -38,6 +40,18 @@ def load(dataset, usecols=None, data_dir=default_dir, fof_vintage='2003'):
             'corp_taxes' : ('f103', 'FA106231005'),
             'iva' : ('f103', 'FA105020601'),
             'foreign_ret_earnings' : ('f103', 'FA106006065'),
+            'capex' : ('f103', 'FA105050005'),
+            'debt_securities' : ('b103', 'FL104122005'),
+            'loans' : ('b103', 'FL104123005'),
+            'foreign_deposits' : ('b103', 'FL103091003'),
+            'checkable_deposits' : ('b103', 'FL103020000'),
+            'time_savings_deposits' : ('b103', 'FL103030003'),
+            'mmf_shares' : ('b103', 'FL103034000'),
+            'repos' : ('b103', 'FL102051003'),
+            'debt_securities_asset' : ('b103', 'LM104022005'),
+            'loans_asset' : ('b103', 'FL104023005'),
+            'mortgages' : ('b103', 'FL103165005'),
+            'nonfinancial_assets_hist_cost' : ('b103', 'FL102010115'),
         }
         
     elif dataset == 'household':
@@ -122,6 +136,7 @@ def load(dataset, usecols=None, data_dir=default_dir, fof_vintage='2003'):
     return df
 
 def load_table(table, data_dir=default_dir, fof_vintage='2003', **kwargs):
+    """Load single table"""
     
     infile = data_dir + 'all_csv/{0}/csv/{1}.csv'.format(fof_vintage, table)
     df = pd.read_csv(infile)

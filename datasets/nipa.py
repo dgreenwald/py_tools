@@ -350,7 +350,7 @@ def load_xls(nipa_table, nipa_vintage='1706', nipa_quarterly=True,
 
     # Combine datasets
     start_date = df_curr.index[0]
-    df_hist_sample = df_hist.ix[:start_date, :]
+    df_hist_sample = df_hist.loc[:start_date, :]
     df = df_hist_sample.iloc[:-1, :].append(df_curr)
 
     ################################################################################
@@ -361,7 +361,7 @@ def load_xls(nipa_table, nipa_vintage='1706', nipa_quarterly=True,
 
     full_list = sorted(list(var_index.keys()))
     codes = [var_index[var] for var in full_list]
-    # df = df.ix[:, codes]
+    # df = df.loc[:, codes]
     df = df.loc[:,~df.columns.duplicated()]
     df.rename(columns = {code : var for var, code in zip(full_list, codes)}, inplace=True)
 
@@ -382,8 +382,8 @@ def load_xls(nipa_table, nipa_vintage='1706', nipa_quarterly=True,
 
 def clean_nipa(df_t, nipa_quarterly=True):
 
-    df_t = df_t.ix[df_t.index != ' ', :]
-    df_t = df_t.ix[pd.notnull(df_t.index), :]
+    df_t = df_t.loc[df_t.index != ' ', :]
+    df_t = df_t.loc[pd.notnull(df_t.index), :]
     del df_t['Line']
     del df_t['Unnamed: 1']
 
