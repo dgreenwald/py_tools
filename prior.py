@@ -79,7 +79,12 @@ class Prior:
             self.non_flat_names.append(name)
 
     def logpdf(self, vals):
-        return np.sum([dist.logpdf(val) for dist, val in zip(self.dists, vals) if dist is not None])
+        logpdf_list = [dist.logpdf(val) for dist, val in zip(self.dists, vals) if dist is not None]
+        if logpdf_list:
+            return np.sum(logpdf_list)
+        else:
+            return 0.0
+        # return np.sum([dist.logpdf(val) for dist, val in zip(self.dists, vals) if dist is not None])
 
     def sample(self, n_samp):
         return np.vstack(list(dist.rvs(n_samp) for dist in self.dists if dist is not None))

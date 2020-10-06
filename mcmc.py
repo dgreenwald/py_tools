@@ -270,6 +270,12 @@ class MonteCarlo:
         else:
             self.Nx = None
             
+        # if self.names is not None:
+        #     for name in names:
+        #         if name not in prior.names:
+        #             print("Defaulting to flat prior for {}".format(name))
+        #             prior.add(None, name=name)
+            
         if ((lb is None) or (ub is None)) and not self.Nx is None:
 
             if lb is None:
@@ -303,7 +309,7 @@ class MonteCarlo:
         return -self.posterior(params)
 
     def find_mode(self, x0, tol=1e-8, basinhopping=False, method='bfgs',
-                  iterate=False, iter_tol=1e-6, **kwargs):
+                  iterate=False, iter_tol=1e-6, disp_iterate=True, **kwargs):
 
         post_start = None
         done = False
@@ -327,8 +333,9 @@ class MonteCarlo:
             self.post_mode = -res.fun
 
             if iterate:
-                mp.disp("Iteration {0:d}: starting posterior = {1:g}, "
-                        "ending posterior = {2:g}".format(count, post_start, self.post_mode))
+                if disp_iterate:
+                    mp.disp("Iteration {0:d}: starting posterior = {1:g}, "
+                            "ending posterior = {2:g}".format(count, post_start, self.post_mode))
                 done = np.abs(self.post_mode - post_start) < iter_tol
                 if not done:
                     x0 = self.x_mode

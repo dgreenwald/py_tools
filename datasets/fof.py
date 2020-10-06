@@ -13,6 +13,8 @@ def load(dataset, usecols=None, data_dir=default_dir, fof_vintage='2003'):
         
         # Format: 'name' : ('table', 'variable')
         var_index = {
+            'financial_assets' : ('b103', 'FL104090005'),
+            # 'liabilities' : ('b103', 'FL104190005'),
             'nonfin_assets' : ('b103', 'LM102010005'),
             'assets' : ('b103', 'FL102000005'),
             'assets_book' : ('b103', 'FL102000115'),

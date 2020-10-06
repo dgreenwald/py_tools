@@ -102,6 +102,7 @@ def load_dataset(dataset, master_dirs={}, **kwargs):
         elif dataset == 'fof_csv':
         
             var_index = {
+                'financial_assets' : ('b103', 'FL104090005'),
                 'nonfin_assets' : ('b103', 'LM102010005'),
                 'assets' : ('b103', 'FL102000005'),
                 'assets_book' : ('b103', 'FL102000115'),
@@ -109,6 +110,8 @@ def load_dataset(dataset, master_dirs={}, **kwargs):
                 'net_worth_book' : ('b103', 'FL102090005'),
                 'net_worth_market' : ('b103', 'FL102090005'),
                 'equities_outstanding_market' : ('b103', 'LM103164103'),
+                'debt_securities_liab' : ('b103', 'FL104122005'),
+                'loans_liab' : ('b103', 'FL104123005'),
                 # 'net_dividends' : ('u103', 'FU106121075'),
                 # 'net_new_equity' : ('u103', 'FU103164103'),
                 # 'net_new_paper' : ('u103', 'FU103169100'),
@@ -125,6 +128,10 @@ def load_dataset(dataset, master_dirs={}, **kwargs):
                 'equities_outstanding_market_fin' : ('l108', 'LM793164105'),
                 'net_new_equity_fin' : ('f108', 'FA793164105'),
                 'net_dividends_fin' : ('f3', 'FA796121073'),
+                'financial_assets_fin' : ('l108', 'FL794090005'),
+                'liabilities_fin' : ('l108', 'FL794190005'),
+                'debt_securities_liab_fin' : ('l108', 'FL794122005'),
+                'loans_liab_fin' : ('l108', 'FL794123005'),
                 'profits_pretax' : ('f103', 'FA106060005'),
                 'corp_taxes' : ('f103', 'FA106231005'),
                 'iva' : ('f103', 'FA105020601'),
