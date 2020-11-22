@@ -6,7 +6,8 @@ from . import defaults
 default_dir = defaults.base_dir() + 'fof/'
 # data_dir = '/home/dan/Dropbox/data/fof/'
 
-def load(dataset, usecols=None, data_dir=default_dir, fof_vintage='2003'):
+def load(dataset, usecols=None, data_dir=default_dir, fof_vintage='2003', 
+         named_only=False):
     """Load pre-packaged set of variables"""
     
     if dataset == 'corporate':
@@ -122,6 +123,10 @@ def load(dataset, usecols=None, data_dir=default_dir, fof_vintage='2003'):
         df_tab = load_table(table, data_dir=data_dir, usecols=these_cols,
                             fof_vintage=fof_vintage)
         df_tab.rename(columns=code_index, inplace=True)
+        
+        if named_only:
+            drop_cols = [var for var in df_tab.columns if var not in var_list + ['date']]
+            df_tab = df_tab.drop(columns=drop_cols)
         
         year = df_tab['date'].str[:4].astype(int)
         q = df_tab['date'].str[-1].astype(int)

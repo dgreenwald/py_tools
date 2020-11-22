@@ -298,7 +298,7 @@ class MonteCarlo:
 
     def posterior(self, params):
 
-        if check_bounds(params, self.lb, self.ub):
+        if check_bounds(params.ravel(), self.lb, self.ub):
             return (self.log_like(params, *self.args) + self.prior.logpdf(params))
         else:
             return -1e+10
@@ -310,6 +310,8 @@ class MonteCarlo:
 
     def find_mode(self, x0, tol=1e-8, basinhopping=False, method='bfgs',
                   iterate=False, iter_tol=1e-6, disp_iterate=True, **kwargs):
+        
+        x0 = x0.ravel()
 
         post_start = None
         done = False

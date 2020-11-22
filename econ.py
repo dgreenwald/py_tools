@@ -83,9 +83,11 @@ def sim_iid(p, N):
     sampler = walker.WalkerRandomSampling(p)
     return sampler.random(N)
 
-def sim_discrete_from_ergodic(P, N):
+def sim_discrete_from_ergodic(P, N, pi_star=None):
 
-    pi_star = ergodic_dist(P)
+    if pi_star is None:
+        pi_star = ergodic_dist(P)
+        
     i0 = np.random.choice(len(pi_star), p=pi_star.ravel())
 
     return sim_discrete(P, N, i0)

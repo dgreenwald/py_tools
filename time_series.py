@@ -928,3 +928,42 @@ def add_lags_by_group(df, x_var, date_var, lag_list, group_id=None, group_vars=N
                 df = df.join(shifted, on=[date_var, group_id])
                 
     return df
+
+def lowpass_filter(series, freq_ub, nlags=4):
+
+    b0 = freq_ub / np.pi
+    filtered = b0 * series
+    
+    for hh in range(-nlags, nlags+1):
+        
+        if hh != 0:
+            bh = np.sin(hh * freq_ub) / (hh * np.pi)
+            filtered += bh * series.shift(hh)
+            
+    return filtered
+            
+def bandpass_filter(series, period_lb=None, period_ub=None, 
+                    freq_lb=None, freq_ub=None, nlags=4):
+    
+    if period_lb is not None:
+        assert freq_ub is None
+        freq_ub = 2.0 * np.pi / period_lb
+        
+    if period_ub is not None:
+        assert freq_lb is None
+        freq_lb = 2.0 * np.pi / period_ub
+    
+    assert (freq_lb is not None) or (freq_ub is not None)
+    
+    if freq_lb is not None:
+        filtered_lb = lowpass_filter(series, freq_lb, nlags=nlags)
+    else:
+        filtered_lb = np.zeros(len(series))
+        
+    if freq_ub is not None:
+        filtered_ub = lowpass_filter(series, freq_ub, nlags=nlags)
+    else:
+        filtered_ub = series
+        
+    filtered = filtered_ub - filtered_lb
+    return filtered

@@ -523,6 +523,9 @@ def projection(x, se, var_titles, shock_title, p=0.9, n_per_row=4, plot_size=3.0
 
     Ny, Nt = x.shape
     n_rows = (Ny - 1) // n_per_row + 1 # number of rows needed
+    
+    if n_rows == 1:
+        n_per_row = Ny
 
     # Get z-score for p-value
     z_star = -norm.ppf(0.5 * (1.0 - p))

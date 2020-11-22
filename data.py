@@ -123,9 +123,6 @@ def bin_data(series, n_bins, weights=None):
     bins = np.unique(bins)
     bins = bins[np.isfinite(bins)]
 
-    bins = np.unique(bins)
-    bins = bins[np.isfinite(bins)]
-
     bins[0] = -np.inf
     bins[-1] = np.inf
 

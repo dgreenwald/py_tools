@@ -1,4 +1,4 @@
-from py_tools import data as dt
+from py_tools import data as dt, plot as pl
 import numpy as np
 
 
@@ -43,7 +43,7 @@ def get_formula(horizon, y_var, shock_var, control_vars, fe_vars, shock_lags,
     ############################################################################
 
     if horizon > 0:
-        formula = 'F{0}_{1} ~'.format(y_var, horizon)
+        formula = 'F{0}_{1} ~'.format(horizon, y_var)
     else:
         formula = '{0} ~'.format(y_var)
 
@@ -82,13 +82,15 @@ def estimate(df_in, y_var, shock_var, control_vars=[], fe_vars=[], shock_lags=2,
     """
 
     # Copy relevant dataframe columns
-    all_vars = list(set([y_var] + [shock_var] + control_vars + fe_vars))
+    unique_controls = [var for var in control_vars if var not in [y_var, shock_var]]
+    
+    all_vars = list(set([y_var] + [shock_var] + unique_controls + fe_vars))
     df = df_in[all_vars].copy()
 
     # Add lags
     df = add_lags(df, shock_var, shock_lags)
     df = add_lags(df, y_var, y_lags)
-    for var in control_vars:
+    for var in unique_controls:
         df = add_lags(df, var, control_lags.get(var, 1))
 
     # Add leads
@@ -101,7 +103,7 @@ def estimate(df_in, y_var, shock_var, control_vars=[], fe_vars=[], shock_lags=2,
 
     for jj in range(periods):
 
-        formula = get_formula(jj, y_var, shock_var, control_vars, fe_vars,
+        formula = get_formula(jj, y_var, shock_var, unique_controls, fe_vars,
                               shock_lags, y_lags, control_lags)
 
         fr_list.append(dt.formula_regression(df, formula, nw_lags=jj))
@@ -111,4 +113,36 @@ def estimate(df_in, y_var, shock_var, control_vars=[], fe_vars=[], shock_lags=2,
         x[jj] = fr_list[jj].results.params[1]
         se[jj] = fr_list[jj].results.HC0_se[1]
         
-    return 
+    return fr_list, x, se
+
+class LocalProjection:
+    """Local projection object"""
+    
+    def __init__(self, df=None, labels={}):
+        
+        self.df = df
+        self.labels = labels
+        
+    def estimate(self, y_var_list, shock_var, **kwargs):
+        
+        self.y_var_list = y_var_list
+        self.shock_var = shock_var
+        
+        self.var_titles = [self.labels.get(y_var, y_var) for y_var in self.y_var_list]
+        self.shock_title = self.labels.get(shock_var, shock_var)
+        
+        self.fr_list_all = {}
+        self.x_all = {}
+        self.se_all = {}
+        
+        for y_var in self.y_var_list:
+            self.fr_list_all[y_var], self.x_all[y_var], self.se_all[y_var] \
+                = estimate(self.df, y_var, self.shock_var, **kwargs)
+        
+        self.x = np.vstack([self.x_all[y_var] for y_var in self.y_var_list])
+        self.se = np.vstack([self.se_all[y_var] for y_var in self.y_var_list])
+        
+    def plot(self, **kwargs):
+        
+        pl.projection(self.x, self.se, self.var_titles, self.shock_title, shock_name=self.shock_var,
+                      **kwargs)
