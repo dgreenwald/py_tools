@@ -59,16 +59,31 @@ class StateSpaceModel:
 
         self.QR = self.Q @ self.R.T
         self.RQR = self.R @ self.QR
-
-        self.CQT = np.linalg.cholesky(self.Q).T
+        
+        self.CQT = nm.robust_cholesky(self.Q, min_eig=0.0).T
         self.CHT = nm.robust_cholesky(self.H, min_eig=0.0).T
         
-    def unconditional_cov(self):
+    def unconditional_cov(self, fixed_init=[]):
         
-        try: 
-            return sp.linalg.solve_discrete_lyapunov(self.A, self.RQR)
-        except:
-            return None
+        if not fixed_init:
+
+            try: 
+                return sp.linalg.solve_discrete_lyapunov(self.A, self.RQR)
+            except:
+                return None
+            
+        else:
+            
+            free_init = [ii for ii in range(self.Nx) if ii not in fixed_init]
+            A_trunc = self.A[free_init, :][:, free_init]
+            RQR_trunc = self.RQR[free_init, :][:, free_init]
+            
+            V_trunc = sp.linalg.solve_discrete_lyapunov(A_trunc, RQR_trunc)
+            V_full = np.zeros((self.Nx, self.Nx))
+            for itrunc, ifull in enumerate(free_init):
+                V_full[ifull, free_init] = V_trunc[itrunc, :]
+            
+            return V_full
 
     def simulate(self, x_1=None, Nt=None, shocks=None, meas_err=None, ix=None,
                  use_b=True):
@@ -231,7 +246,10 @@ class StateSpaceEstimates:
     Associated with StateSpaceModel ssm
     """
 
-    def __init__(self, ssm, y, x_init=None, P_init=None):
+    def __init__(self, ssm, y, x_init=None, P_init=None, fixed_init=[]):
+
+        # Fixed vars for initial condition
+        self.fixed_init = fixed_init        
 
         self.set_data(y)
         self.set_ssm(ssm)
@@ -244,7 +262,7 @@ class StateSpaceEstimates:
             x_init = np.zeros(self.Nx)
 
         if P_init is None:
-            P_init = self.ssm.unconditional_cov()
+            P_init = self.ssm.unconditional_cov(self.fixed_init)
             if P_init is None:
                 self.valid = False # bad model
             else:

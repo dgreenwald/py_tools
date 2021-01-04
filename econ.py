@@ -151,6 +151,26 @@ def sim_ar1(rho, sig, mu=0.0, Nsim=100, e=None, x0=None):
     x += mu
     return x
 
+def sim_ar1_multi(rho, sig, Nper, Nsim=1, mu=0.0, e=None, x0=None):
+    
+    x = np.zeros((Nsim, Nper))
+    if e is None:
+        e = np.random.randn(Nsim, Nper)
+    else:
+        assert e.shape == (Nsim, Nper)
+        
+    if x0 is None:
+        sig0 = sig / np.sqrt(1.0 - rho ** 2)
+        x[:, 0] = sig0 * e[:, 0]
+    else:
+        assert len(x0) == Nsim
+        
+    for jj in range(1, Nper):
+        x[:, jj] = rho * x[:, jj-1] + sig * e[:, jj]
+        
+    x += mu
+    return x
+
 def sim_cir(rho, sig, mu=0.0, Nsim=100, e=None, x0=None, bound=False):
     """Cox-Ingersoll-Ross Process"""
 

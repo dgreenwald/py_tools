@@ -331,6 +331,7 @@ class MonteCarlo:
                                        minimizer_kwargs=minimizer_kwargs, **kwargs)
             else:
                 res = opt.minimize(self.min_objfcn, x0_u, method=method, tol=tol, **kwargs)
+                
             self.x_mode = self.bound_transform(res.x, to_bdd=True)
             self.post_mode = -res.fun
 
@@ -338,6 +339,9 @@ class MonteCarlo:
                 if disp_iterate:
                     mp.disp("Iteration {0:d}: starting posterior = {1:g}, "
                             "ending posterior = {2:g}".format(count, post_start, self.post_mode))
+                    
+                    these_params = {self.names[ii] : self.x_mode[ii] for ii in range(len(self.names))}
+                    mp.disp("Params: " + repr(these_params))
                 done = np.abs(self.post_mode - post_start) < iter_tol
                 if not done:
                     x0 = self.x_mode
@@ -377,6 +381,10 @@ class MonteCarlo:
             else:
 
                 self.CH_inv = np.linalg.cholesky(self.H_inv)
+
+        self.H = np.real(self.H)
+        self.H_inv = np.real(self.H_inv)
+        self.CH_inv = np.real(self.CH_inv)
 
         return None
 

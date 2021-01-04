@@ -15,11 +15,11 @@ def load(dataset, usecols=None, data_dir=default_dir, fof_vintage='2003',
         # Format: 'name' : ('table', 'variable')
         var_index = {
             'financial_assets' : ('b103', 'FL104090005'),
-            # 'liabilities' : ('b103', 'FL104190005'),
+            'liabilities' : ('b103', 'FL104190005'),
             'nonfin_assets' : ('b103', 'LM102010005'),
             'assets' : ('b103', 'FL102000005'),
             'assets_book' : ('b103', 'FL102000115'),
-            'liabilities_book' : ('b103', 'FL104190005'),
+            # 'liabilities_book' : ('b103', 'FL104190005'),
             'net_worth_book' : ('b103', 'FL102090005'),
             'net_worth_market' : ('b103', 'FL102090005'),
             'equities_outstanding_market' : ('b103', 'LM103164103'),
@@ -40,6 +40,7 @@ def load(dataset, usecols=None, data_dir=default_dir, fof_vintage='2003',
             'net_new_equity_fin' : ('f108', 'FA793164105'),
             'net_dividends_fin' : ('f3', 'FA796121073'),
             'profits_pretax' : ('f103', 'FA106060005'),
+            'profits_pretax_iva_cca' : ('f103', 'FA146060035'),
             'corp_taxes' : ('f103', 'FA106231005'),
             'iva' : ('f103', 'FA105020601'),
             'foreign_ret_earnings' : ('f103', 'FA106006065'),
@@ -55,6 +56,11 @@ def load(dataset, usecols=None, data_dir=default_dir, fof_vintage='2003',
             'loans_asset' : ('b103', 'FL104023005'),
             'mortgages' : ('b103', 'FL103165005'),
             'nonfinancial_assets_hist_cost' : ('b103', 'FL102010115'),
+            'net_capital_transfers' : ('f103', 'FA105440005'),
+            'cca' : ('f103', 'FA106300015'),
+            'net_financial_assets' : ('f103', 'FA104090005'),
+            'net_liabilities' : ('f103', 'FA104194005'),
+            'discrepancy' : ('f103', 'FA107005005'),
         }
         
     elif dataset == 'household':
@@ -128,18 +134,19 @@ def load(dataset, usecols=None, data_dir=default_dir, fof_vintage='2003',
             drop_cols = [var for var in df_tab.columns if var not in var_list + ['date']]
             df_tab = df_tab.drop(columns=drop_cols)
         
-        year = df_tab['date'].str[:4].astype(int)
-        q = df_tab['date'].str[-1].astype(int)
+        # Now moved to load_table
+        # year = df_tab['date'].str[:4].astype(int)
+        # q = df_tab['date'].str[-1].astype(int)
         
-        df_tab['date'] = ts.date_from_qtr(year, q)
-        df_tab = df_tab.set_index('date').sort_index()
+        # df_tab['date'] = ts.date_from_qtr(year, q)
+        # df_tab = df_tab.set_index('date').sort_index()
 
         new_vars = [var for var in df_tab if var not in vars_loaded]
         df_list.append(df_tab[new_vars].copy())
         vars_loaded += new_vars
         
     df = pd.concat(df_list, axis=1)
-    df = df.apply(pd.to_numeric, errors='coerce')
+    # df = df.apply(pd.to_numeric, errors='coerce')
     return df
 
 def load_table(table, data_dir=default_dir, fof_vintage='2003', **kwargs):
@@ -147,6 +154,14 @@ def load_table(table, data_dir=default_dir, fof_vintage='2003', **kwargs):
     
     infile = data_dir + 'all_csv/{0}/csv/{1}.csv'.format(fof_vintage, table)
     df = pd.read_csv(infile)
+    
+    year = df['date'].str[:4].astype(int)
+    q = df['date'].str[-1].astype(int)
+    
+    df['date'] = ts.date_from_qtr(year, q)
+    df = df.set_index('date').sort_index()
+    
+    df = df.apply(pd.to_numeric, errors='coerce')
     
     return df
 

@@ -228,6 +228,10 @@ def get_var_index(nipa_table, nipa_vintage='1706', add_prefix=False, **kwargs):
             'net_interest' : 'B1037C1',
             'rental_income' : 'B1035C1',
         }
+        
+    else:
+        
+        var_index = {}
 
     if add_prefix:
         temp = var_index.copy()
@@ -248,7 +252,7 @@ def load(nipa_table=None, nipa_source='xls', **kwargs):
 
 def load_flat(nipa_table=None, data_dir=default_dir+'nipa/', var_list=None,
               reimport=False, billions=True, var_index=None, nipa_vintage='2003',
-              **kwargs):
+              named_only=True, **kwargs):
 
     vintage_dir = data_dir + nipa_vintage + '/'
     pkl_file = vintage_dir + 'nipadataQ.pkl'
@@ -281,12 +285,15 @@ def load_flat(nipa_table=None, data_dir=default_dir+'nipa/', var_list=None,
 
     var_index = {key : val[:-1] for key, val in var_index.items()}
 
-    if var_list is None:
-        var_list = list(var_index.keys())
-
-    code_list = [var_index[var] for var in var_list]
-
-    df = df.loc[idx[code_list, :], :]
+    if named_only:
+        # Drop to only named variables
+        
+        if var_list is None:
+            var_list = list(var_index.keys())
+    
+        code_list = [var_index[var] for var in var_list]
+    
+        df = df.loc[idx[code_list, :], :]
     
     if billions: 
         df['Value'] /= 1000
