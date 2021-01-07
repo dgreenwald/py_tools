@@ -204,15 +204,15 @@ def load_dataset(dataset, master_dirs={}, **kwargs):
                 df_new.rename(columns=code_index, inplace=True)
 
 #                yr_q_str = df_new.ix[0, 'date']
-                yr_q_str = df_new['date'].values[0]
+                # yr_q_str = df_new['date'].values[0]
                 
-                yr = yr_q_str[:4]
-                q = yr_q_str[-1]
-                df_new = ts.quarter_index(df_new, yr, q)
+                # yr = yr_q_str[:4]
+                # q = yr_q_str[-1]
+                # df_new = ts.quarter_index(df_new, yr, q)
                 # mon = 3 * (q - 1) + 1
                 # ts.date_index(df_new, '{0}/1/{1}'.format(mon, yr))
 
-                df_new.drop(['date'], axis=1, inplace=True)
+                # df_new.drop(['date'], axis=1, inplace=True)
 
                 if df is not None:
                     keep_cols = [var for var in df_new if var not in df]
