@@ -13,6 +13,36 @@ def init_to_val(shape, val):
     x[:] = val
     return x
 
+def get_t(x, tt):
+    
+    if isinstance(x, list):
+        return x[tt]
+    else:
+        return x
+    
+class MatrixOrList:
+    
+    def __init__(self, x):
+        
+        self.x = x
+        self.is_list = isinstance(self.x, list)
+        
+    def __getitem__(self, tt):
+        
+        if self.is_list:
+            return self.x[tt]
+        else:
+            return self.x
+        
+    def __matmul__(self, other):
+        
+        if self.is_list:
+            z = [x_t @ y_t for x_t, y_t in zip(self.x, other.x)]
+        else:
+            z = self.x @ other.x
+            
+        return MatrixOrList(z)
+
 class StateSpaceModel:
     """State space model.
     
@@ -31,52 +61,56 @@ class StateSpaceModel:
     def __init__(self, A, R, Q, Z, H, c=None, b=None):
 
         # Copy data
-        self.A = A
-        self.R = R
-        self.Q = Q
-        self.Z = Z
-        self.H = H
+        self.A = MatrixOrList(A)
+        self.R = MatrixOrList(R)
+        self.Q = MatrixOrList(Q)
+        self.Z = MatrixOrList(Z)
+        self.H = MatrixOrList(H)
 
         # Set sizes
-        self.Nx, self.Ne = R.shape
-        self.Ny, _ = Z.shape
+        self.Nx, self.Ne = R[0].shape
+        self.Ny, _ = Z[0].shape
 
         # Check sizes
-        assert all([var == self.Nx for var in [self.A.shape[0], self.A.shape[1], self.Z.shape[1]]])
-        assert all([var == self.Ne for var in [self.Q.shape[0], self.Q.shape[1]]])
+        assert all([var == self.Nx for var in [self.A[0].shape[0], self.A[0].shape[1], self.Z[0].shape[1]]])
+        assert all([var == self.Ne for var in [self.Q[0].shape[0], self.Q[0].shape[1]]])
 
         # Set constant terms if needed
         if b is None:
-            self.b = np.zeros(self.Ny)
-        else:
-            assert len(b) == self.Ny
-            self.b = b
+            b = np.zeros(self.Ny)
+            
+        self.b = MatrixOrList(b)
+        assert len(self.b[0]) == self.Ny
 
         if c is not None:
-            assert len(c) == self.Nx
-            x_bar = np.linalg.solve(np.eye(self.Nx) - self.A, c)
-            self.b -= np.dot(Z, x_bar) 
+            raise Exception
+            # assert len(c) == self.Nx
+            # x_bar = np.linalg.solve(np.eye(self.Nx) - self.A, c)
+            # self.b -= np.dot(Z, x_bar) 
 
-        self.QR = self.Q @ self.R.T
-        self.RQR = self.R @ self.QR
+        # self.QR = self.Q @ self.R.T
+        self.RQR = self.R @ (self.Q @ self.R.T)
         
-        self.CQT = nm.robust_cholesky(self.Q, min_eig=0.0).T
-        self.CHT = nm.robust_cholesky(self.H, min_eig=0.0).T
-        
+        if not Q.is_list:
+            self.CQT = nm.robust_cholesky(self.Q[0], min_eig=0.0).T
+            
+        if not H.is_list:
+            self.CHT = nm.robust_cholesky(self.H[0], min_eig=0.0).T
+    
     def unconditional_cov(self, fixed_init=[]):
         
         if not fixed_init:
 
             try: 
-                return sp.linalg.solve_discrete_lyapunov(self.A, self.RQR)
+                return sp.linalg.solve_discrete_lyapunov(self.A[0], self.RQR[0])
             except:
                 return None
             
         else:
             
             free_init = [ii for ii in range(self.Nx) if ii not in fixed_init]
-            A_trunc = self.A[free_init, :][:, free_init]
-            RQR_trunc = self.RQR[free_init, :][:, free_init]
+            A_trunc = self.A[0][free_init, :][:, free_init]
+            RQR_trunc = self.RQR[0][free_init, :][:, free_init]
             
             V_trunc = sp.linalg.solve_discrete_lyapunov(A_trunc, RQR_trunc)
             V_full = np.zeros((self.Nx, self.Nx))
@@ -97,8 +131,6 @@ class StateSpaceModel:
             Nt = shocks.shape[0] + 1
 
         if shocks is None:
-            # CQ = np.linalg.cholesky(self.Q)
-            # shocks = np.dot(CQ, np.random.randn(self.Ne, Nt)).T
             shocks = self.draw_shocks(Nt - 1)
         
         if meas_err is None:
@@ -127,21 +159,33 @@ class StateSpaceModel:
         for tt in range(Nt):
 
             ix_t = ix[tt, :]
-            y_sim[tt, ix_t] = np.dot(self.Z[ix_t, :], x_t) + meas_err[tt, ix_t]
+            y_sim[tt, ix_t] = np.dot(self.Z[tt][ix_t, :], x_t) + meas_err[tt, ix_t]
             if use_b: 
                 y_sim[tt, ix_t] += self.b[ix_t]
             x_sim[tt, :] = x_t
 
             if tt < Nt - 1:
-                x_t = np.dot(self.A, x_t) + np.dot(self.R, shocks[tt, :])
+                x_t = np.dot(self.A[tt], x_t) + np.dot(self.R[tt], shocks[tt, :])
 
         return (y_sim, x_sim)
 
     def draw_shocks(self, Nt):
-        return np.dot(np.random.randn(Nt, self.Ne), self.CQT)
+        if Q.is_list:
+            return np.vstack([
+                np.random.randn(1, self.Ne), np.linalg.cholesky(self.Q[tt])
+                for tt in range(Nt)
+                ])
+        else:
+            return np.dot(np.random.randn(Nt, self.Ne), self.CQT)
 
     def draw_meas_err(self, Nt):
-        return np.dot(np.random.randn(Nt, self.Ny), self.CHT)
+        if H.is_list:
+            return np.vstack([
+                np.random.randn(1, self.Ny), np.linalg.cholesky(self.H[tt])
+                for tt in range(Nt)
+                ])
+        else:
+            return np.dot(np.random.randn(Nt, self.Ne), self.CHT)
 
     def decompose_by_shock(self, shocks, states, start_ix=0):
 
@@ -160,6 +204,8 @@ class StateSpaceModel:
 
     def decompose_by_shock_init(self, shocks, x1):
 
+        assert not self.R.is_list        
+
         Nt = shocks.shape[0] + 1
 
         # Compute deterministic component
@@ -167,36 +213,38 @@ class StateSpaceModel:
         det_component[0, :] = x1
             
         for tt in range(1, Nt):
-            det_component[tt, :] = self.A @ det_component[tt-1, :]
+            det_component[tt, :] = self.A[tt] @ det_component[tt-1, :]
 
         # Compute shock components
         shock_components = np.zeros((Nt, self.Nx, self.Ne))
-        Ri_shock_list = [shocks[:, ishock][:, np.newaxis] @ self.R[:, ishock][np.newaxis, :] 
+        Ri_shock_list = [shocks[:, ishock][:, np.newaxis] @ self.R[0][:, ishock][np.newaxis, :] 
                          for ishock in range(self.Ne)]
         R_shocks = np.concatenate([x[:, :, np.newaxis] for x in Ri_shock_list], axis=2)
 
         for tt in range(Nt - 1):
-            shock_components[tt + 1, :, :] = self.A @ shock_components[tt, :, :] + R_shocks[tt, :, :]
+            shock_components[tt + 1, :, :] = self.A[tt] @ shock_components[tt, :, :] + R_shocks[tt, :, :]
 
         shock_components = np.moveaxis(shock_components, [0, 1, 2], [1, 2, 0])
         
         return shock_components, det_component
 
     def decompose_y_by_shock(self, shocks, states, y=None, start_ix=0):
+        
+        assert not (self.Z.is_list or self.b.is_list)
 
         if y is None:
-            y = states @ self.Z.T + self.b[np.newaxis, :]
+            y = states @ self.Z[0].T + self.b[0][np.newaxis, :]
 
         shock_components_samp, det_component_samp = self.decompose_by_shock_init(
             shocks[start_ix:, :], states[start_ix, :]
         )
 
         y_shock_components_samp = np.concatenate([
-            shock_components_samp[ishock, :, :] @ self.Z.T
+            shock_components_samp[ishock, :, :] @ self.Z[0].T
             for ishock in range(self.Ne)
         ])
 
-        y_det_component_samp = det_component @ self.Z.T
+        y_det_component_samp = det_component @ self.Z[0].T
 
         y_shock_only_samp = y_shock_components_samp + y_det_component_samp
         y_shock_removed_samp = y - y_shock_components_samp
@@ -216,15 +264,17 @@ class StateSpaceModel:
 
     def decompose_y_by_state(self, states, y=None, start_ix=0):
 
+        assert not (self.Z.is_list or self.b.is_list)        
+
         if y is None:
-            y = states @ self.Z.T + self.b[np.newaxis, :]
+            y = states @ self.Z[0].T + self.b[0][np.newaxis, :]
 
         y_state_components_samp = np.concatenate([
-            (states[start_ix:, istate] @ self.Z[:, istate].T)[np.newaxis, :, :]
+            (states[start_ix:, istate] @ self.Z[0][:, istate].T)[np.newaxis, :, :]
             for istate in range(self.Nx)
         ], axis=0)
 
-        y_state_only_samp = y_state_components_samp + self.b[np.newaxis, np.newaxis, :]
+        y_state_only_samp = y_state_components_samp + self.b[0][np.newaxis, np.newaxis, :]
         y_state_removed_samp = y[np.newaxis, start_ix:, :] - y_state_components_samp
 
         if start_ix > 0:
@@ -284,7 +334,7 @@ class StateSpaceEstimates:
     def set_ssm(self, ssm):
 
         self.ssm = ssm
-        self.Nx, self.Ne = self.ssm.R.shape
+        self.Nx, self.Ne = self.ssm.R[0].shape
         assert self.Ny == ssm.Ny
 
         # Observables net of constant
