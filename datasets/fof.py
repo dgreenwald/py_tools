@@ -6,9 +6,13 @@ from . import defaults
 default_dir = defaults.base_dir() + 'fof/'
 # data_dir = '/home/dan/Dropbox/data/fof/'
 
-def load(dataset, usecols=None, data_dir=default_dir, fof_vintage='2003', 
-         named_only=False):
+def load(dataset, usecols=None, data_dir=default_dir, vintage='2003', 
+         named_only=False, fof_vintage=None):
     """Load pre-packaged set of variables"""
+    
+    if fof_vintage is not None:
+        print("Change to keyword vintage")
+        vintage = fof_vintage
     
     if dataset == 'corporate':
         
@@ -127,7 +131,7 @@ def load(dataset, usecols=None, data_dir=default_dir, fof_vintage='2003',
         these_cols = ['date'] + these_codes
 
         df_tab = load_table(table, data_dir=data_dir, usecols=these_cols,
-                            fof_vintage=fof_vintage)
+                            vintage=vintage)
         df_tab.rename(columns=code_index, inplace=True)
         
         if named_only:
@@ -149,10 +153,15 @@ def load(dataset, usecols=None, data_dir=default_dir, fof_vintage='2003',
     # df = df.apply(pd.to_numeric, errors='coerce')
     return df
 
-def load_table(table, data_dir=default_dir, fof_vintage='2003', **kwargs):
+def load_table(table, data_dir=default_dir, vintage='2003', fof_vintage=None,
+               **kwargs):
     """Load single table"""
     
-    infile = data_dir + 'all_csv/{0}/csv/{1}.csv'.format(fof_vintage, table)
+    if fof_vintage is not None:
+        print("Change to keyword vintage")
+        vintage = fof_vintage
+    
+    infile = data_dir + 'all_csv/{0}/csv/{1}.csv'.format(vintage, table)
     df = pd.read_csv(infile)
     
     year = df['date'].str[:4].astype(int)

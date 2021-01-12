@@ -8,7 +8,7 @@ default_dir = defaults.base_dir()
 
 idx = pd.IndexSlice
 
-def get_var_index(nipa_table, nipa_vintage='1706', add_prefix=False, **kwargs):
+def get_var_index(nipa_table, vintage='1706', add_prefix=False, **kwargs):
 
     if nipa_table == '10105':
         
@@ -206,11 +206,11 @@ def get_var_index(nipa_table, nipa_vintage='1706', add_prefix=False, **kwargs):
             'real_pc_disp_inc' : 'A229RX0',
         }
 
-        if nipa_vintage in ['1604', '1706']:
+        if vintage in ['1604', '1706']:
             var_index.update({
                 'wage_sal' : 'A034RC1',
             })
-        elif nipa_vintage == '1302':
+        elif vintage == '1302':
             var_index.update({
                 'wage_sal' : 'A576RC1',
             })
@@ -228,6 +228,12 @@ def get_var_index(nipa_table, nipa_vintage='1706', add_prefix=False, **kwargs):
             'net_interest' : 'B1037C1',
             'rental_income' : 'B1035C1',
         }
+        
+    elif nipa_table == '71200':
+        
+        var_index = {
+            'owner_services' : 'A2013C',
+            }
         
     else:
         
@@ -251,14 +257,18 @@ def load(nipa_table=None, nipa_source='xls', **kwargs):
         raise Exception
 
 def load_flat(nipa_table=None, data_dir=default_dir+'nipa/', var_list=None,
-              reimport=False, billions=True, var_index=None, nipa_vintage='2003',
-              named_only=True, **kwargs):
+              reimport=False, billions=True, var_index=None, vintage='2003',
+              named_only=True, nipa_vintage=None, freq='Q', **kwargs):
+    
+    if nipa_vintage is not None:
+        print("Need to switch to using vintage argument")
+        vintage = nipa_vintage
 
-    vintage_dir = data_dir + nipa_vintage + '/'
-    pkl_file = vintage_dir + 'nipadataQ.pkl'
+    vintage_dir = data_dir + vintage + '/'
+    pkl_file = vintage_dir + 'nipadata{}.pkl'.format(freq)
 
     if not os.path.exists(pkl_file) or reimport:
-        infile = 'nipadataQ.txt'
+        infile = 'nipadata{}.txt'.format(freq)
         df = pd.read_csv(vintage_dir + infile).rename(columns={'%SeriesCode' : 'Series'})
         
         # Convert numbers
@@ -266,24 +276,39 @@ def load_flat(nipa_table=None, data_dir=default_dir+'nipa/', var_list=None,
         df['Value'] = pd.to_numeric(df['Value'], errors='coerce')
 
         # Convert dates
-        df[['y', 'q']] = df['Period'].str.split(pat='Q', expand=True)
-        df['q'] = df['q'].astype(np.int64)
-        df['m'] = df['q'] * 3 - 2
-        df['Date'] = df['y'].astype(str) + '-' + df['m'].astype(str) + '-01'
+        if freq == 'Q':
+            df[['y', 'q']] = df['Period'].str.split(pat='Q', expand=True)
+            df['q'] = df['q'].astype(np.int64)
+            df['m'] = df['q'] * 3 - 2
+            df['Date'] = df['y'].astype(str) + '-' + df['m'].astype(str) + '-01'
+            df = df.drop(columns=['y', 'q', 'm', 'Period'])
+        elif freq == 'A':
+            df['Date'] = df['Period'].astype(str) + '-01-01'
+            df = df.drop(columns=['Period'])
+        else:
+            raise Exception
+            
         df['Date'] = pd.to_datetime(df['Date'])
 
         df['Series'] = df['Series'].astype(str)
-        df = df.set_index(['Series', 'Date']).drop(columns=['y', 'q', 'm', 'Period'])
+        df = df.set_index(['Series', 'Date'])
         df.to_pickle(pkl_file)
     else:
         df = pd.read_pickle(pkl_file)
 
     if var_index is None:
         assert nipa_table is not None
-        var_index = get_var_index(nipa_table, nipa_vintage=nipa_vintage, 
+        var_index = get_var_index(nipa_table, vintage=vintage, 
                                   **kwargs)
 
-    var_index = {key : val[:-1] for key, val in var_index.items()}
+    # Get rid of final digits
+    numbers = [str(ii) for ii in range(10)]
+    for key, val in var_index.items():
+        if val[-1] in numbers:
+            val = val[:-1]
+            var_index[key] = val
+            
+    # var_index = {key : val[:-1] for key, val in var_index.items()}
 
     if named_only:
         # Drop to only named variables
@@ -304,7 +329,7 @@ def load_flat(nipa_table=None, data_dir=default_dir+'nipa/', var_list=None,
 
     return df
 
-def load_xls(nipa_table, nipa_vintage='1706', nipa_quarterly=True,
+def load_xls(nipa_table, vintage='1706', nipa_quarterly=True,
          master_dirs={}, **kwargs):
     """Load NIPA table, specify table (e.g., 20100) vintage (when downloaded) and whether quarterly data"""
 
@@ -314,7 +339,7 @@ def load_xls(nipa_table, nipa_vintage='1706', nipa_quarterly=True,
         # home_dir = os.environ['HOME']
         # dirs['base'] = home_dir + '/Dropbox/data/'
 
-    data_dir = dirs['base'] + 'nipa/' + nipa_vintage + '/'
+    data_dir = dirs['base'] + 'nipa/' + vintage + '/'
 
     if nipa_quarterly:
         freq_str = ' Qtr'
