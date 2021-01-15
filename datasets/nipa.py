@@ -214,6 +214,13 @@ def get_var_index(nipa_table, vintage='1706', add_prefix=False, **kwargs):
             var_index.update({
                 'wage_sal' : 'A576RC1',
             })
+            
+    elif nipa_table == '20305':
+        
+        var_index = {
+            'services' : 'DSERRC',
+            'housing_services' : 'DHCERC'
+            }
 
     elif nipa_table == '70405':
 
