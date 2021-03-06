@@ -250,7 +250,7 @@ def double_hist(df1, df2=None, label1=None, label2=None, var=None,
                 ylim=None, legend_font=10, label_font=12, copy_path1=None,
                 copy_path2=None, color1=None, color2=None, edgecolor='black', 
                 alpha=0.5, use_bar=False, labels={}, kwargs1={}, kwargs2={}, x_vertline=None,
-                vertline_kwargs={}, **kwargs):
+                vertline_kwargs={}, topcode=False, bottomcode=False, **kwargs):
     """Plots double histogram overlaying var1 from df1 and var2 from df2
 
     Arguments:
@@ -294,14 +294,43 @@ def double_hist(df1, df2=None, label1=None, label2=None, var=None,
         kwargs['normed'] = True
     else:
         kwargs['density'] = True
-
-    _df1 = dt.clean(df1, [var1, wvar1])
-    _df2 = dt.clean(df2, [var2, wvar2])
+        
+    _df1 = df1[[var1]].copy()
+    _df2 = df2[[var2]].copy()
     
     if wvar1 == '_count':
-        _df1[wvar1] = 1.0
+        _df1['_weight1'] = 1.0
+    else:
+        _df1['_weight1'] = df1[wvar1]
+        
     if wvar2 == '_count':
-        _df2[wvar2] = 1.0
+        _df2['_weight2'] = 1.0
+    else:
+        _df2['_weight2'] = df2[wvar2]
+
+    # _df1 = dt.clean(df1, [var1, wvar1])
+    # _df2 = dt.clean(df2, [var2, wvar2])
+    
+    wvar1 = '_weight1'
+    wvar2 = '_weight2'
+    
+    _df1 = dt.clean(_df1, [var1, wvar1])
+    _df2 = dt.clean(_df2, [var2, wvar2])
+    
+    if topcode:
+        assert bins is not None
+        _df1[var1] = np.minimum(_df1[var1], bins[-1])
+        _df2[var2] = np.minimum(_df2[var2], bins[-1])
+    
+    if bottomcode:
+        assert bins is not None
+        _df1[var1] = np.maximum(_df1[var1], bins[0])
+        _df2[var2] = np.maximum(_df2[var2], bins[0])
+    
+    # if wvar1 == '_count':
+    #     _df1[wvar1] = 1.0
+    # if wvar2 == '_count':
+    #     _df2[wvar2] = 1.0
 
     if var1 not in _df1 or var2 not in _df2:
         return False
@@ -775,6 +804,12 @@ def state_scatter_inner(ax, this_df, yvar, xvar):
     for ii, state in enumerate(this_df.index):
         ax.annotate(state, (this_df.loc[state, xvar], this_df.loc[state, yvar]))
     return None
+
+def get_colors(n, cmap_name, startval=0.0, endval=1.0):
+    
+    cmap = plt.get_cmap(cmap_name)
+    colors = cmap(np.linspace(startval, endval, n))
+    return colors
 
 # From TomAugsburger
 

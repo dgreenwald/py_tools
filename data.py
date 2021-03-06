@@ -6,6 +6,7 @@ import patsy
 
 import statsmodels.api as sm
 import statsmodels.formula.api as smf
+from statsmodels.tsa import stattools
 
 from . import stats
 
@@ -706,3 +707,47 @@ def collapse(df, method='mean', var_list=None, by=[], wvar=None):
 def safe_sum(x):
     
     return x.sum(skipna=False)
+
+def chow_lin_V_default(a, N):
+    
+    V = np.zeros((N, N))
+    for tt in range(N):
+        V[tt, :] = a ** np.abs(np.arange(N) - tt)
+        
+    return V
+
+def chow_lin(Y, Z, B, Vfcn=chow_lin_V_default, a0=0.9, tol=1e-4):
+    
+    a = a0
+    done = False
+    
+    N = Z.shape[0]
+    
+    while not done:
+        
+        V = Vfcn(a, N)
+        
+        ZB = Z.T @ B
+        BV = B.T @ V
+        BVB = BV @ B
+        
+        ZB_BVB_inv = np.linalg.solve(BVB.T, ZB.T).T
+        
+        bet_hat = np.linalg.solve(ZB_BVB_inv @ ZB.T,
+                                  ZB_BVB_inv @ Y)
+        
+        X_hat = Z @ bet_hat + BV.T @ np.linalg.solve(
+            BVB, Y - B.T @ (Z @ bet_hat)
+            )
+        
+        u_hat = X_hat - Z @ bet_hat
+        a_new = stattools.acf(u_hat, nlags=1, fft=False)[1]
+        
+        a_err = np.abs(a_new - a)
+        if a_err < tol:
+            done = True
+            
+        a = a_new
+            
+    return X_hat
+        

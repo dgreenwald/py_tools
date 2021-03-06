@@ -17,7 +17,7 @@ def poly(x, n):
 
     return T.T
 
-def gradient(x, n):
+def basis_and_gradient(x, n):
     
     T = poly(x, n).T
     dT = np.zeros((n, len(x)))
@@ -28,7 +28,12 @@ def gradient(x, n):
     for jj in range(2, n):
         dT[jj, :] = 2.0 * T[jj-1, :] + 2.0 * x * dT[jj-1, :] - dT[jj-2, :]
         
-    return dT.T
+    return T.T, dT.T
+
+def gradient(x, n):
+    
+    _, dT = basis_and_gradient(x, n)
+    return dT
 
 def tensor(X, n_vec):
     """Each row of X should be one observation
@@ -86,17 +91,37 @@ class ChebFcn:
         vals = fcn(self.scaled_grid)
         self.fit_vals(vals)
         
-    def evaluate(self, x_in):
+    def get_basis(self, x_in):
         
         x_scaled = self.scale_x(x_in)
-        Tx = poly(x_scaled, self.n)
-        return np.dot(Tx, self.coeffs)
+        return poly(x_scaled, self.n)
+        
+    def get_basis_and_gradient(self, x_in):
+        
+        x_scaled = self.scale_x(x_in)
+        return basis_and_gradient(x_scaled, self.n)
+        
+    def get_basis_gradient_only(self, x_in):
+        
+        x_scaled = self.scale_x(x_in)
+        return gradient(x_scaled, self.n)
+        
+    def evaluate(self, x_in):
+        
+        Tx = self.get_basis(x_in)
+        return Tx @ self.coeffs
     
     def gradient(self, x_in):
         
-        x_scaled = self.scale_x(x_in)
-        dTx = gradient(x_scaled, self.n)
+        _, dTx = self.get_basis_and_gradient(x_in)
         return np.dot(dTx, self.coeffs)
+    
+    def evaluate_with_gradient(self, x_in):
+        
+        Tx, dTx = self.get_basis_and_gradient(x_in)
+        fx = Tx @ self.coeffs
+        dfx = dTx @ self.coeffs
+        return fx, dfx
         
     def scale_x(self, x_in):
         
