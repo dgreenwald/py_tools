@@ -709,6 +709,7 @@ def safe_sum(x):
     return x.sum(skipna=False)
 
 def chow_lin_V_default(a, N):
+    """Default V matrix: AR(1) correlation structure"""
     
     V = np.zeros((N, N))
     for tt in range(N):
@@ -717,6 +718,20 @@ def chow_lin_V_default(a, N):
     return V
 
 def chow_lin(Y, Z, B, Vfcn=chow_lin_V_default, a0=0.9, tol=1e-4):
+    """Use the Chow-Lin method to approximate the target series X using a
+    coarser series Y and a proxy series Z. The inputs should be:
+        
+        Y: the Nt_coarse x 1 target series with limited availability
+        Z: the Nt_fine x k target series
+        B: the Nx_fine x Nt_coarse matrix relating Y and X
+        Vfcn: a function for computing the error matrix V given the correlation parameter a
+        a0: a scalar guess for the correlation parameter
+        tol: the scalar tolerance for the iterative process to converge
+        
+    The function returns:
+        
+        X_hat: the approximated series for X
+    """
     
     a = a0
     done = False
