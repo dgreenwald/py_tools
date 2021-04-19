@@ -462,7 +462,7 @@ def plot_series(df_in, var_names, filepath=None, directory=None, filename=None, 
                 plot_type=None,
                 ylabel=None, sample='outer', title=None, 
                 single_legend=True, vertline_ix=None,
-                vertline_kwargs={}, linewidths={}, ylim=None):
+                vertline_kwargs={}, linewidths={}, ylim=None, dpi=None):
 
     matplotlib.rcParams.update({'font.size' : fontsize})
     
@@ -528,7 +528,7 @@ def plot_series(df_in, var_names, filepath=None, directory=None, filename=None, 
 
     plt.tight_layout()
     if filepath is not None:
-        plt.savefig(filepath)
+        plt.savefig(filepath, dpi=dpi)
     else:
         plt.show()
 

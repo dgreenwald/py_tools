@@ -264,7 +264,7 @@ def load(nipa_table=None, nipa_source='xls', **kwargs):
         raise Exception
 
 def load_flat(nipa_table=None, data_dir=default_dir+'nipa/', var_list=None,
-              reimport=False, billions=True, var_index=None, vintage='2003',
+              reimport=False, billions=True, var_index=None, vintage='2103',
               named_only=True, nipa_vintage=None, freq='Q', **kwargs):
     
     if nipa_vintage is not None:
