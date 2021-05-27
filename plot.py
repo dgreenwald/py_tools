@@ -598,11 +598,11 @@ def projection(x, se, var_titles, shock_title, p=0.9, n_per_row=4, plot_size=3.0
 
     return None
 
-def binscatter(df_in, yvars, xvar, wvar=None, fit_var=None, labels={}, n_bins=20, 
+def binscatter(df_in, yvars, xvar, wvar=None, fit_var=None, labels={}, n_bins=20, bins=None,
                filepath=None, xlim=None, ylim=None, plot_line=True, 
                control=[], absorb=[], bin_scale=None, raw_scale=10.0,
                plot_raw_data=False, bin_kwargs={}, raw_kwargs={}, line_kwargs={},
-               legend_font=10, label_font=12, use_legend=True,
+               legend_font=10, label_font=12, use_legend=True, median=False,
                **kwargs):
         
     matplotlib.rcParams.update({'font.size' : label_font})
@@ -723,7 +723,8 @@ def binscatter(df_in, yvars, xvar, wvar=None, fit_var=None, labels={}, n_bins=20
                     'color' : this_color,
                     })
         
-        by_bin = dt.compute_binscatter(df, yvar, xvar, wvar=wvar, n_bins=n_bins)
+        by_bin = dt.compute_binscatter(df, yvar, xvar, wvar=wvar, n_bins=n_bins, 
+                                       bins=bins, median=median)
         
         if plot_line and (fit_var is None):
             fr = dt.regression(df, yvar, [xvar], weight_var=wvar)
@@ -799,6 +800,8 @@ def binscatter(df_in, yvars, xvar, wvar=None, fit_var=None, labels={}, n_bins=20
         plt.savefig(filepath)
 
     plt.close(fig)
+    
+    return by_bin
     
 def state_scatter_inner(ax, this_df, yvar, xvar):
     for ii, state in enumerate(this_df.index):

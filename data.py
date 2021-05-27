@@ -82,7 +82,10 @@ def absorb(df, groups, value_var, weight_var=None, restore_mean=True):
 
     return x
 
-def compute_binscatter(df_in, yvar, xvar, wvar=None, n_bins=10):
+def compute_binscatter(df_in, yvar, xvar, wvar=None, n_bins=10, bins=None, median=False):
+    
+    if median:
+        assert wvar is None
 
     df = df_in[[xvar, yvar]].copy()
     if wvar is not None:
@@ -93,17 +96,26 @@ def compute_binscatter(df_in, yvar, xvar, wvar=None, n_bins=10):
         
     df = df.dropna()
         
-    df['x_bin'] = bin_data(df[xvar], n_bins, weights=df[wvar])
+    if bins is None:
+        df['x_bin'] = bin_data(df[xvar], n_bins, weights=df[wvar])
+    else:
+        df['x_bin'] = pd.cut(df[xvar], bins, labels=np.arange(len(bins)-1))
+        
+    if median:
+        
+        by_bin = df.groupby('x_bin')[[xvar, yvar]].median()
+    
+    else:
 
-    df[xvar] *= df[wvar]
-    df[yvar] *= df[wvar]
-    
-    by_bin = df.groupby('x_bin')[[xvar, yvar, wvar]].sum()
-    by_bin[xvar] /= by_bin[wvar]
-    by_bin[yvar] /= by_bin[wvar]
-    
-    weight_adj = n_bins / len(df)
-    by_bin[wvar] *= weight_adj
+        df[xvar] *= df[wvar]
+        df[yvar] *= df[wvar]
+        
+        by_bin = df.groupby('x_bin')[[xvar, yvar, wvar]].sum()
+        by_bin[xvar] /= by_bin[wvar]
+        by_bin[yvar] /= by_bin[wvar]
+        
+        weight_adj = n_bins / len(df)
+        by_bin[wvar] *= weight_adj
 
     return by_bin
 

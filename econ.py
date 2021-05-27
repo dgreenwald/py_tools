@@ -17,7 +17,7 @@ from . import walker
     # x_til = x - x_star
     # return x_star + np.log(np.sum(np.exp(x_til), axis=axis))
 
-def get_unit_vecs(P, tol=1e-8, normalize=False):
+def get_unit_vecs(P, tol=1e-8, normalize=False, **kwargs):
     
     vals, vecs = np.linalg.eig(P)
     unit = np.abs(vals - 1.0) < tol
@@ -28,9 +28,39 @@ def get_unit_vecs(P, tol=1e-8, normalize=False):
         
     return unit_vecs
 
-def ergodic_dist(P):
+def stationary_doubling(P, tol=1e-12, pi_seed=None, maxit=500, normalize=True, **kwargs):
+    """Find invariant distribution of a Markov chain by iteration."""
+    
+    if pi_seed is None:
+        pi = np.ones(P.shape[0]) / P.shape[0]
+    else:
+        pi = pi_seed
+        
+    Pj = P.copy()
 
-    return get_unit_vecs(P.T, normalize=True) 
+    for it in range(maxit):
+        pi_new = pi @ Pj
+        Pj = Pj @ Pj
+        dist = np.max(np.abs(pi_new - pi))
+        # print(dist)
+        if dist < tol:
+            break
+        pi = pi_new
+    else:
+        raise ValueError(f'No convergence after {maxit} forward iterations!')
+    pi = pi_new
+    
+    if normalize:
+        pi = pi / np.sum(pi)
+
+    return pi
+
+def ergodic_dist(P, doubling=False, **kwargs):
+    
+    if doubling:
+        return stationary_doubling(P, **kwargs)
+    else:
+        return get_unit_vecs(P.T, normalize=True, **kwargs) 
 
 def check_ergodic(invariant, tol=1e-8):
     
