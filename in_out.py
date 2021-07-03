@@ -62,3 +62,10 @@ def write_numeric(val, filename, precision='4.3f'):
         fid.write('{0:{1}}'.format(val, precision))
         
     return None
+
+def read_numeric(filename):
+    
+    with open(filename, 'r') as fid:
+        val = float(fid.read())
+        
+    return val
