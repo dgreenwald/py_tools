@@ -32,6 +32,8 @@ def absorb(df, groups, value_var, weight_var=None, restore_mean=True, tol=1e-8,
     # for var in ['_weight', '_x', '_x_weight']:
         # assert var not in df
 
+    Ng = len(groups)
+
     var_list = [value_var]
     if weight_var is not None:
         var_list.append(weight_var)
@@ -70,11 +72,12 @@ def absorb(df, groups, value_var, weight_var=None, restore_mean=True, tol=1e-8,
         return err
             
     # Prep across groups
-    fe_list = ['_fe_weight_' + group for group in groups]
+    fe_list = ['_fe' + str(ii) for ii in range(Ng)]
     gbfe_list = [_df.groupby(group) for group in groups]
     sum_weight_list = [gbfe['_weight'].transform(np.nansum) for gbfe in gbfe_list]
-    for group in groups:
-        _df['_fe_weight_' + group] = 0.0
+    for fe_var in fe_list:
+        _df[fe_var] = 0.0
+        _df[fe_var + '_weight'] = 0.0
         
     _df['_res_weight'] = _df['_x_weight'].copy()
     
@@ -87,7 +90,7 @@ def absorb(df, groups, value_var, weight_var=None, restore_mean=True, tol=1e-8,
             
             for ii, group in enumerate(groups):
                 fe_var = fe_list[ii]
-                _df['_temp'] = _df['_res_weight'] + _df[fe_var]
+                _df['_temp'] = _df['_res_weight'] + _df[fe_var + '_weight']
                 _df[fe_var] = gbfe_list[ii]['_temp'].transform(np.nansum) / sum_weight_list[ii]
                 
             _df['_res_weight'] = _df['_x_weight'] - np.nansum(_df[fe_list], axis=1)
@@ -96,16 +99,17 @@ def absorb(df, groups, value_var, weight_var=None, restore_mean=True, tol=1e-8,
             
             for ii, group in enumerate(groups):
                 fe_var = fe_list[ii]
-                _df['_res_weight'] += _df[fe_var]
+                _df['_res_weight'] += _df[fe_var + '_weight']
                 _df[fe_var] = gbfe_list[ii]['_res_weight'].transform(np.nansum) / sum_weight_list[ii]
-                _df['_res_weight'] -= _df[fe_var]
+                _df[fe_var + '_weight'] = _df[fe_var] * _df['_weight']
+                _df['_res_weight'] -= _df[fe_var + '_weight']
                 
         err = get_err()
         count += 1
         if display: print("Iteration {0:d}, rmse = {1:g}".format(count, err))
 
     # Restore original mean and output
-    fe_means = np.sum(_df[fe_list], axis=1) / _df['_weight']
+    fe_means = np.sum(_df[fe_list], axis=1)
     x = _df['_x'] - fe_means
     if restore_mean:
         x_mean = np.sum(_df['_x_weight']) / np.sum(_df['_weight'])
