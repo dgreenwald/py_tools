@@ -293,7 +293,7 @@ def multi_hist(dfs, labels=None, xvar=None, xvars=None, bins=None, wvar=None, wv
         xlim = bins[[0, -1]]
         
     # Normalize
-    if density:
+    if density and (not use_bar):
         if matplotlib.__version__ == '2.0.2':
             kwargs['normed'] = True
         else:
