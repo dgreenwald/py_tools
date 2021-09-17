@@ -3,6 +3,7 @@ import pandas as pd
 # import pdb
 import pickle
 import patsy
+import pyhdfe
 
 import statsmodels.api as sm
 import statsmodels.formula.api as smf
@@ -14,7 +15,8 @@ def lowercase(df):
     
     return df.rename(columns={var : var.lower() for var in df.columns})
 
-def absorb(df, groups, value_var, weight_var=None, restore_mean=True):
+def absorb(df, groups, value_var, weight_var=None, restore_mean=True, tol=1e-8,
+           display=False):
     """Remove the mean from a variable by group
 
     Arguments:
@@ -52,30 +54,83 @@ def absorb(df, groups, value_var, weight_var=None, restore_mean=True):
 
     # Make sure we cut down to overlapping sample of values and weights
     _df['_x'] = _df[value_var].copy()
-    ix = np.any(pd.isnull(_df[[value_var, '_weight']]), axis=1)
+    ix = np.any(pd.isnull(_df[[value_var, '_weight']]), axis=1) | (_df['_weight'] == 0.0)
     _df.loc[ix, ['_weight', '_x']] = np.nan
-
-    # Compute overall mean and remove
-    if restore_mean:
-
-        _df['_x_weight'] = _df['_x'] * _df['_weight']
-        x_mean = np.sum(_df['_x_weight']) / np.sum(_df['_weight'])
-        _df['_x'] -= x_mean
-
-    # Loop through groups demeaning each time
-    for group in groups:
+    
+    # Weighted variable
+    _df['_x_weight'] = _df['_x'] * _df['_weight']
+    
+    # Weighted means error
+    def get_err():
         
-        gb = _df.groupby(group)
-        _df['_x_weight'] = _df['_x'] * _df['_weight']
-        
-        for var in ['_weight', '_x_weight']:
-            _df[var + '_sum'] = gb[var].transform(sum)
+        err = 0.0
+        for ii, group in enumerate(groups):
+            group_means = gbfe_list[ii]['_res_weight'].transform(np.nansum) / sum_weight_list[ii]
+            err += np.sqrt((group_means @ group_means) / len(group_means))
             
-        _df['_x'] -= (_df['_x_weight_sum']) / _df['_weight_sum']
+        return err
+            
+    # Compute weights by cell
+    gb = _df.groupby(groups)
+    sum_weights = gb['_weight'].transform(np.nansum)
+    
+    fe_list = ['_fe_weight_' + group for group in groups]
+    gbfe_list = [_df.groupby(group) for group in groups]
+    sum_weight_list = [gbfe['_weight'].transform(np.nansum) for gbfe in gbfe_list]
+    for group in groups:
+        _df['_fe_weight_' + group] = 0.0
+        
+    _df['_res_weight'] = _df['_x_weight'].copy()
+    
+    err = get_err()
+        
+    count = 0
+    while err > tol:
+        
+        if False:
+            
+            for ii, group in enumerate(groups):
+                fe_var = fe_list[ii]
+                _df['_temp'] = _df['_res_weight'] + _df[fe_var]
+                _df[fe_var] = gbfe_list[ii]['_temp'].transform(np.nansum) / sum_weight_list[ii]
+                
+            _df['_res_weight'] = _df['_x_weight'] - np.nansum(_df[fe_list], axis=1)
+            
+        else:
+            
+            for ii, group in enumerate(groups):
+                fe_var = fe_list[ii]
+                _df['_res_weight'] += _df[fe_var]
+                _df[fe_var] = gbfe_list[ii]['_res_weight'].transform(np.nansum) / sum_weight_list[ii]
+                _df['_res_weight'] -= _df[fe_var]
+                
+        err = get_err()
+        count += 1
+        if display: print("Iteration {0:d}, rmse = {1:g}".format(count, err))
+
+    # # Compute overall mean and remove
+    # if restore_mean:
+
+    #     _df['_x_weight'] = _df['_x'] * _df['_weight']
+    #     x_mean = np.sum(_df['_x_weight']) / np.sum(_df['_weight'])
+    #     _df['_x'] -= x_mean
+
+    # # Loop through groups demeaning each time
+    # for group in groups:
+        
+    #     gb = _df.groupby(group)
+    #     _df['_x_weight'] = _df['_x'] * _df['_weight']
+        
+    #     for var in ['_weight', '_x_weight']:
+    #         _df[var + '_sum'] = gb[var].transform(sum)
+            
+    #     _df['_x'] -= (_df['_x_weight_sum']) / _df['_weight_sum']
 
     # Restore original mean and output
-    x = _df['_x'].copy()
+    fe_means = np.sum(_df[fe_list], axis=1) / _df['_weight']
+    x = _df['_x'] - fe_means
     if restore_mean:
+        x_mean = np.sum(_df['_x_weight']) / np.sum(_df['_weight'])
         x += x_mean
         
     # _df = _df.drop(columns=['_weight', '_x', '_x_weight'])
