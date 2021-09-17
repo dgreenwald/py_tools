@@ -244,6 +244,156 @@ def compute_hist(df, var, bins, wvar=None):
 
     return hist
 
+def multi_hist(dfs, labels=None, xvar=None, xvars=None, bins=None, wvar=None, wvars=None,
+                filepath=None, xlabel=None, ylabel=None, xlim=None,
+                ylim=None, legend_font=10, label_font=12, copy_paths=None,
+                colors=None, edgecolor='black', alpha=0.5, use_bar=False, 
+                kwarg_list=None, x_vertline=None,
+                vertline_kwargs={}, topcode=False, bottomcode=False, 
+                density=True,
+                **kwargs):
+    """Plots double histogram overlaying var1 from df1 and var2 from df2
+
+    Arguments:
+    """
+
+    def get_length(x):
+        if isinstance(x, list):
+            return len(x)
+        else:
+            return 0
+        
+    def to_list(x_in, n_plots, default=None):
+        
+        if x_in is None:
+            x_in = default
+            
+        if isinstance(x_in, list):
+            x = x_in.copy()
+        else:
+            x = [x_in]
+            
+        if (len(x) == 1) and (n_plots > 1):
+            x = n_plots * x
+            
+        assert len(x) == n_plots
+        
+        return x
+        
+    # Number of independent plots
+    n_plots = max([get_length(x) for x in [dfs, xvars, wvars]])
+    ilist = list(range(n_plots))
+        
+    # Default: equal weights
+    if wvar is None:
+        wvar = '_count'
+        
+    # Bound at edges of bins
+    if (xlim is None) and (bins is not None):
+        xlim = bins[[0, -1]]
+        
+    # Normalize
+    if density:
+        if matplotlib.__version__ == '2.0.2':
+            kwargs['normed'] = True
+        else:
+            kwargs['density'] = True
+        
+    dfs = to_list(dfs, n_plots)
+    labels = to_list(labels, n_plots)
+    colors = to_list(colors, n_plots)
+    
+    xvars = to_list(xvars, n_plots, xvar)
+    wvars = to_list(wvars, n_plots, wvar)
+    kwarg_list = to_list(kwarg_list, n_plots, {})
+    
+    for ii in ilist:
+        these_kwargs = kwargs.copy()
+        these_kwargs.update(kwarg_list[ii])
+        kwarg_list[ii] = these_kwargs
+
+    _dfs = []
+    
+    for ii in ilist:
+        
+        xv = xvars[ii]
+        wv = wvars[ii]
+        
+        df = dfs[ii][[xv]].copy()
+        
+        if wvars[ii] == '_count':
+            df['_count'] = 1.0
+        else:
+            df[wv] = dfs[ii][wv]
+            
+        df = dt.clean(df, [xv, wv])
+
+        if topcode:
+            df[xv] = np.minimum(df[xv], bins[-1])
+            
+        if bottomcode:
+            df[xv] = np.maximum(df[xv], bins[0])
+    
+        _dfs.append(df)
+        
+    fig = plt.figure()
+    matplotlib.rcParams.update({'font.size' : label_font})
+        
+    if use_bar:
+        
+        assert bins is not None
+        
+        # TOD0: 
+        bins = np.array(bins)
+        bin_width = bins[1:] - bins[:-1]
+
+        for ii in ilist:
+            
+            hist = compute_hist(_dfs[ii], xvars[ii], bins, wvar=wvars[ii])
+            
+            plt.bar(np.array(hist.index), hist.values, width=bin_width,
+                    alpha=alpha, edgecolor=edgecolor, align='edge',
+                    label=str(labels[ii]), color=colors[ii], **kwarg_list[ii]
+                    )
+
+    else:
+        
+        for ii in ilist:
+
+            plt.hist(_dfs[ii][xvars[ii]].values, bins=bins, alpha=alpha, edgecolor=edgecolor,
+                     weights=_dfs[ii][wvars[ii]].copy(), label=str(labels[ii]), color=colors[ii], **kwarg_list[ii])
+
+    if x_vertline is not None:
+        plt.axvline(x=x_vertline, **vertline_kwargs)
+
+    plt.legend(fontsize=legend_font)
+
+    if xlabel is not None:
+        plt.xlabel(xlabel, fontsize=label_font)
+    if ylabel is not None:
+        plt.ylabel(ylabel, fontsize=label_font)
+
+    if xlim is not None:
+        plt.xlim((xlim))
+    if ylim is not None:
+        plt.ylim((ylim))
+        
+    plt.legend(fontsize=legend_font)
+    plt.tight_layout()
+
+    if filepath is not None:
+        plt.savefig(filepath)
+    else:
+        plt.show()
+
+    plt.close(fig)
+
+    if copy_paths is not None:
+        for ii in ilist:
+            save_hist(_dfs[ii][xvars[ii]].values, copy_paths[ii], density=True, bins=bins, weights=_dfs[ii][wvars[ii]].values)
+
+    return True
+
 def double_hist(df1, df2=None, label1=None, label2=None, var=None,
                 var1=None, var2=None, bins=None, wvar=None, wvar1=None,
                 wvar2=None, filepath=None, xlabel=None, ylabel=None, xlim=None,
