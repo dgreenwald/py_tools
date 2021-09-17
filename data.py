@@ -3,7 +3,6 @@ import pandas as pd
 # import pdb
 import pickle
 import patsy
-import pyhdfe
 
 import statsmodels.api as sm
 import statsmodels.formula.api as smf
@@ -70,10 +69,7 @@ def absorb(df, groups, value_var, weight_var=None, restore_mean=True, tol=1e-8,
             
         return err
             
-    # Compute weights by cell
-    gb = _df.groupby(groups)
-    sum_weights = gb['_weight'].transform(np.nansum)
-    
+    # Prep across groups
     fe_list = ['_fe_weight_' + group for group in groups]
     gbfe_list = [_df.groupby(group) for group in groups]
     sum_weight_list = [gbfe['_weight'].transform(np.nansum) for gbfe in gbfe_list]
@@ -108,32 +104,12 @@ def absorb(df, groups, value_var, weight_var=None, restore_mean=True, tol=1e-8,
         count += 1
         if display: print("Iteration {0:d}, rmse = {1:g}".format(count, err))
 
-    # # Compute overall mean and remove
-    # if restore_mean:
-
-    #     _df['_x_weight'] = _df['_x'] * _df['_weight']
-    #     x_mean = np.sum(_df['_x_weight']) / np.sum(_df['_weight'])
-    #     _df['_x'] -= x_mean
-
-    # # Loop through groups demeaning each time
-    # for group in groups:
-        
-    #     gb = _df.groupby(group)
-    #     _df['_x_weight'] = _df['_x'] * _df['_weight']
-        
-    #     for var in ['_weight', '_x_weight']:
-    #         _df[var + '_sum'] = gb[var].transform(sum)
-            
-    #     _df['_x'] -= (_df['_x_weight_sum']) / _df['_weight_sum']
-
     # Restore original mean and output
     fe_means = np.sum(_df[fe_list], axis=1) / _df['_weight']
     x = _df['_x'] - fe_means
     if restore_mean:
         x_mean = np.sum(_df['_x_weight']) / np.sum(_df['_weight'])
         x += x_mean
-        
-    # _df = _df.drop(columns=['_weight', '_x', '_x_weight'])
 
     return x
 
