@@ -382,10 +382,15 @@ class MonteCarlo:
 
                 self.CH_inv = np.linalg.cholesky(self.H_inv)
 
-        self.H = np.real(self.H)
-        self.H_inv = np.real(self.H_inv)
-        self.CH_inv = np.real(self.CH_inv)
+        # self.H = np.real(self.H)
+        # self.H_inv = np.real(self.H_inv)
+        # self.CH_inv = np.real(self.CH_inv)
 
+        return None
+
+    def set_CH_inv(self, CH_inv):
+
+        self.CH_inv = CH_inv
         return None
 
     def metro(self, x, post, x_try, **kwargs):

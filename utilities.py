@@ -158,7 +158,10 @@ def cartesian_matrices(A, B):
 
     return C
 
-def get_env(name, default, prefix='', upper=True, dtype=None):
+def get_env(name, default, prefix='', upper=True, dtype=None, no_underscore=False):
+
+    if (prefix != '') and (not no_underscore) and (prefix[-1] != '_'):
+        prefix += '_'
 
     # ipdb.set_trace()
     fullname = prefix + name
