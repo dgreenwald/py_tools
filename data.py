@@ -14,7 +14,7 @@ def lowercase(df):
     
     return df.rename(columns={var : var.lower() for var in df.columns})
 
-def absorb(df, groups, value_var, weight_var=None, restore_mean=True, tol=1e-8,
+def absorb(df, groups, value_var, weight_var=None, restore_mean=True, tol=1e-12,
            display=False):
     """Remove the mean from a variable by group
 
