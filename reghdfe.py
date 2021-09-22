@@ -16,12 +16,8 @@ def reghdfe(df, yvar, xvars, **kwargs):
     formula = '{0} ~ {1}'.format(yvar, ' + '.join(xvars))
     return reghdfe_formula(df, formula, **kwargs)
 
-def group_mean_error():
-    
-    return None
-
 def reghdfe_formula(df, formula, fes=[], weight_var=None, se_type='robust', 
-                    tol=1e-8):
+                    tol=1e-12, cluster=None):
     
     unweighted = (weight_var is None)
     
@@ -89,7 +85,7 @@ def reghdfe_formula(df, formula, fes=[], weight_var=None, se_type='robust',
     X = X.values
         
     Nt, Nx = X.shape
-    Nt_adj = Nt - Nx - 1
+    Nt_adj = Nt - Nx
     if fes:
         Nt_adj -= sum(Ng)
         Nt_adj += len(fes)
@@ -102,7 +98,7 @@ def reghdfe_formula(df, formula, fes=[], weight_var=None, se_type='robust',
     XWX = XW @ X
     coeffs = np.linalg.solve(XWX, XW @ y)
     
-    e = (y - X @ coeffs)[:, np.newaxis]
+    e = (y - X @ coeffs)
     
     if se_type == 'robust':
         XWe = XW * e.T
