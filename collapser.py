@@ -123,7 +123,7 @@ class Collapser:
         else:
             dfc_old = self.dfc
         
-        dfc_new = dfc_old.groupby(by_list).sum()
+        dfc_new = dfc_old.groupby(by_list).agg(np.nansum)
         if singleton:
             dfc_new = dfc_new.reset_index().drop(columns=['TEMP'])
             
@@ -137,7 +137,7 @@ class Collapser:
         
     def resample(self, by_list, time_var, freq, inplace=False):
         
-        dfc_new = self.dfc.groupby(by_list).resample(freq, level=time_var).sum()
+        dfc_new = self.dfc.groupby(by_list).resample(freq, level=time_var).agg(np.nansum)
         by_list_new = list(dfc_new.index.names)
         
         if inplace:

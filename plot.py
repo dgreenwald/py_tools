@@ -753,6 +753,7 @@ def binscatter(df_in, yvars, xvar, wvar=None, fit_var=None, labels={}, n_bins=20
                control=[], absorb=[], bin_scale=None, raw_scale=10.0,
                plot_raw_data=False, bin_kwargs={}, raw_kwargs={}, line_kwargs={},
                legend_font=10, label_font=12, use_legend=True, median=False,
+               restore_mean=False,
                **kwargs):
         
     matplotlib.rcParams.update({'font.size' : label_font})
@@ -850,7 +851,7 @@ def binscatter(df_in, yvars, xvar, wvar=None, fit_var=None, labels={}, n_bins=20
 
             if absorb:
                 df[this_var] = dt.absorb(df, absorb, this_var, weight_var=wvar, 
-                                    restore_mean=False)
+                                    restore_mean=restore_mean)
 
             if control:
                 fr = dt.regression(df, this_var, control, weight_var=wvar)
