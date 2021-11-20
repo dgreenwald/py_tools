@@ -99,7 +99,7 @@ class Collapser:
         if collapse:
             return self.collapse(self.by_list, inplace=inplace)
             
-    def get_data(self, weight_suffix=False):
+    def get_data(self, weight_suffix=False, include_denom=False):
         
         if weight_suffix:
             suffix = '_' + self.weight_var
@@ -109,6 +109,9 @@ class Collapser:
         df_out = pd.DataFrame(index=self.dfc.index.copy())
         for var in self.var_list:
             df_out[var + suffix] = self.dfc[var + '_num'] / self.dfc[var + '_denom']
+            
+        if include_denom:
+            df_out = pd.concat([df_out, self.dfc[[var + '_denom' for var in self.var_list]]], axis=1)
             
         return df_out
             
