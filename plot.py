@@ -918,7 +918,7 @@ def binscatter(df_in, yvars, xvar, wvar=None, fit_var=None, labels={}, n_bins=20
             plt.xlim(xlim)
         else:
             if plot_raw_data:
-                xlim = stats.weighted_quantile(df[xvar].values, df[wvar].values, [0.005, 0.995])
+                xlim = stats.weighted_quantile(df[xvar].values, weights, [0.005, 0.995])
                 plt.xlim(xlim)
             else:
                 bin_min = np.amin(by_bin[xvar].values)
@@ -933,7 +933,7 @@ def binscatter(df_in, yvars, xvar, wvar=None, fit_var=None, labels={}, n_bins=20
             plt.ylim(ylim)
         else:
             if plot_raw_data:
-                ylim = stats.weighted_quantile(df[yvar].values, df[wvar].values, [0.005, 0.995])
+                ylim = stats.weighted_quantile(df[yvar].values, weights, [0.005, 0.995])
                 plt.ylim(ylim)
             else:
                 bin_min = np.amin(by_bin[yvar].values)
