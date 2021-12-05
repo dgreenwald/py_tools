@@ -753,7 +753,7 @@ def binscatter(df_in, yvars, xvar, wvar=None, fit_var=None, labels={}, n_bins=20
                control=[], absorb=[], bin_scale=None, raw_scale=10.0,
                plot_raw_data=False, bin_kwargs={}, raw_kwargs={}, line_kwargs={},
                legend_font=10, label_font=12, use_legend=True, median=False,
-               restore_mean=False,
+               restore_mean=False, title=None,
                **kwargs):
         
     matplotlib.rcParams.update({'font.size' : label_font})
@@ -942,6 +942,9 @@ def binscatter(df_in, yvars, xvar, wvar=None, fit_var=None, labels={}, n_bins=20
                 ylim = (bin_min - 0.1 * tot_range, bin_max + 0.1 * tot_range)
                 if all([np.isfinite(val) for val in ylim]):
                     plt.ylim(ylim)
+
+    if title is not None:
+        plt.title(title)
 
     plt.tight_layout()
     

@@ -1,7 +1,30 @@
 import numpy as np
 from scipy.stats import norm, lognorm
 
-def weighted_quantile(values_in, weights_in, quantiles, sort=True):
+# def weighted_quantile(values_in, weights_in, quantiles, sort=True):
+    
+#     # assert (np.all(np.isfinite(values_in)) and np.all(np.isfinite(weights_in)))
+    
+#     ix_keep = np.isfinite(values_in) & np.isfinite(weights_in) & (weights_in > 0.0)
+
+#     if sort:
+#         sorter = np.argsort(values_in[ix_keep])
+#         values = values_in[ix_keep][sorter].astype(np.float64)
+#         weights = weights_in[ix_keep][sorter].astype(np.float64)
+    
+#     cumulative_weights = np.cumsum(weights)
+#     cumulative_weights /= cumulative_weights[-1]
+    
+#     # Set up step function. This includes two observations for each x value, at the bottom of the step and the top of the step
+#     # step_top = cumulative_weights
+#     step_bottom = np.hstack((0.0, cumulative_weights[:-1]))
+    
+#     step_cweights = np.ravel(np.vstack((step_bottom, cumulative_weights)).T)
+#     step_values = np.repeat(values, 2)
+
+#     return np.interp(quantiles, step_cweights, step_values)
+
+def weighted_quantile(values_in, weights_in, quantiles, sort=True, C=0.5):
     
     # assert (np.all(np.isfinite(values_in)) and np.all(np.isfinite(weights_in)))
     
@@ -12,17 +35,10 @@ def weighted_quantile(values_in, weights_in, quantiles, sort=True):
         values = values_in[ix_keep][sorter].astype(np.float64)
         weights = weights_in[ix_keep][sorter].astype(np.float64)
     
-    cumulative_weights = np.cumsum(weights)
-    cumulative_weights /= cumulative_weights[-1]
-    
-    # Set up step function. This includes two observations for each x value, at the bottom of the step and the top of the step
-    # step_top = cumulative_weights
-    step_bottom = np.hstack((0.0, cumulative_weights[:-1]))
-    
-    step_cweights = np.ravel(np.vstack((step_bottom, cumulative_weights)).T)
-    step_values = np.repeat(values, 2)
+    S = np.cumsum(weights)
+    q_grid = (S - C * weights) / (S[-1] + (1.0 - 2.0 * C) * weights)
 
-    return np.interp(quantiles, step_cweights, step_values)
+    return np.interp(quantiles, q_grid, values)
 
 def wq_by_col(values, weights, quantiles, **kwargs):
 
