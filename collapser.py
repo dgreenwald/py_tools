@@ -115,10 +115,10 @@ class Collapser:
             
         return df_out
             
-    def collapse(self, by_list=None, inplace=False):
+    def collapse(self, by_list=[], inplace=False):
         
         
-        singleton = (by_list is None)
+        singleton = (not by_list)
         if singleton:
             dfc_old = self.dfc.copy()
             dfc_old['TEMP'] = 0

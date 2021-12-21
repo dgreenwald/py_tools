@@ -353,7 +353,9 @@ def regression(df, lhs, rhs, fes=[], absorb_vars=[], intercept=True, formula_ext
 
     if absorb_vars:
         for var in [lhs] + rhs:
+            # old_values = _df.loc[ix_both, var].copy()
             _df.loc[ix_both, var] = absorb(_df.loc[ix_both, :], absorb_vars, var, weight_var=weight_var, restore_mean=True)
+            # _df.loc[ix_both, var + '_FE'] = old_values - _df.loc[ix_both]
         
     Xs = _df.loc[ix_both, rhs].values
     zs = _df.loc[ix_both, lhs].values
@@ -403,7 +405,7 @@ def wls_formula(df, formula, weight_var=None, weights=None, ix=None, nw_lags=0,
     
     y, X = patsy.dmatrices(formula, df.loc[ix, :], return_type='dataframe')
     results = sm.WLS(y, X, weights=weights).fit()
-    results = results.get_robustcov_results('HC0')
+    results = results.get_robustcov_results('HC3')
 
     results = update_results_cov(results, nw_lags=nw_lags, cluster_groups=cluster_groups)
 
@@ -425,7 +427,7 @@ def update_results_cov(results, nw_lags=0, cluster_groups=None):
     elif nw_lags > 0:
         results = results.get_robustcov_results('HAC', maxlags=nw_lags)
     else:
-        results = results.get_robustcov_results('HC0')
+        results = results.get_robustcov_results('HC3')
 
     return results
 

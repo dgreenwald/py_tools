@@ -39,7 +39,8 @@ def two_axis(df_in, var1, var2, filepath=None, loc1='upper left',
              normalize=False, color1='#1f77b4', color2='#ff7f0e', flip1=False,
              flip2=False, legend=True,
              single_legend=False, print_legend_axis=True, labels={},
-             leglabels={}, drop=True, kwargs1={}, kwargs2={}):
+             leglabels={}, drop=True, kwargs1={}, kwargs2={}, format_dates=False,
+             savefig_kwargs={}):
     
     kwargs1_copy = kwargs1.copy()
     kwargs1 = {'linewidth' : 2,}
@@ -59,7 +60,7 @@ def two_axis(df_in, var1, var2, filepath=None, loc1='upper left',
     for these_kwargs in [kwargs1, kwargs2]:
         if these_kwargs.get('marker', None) is not None:
             if these_kwargs.get('markevery', None) is None:
-                these_kwargs['markevery'] = math.round(len(df) / 20)
+                these_kwargs['markevery'] = np.round(len(df) / 20)
 
     fig, ax1 = plt.subplots()
 
@@ -138,10 +139,13 @@ def two_axis(df_in, var1, var2, filepath=None, loc1='upper left',
         ax2.set_ylim(ax2_ylim_new)
 
     plt.xlim(df.index[[0, -1]])
+    
+    if format_dates:
+        fig.autofmt_xdate()
 
     if filepath is not None:
         plt.tight_layout()
-        plt.savefig(filepath)
+        plt.savefig(filepath, **savefig_kwargs)
     else:
         plt.show()
 
