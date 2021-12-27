@@ -84,31 +84,48 @@ class Collapser:
             self.var_list = [var for var in df.columns if var not in self.by_list]
             
         if self.weight_var is None:
-            weight = np.ones(len(df))
+            weight = np.ones((len(df), 1))
         else:
-            weight = df[self.weight_var].copy()
+            weight = df[self.weight_var].values[:, np.newaxis]
             
         if scale:
             weight = weight / np.mean(weight)
             
-        for var in self.var_list:
+        # Old way, caused fragmentation errors
+        
+        # for var in self.var_list:
             
-            self.dfc[var + '_num'] = df[var] * weight
-            self.dfc[var + '_denom'] = pd.notnull(df[var]).astype(np.int) * weight
+        #     self.dfc[var + '_num'] = df[var] * weight
+        #     self.dfc[var + '_denom'] = pd.notnull(df[var]).astype(np.int) * weight
+            
+        df_num = (df[self.var_list] * weight)
+        df_denom = pd.notnull(df[self.var_list]) * weight
+        
+        df_num = df_num.rename({var : var + '_num' for var in df_num.columns}, axis=1)
+        df_denom = df_denom.rename({var : var + '_denom' for var in df_denom.columns}, axis=1)
+        
+        self.dfc = pd.concat([self.dfc, df_num, df_denom], axis=1)
             
         if collapse:
             return self.collapse(self.by_list, inplace=inplace)
             
     def get_data(self, weight_suffix=False, include_denom=False):
         
-        if weight_suffix:
-            suffix = '_' + self.weight_var
-        else:
-            suffix = ''
+        # if weight_suffix:
+        #     suffix = '_' + self.weight_var
+        # else:
+        #     suffix = ''
         
-        df_out = pd.DataFrame(index=self.dfc.index.copy())
-        for var in self.var_list:
-            df_out[var + suffix] = self.dfc[var + '_num'] / self.dfc[var + '_denom']
+        df_num = self.dfc[[var + '_num' for var in self.var_list]].rename({var + '_num' : var for var in self.var_list}, axis=1)
+        df_denom = self.dfc[[var + '_denom' for var in self.var_list]].rename({var + '_denom' : var for var in self.var_list}, axis=1)
+        
+        df_out = df_num / df_denom
+        if weight_suffix:
+            df_out = df_out.rename({var : var + '_' + self.weight_var for var in self.var_list}, axis=1)
+        
+        # df_out = pd.DataFrame(index=self.dfc.index.copy())
+        # for var in self.var_list:
+        #     df_out[var + suffix] = self.dfc[var + '_num'] / self.dfc[var + '_denom']
             
         if include_denom:
             df_out = pd.concat([df_out, self.dfc[[var + '_denom' for var in self.var_list]]], axis=1)

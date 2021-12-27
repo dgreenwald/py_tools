@@ -52,8 +52,8 @@ def load_state_county_year(filename, skiprows, target_cols):
 
 def load_county_year(year, data_dir=default_dir, reimport=False):
 
-    pkl_file = data_dir + 'county/irs_county_{:d}.pkl'.format(year)
-    if reimport or not os.path.exists(pkl_file):
+    parquet_file = data_dir + 'county/irs_county_{:d}.parquet'.format(year)
+    if reimport or not os.path.exists(parquet_file):
         
         print("Loading year {}".format(year))
         if year <= 2009:
@@ -63,9 +63,9 @@ def load_county_year(year, data_dir=default_dir, reimport=False):
         else:
             df_t = import_geo_year_from_2011(year, 'county', data_dir=default_dir)
 
-        df_t.to_pickle(pkl_file)
+        df_t.to_parquet(parquet_file)
     else:
-        df_t = pd.read_pickle(pkl_file) 
+        df_t = pd.read_parquet(parquet_file) 
 
     return df_t
 
@@ -221,17 +221,17 @@ def import_county_year_to_2009(year, data_dir=default_dir):
 
 def load_county(data_dir=default_dir, reimport=False, reimport_year=False):
 
-    pkl_file = data_dir + 'county/irs_county.pkl'
-    if reimport or not os.path.exists(pkl_file):
+    parquet_file = data_dir + 'county/irs_county.parquet'
+    if reimport or not os.path.exists(parquet_file):
 
         df = pd.concat((load_county_year(year, reimport=reimport_year) for year in range(1989, 2017)), sort=True)
         df['date'] = pd.to_datetime(df['date'])
         df = df.set_index(['fips', 'date']).sort_index()
-        df.to_pickle(pkl_file)
+        df.to_parquet(parquet_file)
 
     else:
 
-        df = pd.read_pickle(pkl_file)
+        df = pd.read_parquet(parquet_file)
 
     return df
 
@@ -289,7 +289,11 @@ def load_state_zip_year(filename, year):
 
 def import_zip_year_to_2010(year, data_dir=default_dir):
 
-    year_dir = data_dir + 'zip/' + str(year) + 'ZIPCode/'
+    year_dir = data_dir + 'zip/' + str(year)
+    if year in [2004, 2005, 2006]:
+        year_dir += 'ZipCode/'
+    else:
+        year_dir += 'ZIPCode/'
 
     if year == 1998:
 
@@ -368,18 +372,10 @@ def import_zip_year_to_2010(year, data_dir=default_dir):
             'tax_due_at_filing', 'overpayments_refunded',
         ])
 
-    if False:
-        print('TESTING')
-        file_list = list(glob.glob(year_dir + '*.xls'))
-        df_t = pd.concat([
-                load_state_zip_year(filename, year)
-                for filename in file_list[:2]
-                ])
-    else:
-        df_t = pd.concat([
-            load_state_zip_year(filename, year)
-            for filename in glob.glob(year_dir + '*.xls')
-        ])
+    df_t = pd.concat([
+        load_state_zip_year(filename, year)
+        for filename in glob.glob(year_dir + '*.xls')
+    ])
 
     df_t = df_t.loc[:, :len(names)-1]
     df_t.columns = names
@@ -394,8 +390,8 @@ def import_zip_year_to_2010(year, data_dir=default_dir):
 
 def load_zip_year(year, data_dir=default_dir, reimport=False):
 
-    pkl_file = data_dir + 'zip/irs_zip_{:d}.pkl'.format(year)
-    if reimport or not os.path.exists(pkl_file):
+    parquet_file = data_dir + 'zip/irs_zip_{:d}.parquet'.format(year)
+    if reimport or not os.path.exists(parquet_file):
         
         print("Loading year {}".format(year))
         if year <= 2010:
@@ -424,9 +420,9 @@ def load_zip_year(year, data_dir=default_dir, reimport=False):
     
         df_t = df_t.groupby(['zip', 'date']).sum().reset_index()
 
-        df_t.to_pickle(pkl_file)
+        df_t.to_parquet(parquet_file)
     else:
-        df_t = pd.read_pickle(pkl_file)
+        df_t = pd.read_parquet(parquet_file)
         
 #    print(df_t.head(10))
 
@@ -436,25 +432,25 @@ def load_zip(data_dir=default_dir, reimport=False, reimport_year=False):
 
     zip_years = [1998, 2001, 2002] + list(range(2004, 2017))
 
-    pkl_file = data_dir + 'zip/irs_zip.pkl'
-    if reimport or not os.path.exists(pkl_file):
+    parquet_file = data_dir + 'zip/irs_zip.parquet'
+    if reimport or not os.path.exists(parquet_file):
 
         df = pd.concat((load_zip_year(year, reimport=reimport_year) for year in zip_years), sort=True)
         df['date'] = pd.to_datetime(df['date'])
         df = df.set_index(['zip', 'date']).sort_index()
-        df.to_pickle(pkl_file)
+        df.to_parquet(parquet_file)
 
     else:
 
-        df = pd.read_pickle(pkl_file)
+        df = pd.read_parquet(parquet_file)
 
     return df
 
 def load_zip3_from_county(data_dir=default_dir, reimport=False, county_kwargs={},
                           crosswalk_kwargs={}):
     
-    pkl_file = data_dir + 'zip/irs_zip3_from_county.pkl'
-    if reimport or not os.path.exists(pkl_file):
+    parquet_file = data_dir + 'zip/irs_zip3_from_county.parquet'
+    if reimport or not os.path.exists(parquet_file):
         
         # Load county data and crosswalk then merge
         these_county_kwargs = {'data_dir' : data_dir}
@@ -472,18 +468,18 @@ def load_zip3_from_county(data_dir=default_dir, reimport=False, county_kwargs={}
         df = df.drop(columns=['fips', 'factor'])
         df = df.groupby(['zip3', 'date']).sum(min_count=1)
 
-        df.to_pickle(pkl_file)
+        df.to_parquet(parquet_file)
         
     else:
         
-        df = pd.read_pickle(pkl_file)
+        df = pd.read_parquet(parquet_file)
         
     return df
 
 def load_zip3_from_zip(data_dir=default_dir, reimport=False, zip_kwargs={}):
     
-    pkl_file = data_dir + 'zip/irs_zip3_from_zip.pkl'
-    if reimport or not os.path.exists(pkl_file):
+    parquet_file = data_dir + 'zip/irs_zip3_from_zip.parquet'
+    if reimport or not os.path.exists(parquet_file):
         
         # Load ZIP data
         these_zip_kwargs = {'data_dir' : data_dir}
@@ -496,10 +492,10 @@ def load_zip3_from_zip(data_dir=default_dir, reimport=False, zip_kwargs={}):
         df = df.drop(columns=['zip'])
         df = df.groupby(['zip3', 'date']).sum(min_count=1)
         
-        df.to_pickle(pkl_file)
+        df.to_parquet(parquet_file)
         
     else:
         
-        df = pd.read_pickle(pkl_file)
+        df = pd.read_parquet(parquet_file)
         
     return df
