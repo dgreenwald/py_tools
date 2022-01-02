@@ -752,12 +752,23 @@ def projection(x, se, var_titles, shock_title, p=0.9, n_per_row=4, plot_size=3.0
 
     return None
 
+def get_45_bounds(df, xvar, yvar, margin=0.05):
+    
+    min_val = np.amin(df[[yvar, xvar]].values)
+    max_val = np.amax(df[[yvar, xvar]].values)
+    dist = max_val - min_val
+    
+    plot_lb = min_val - margin * dist
+    plot_ub = max_val + margin * dist
+    
+    return plot_lb, plot_ub
+
 def binscatter(df_in, yvars, xvar, wvar=None, fit_var=None, labels={}, n_bins=20, bins=None,
                filepath=None, xlim=None, ylim=None, plot_line=True, 
                control=[], absorb=[], bin_scale=None, raw_scale=10.0,
                plot_raw_data=False, bin_kwargs={}, raw_kwargs={}, line_kwargs={},
                legend_font=10, label_font=12, use_legend=True, median=False,
-               restore_mean=False, title=None,
+               restore_mean=False, title=None, include45=False, include0=False,
                **kwargs):
         
     matplotlib.rcParams.update({'font.size' : label_font})
@@ -907,6 +918,14 @@ def binscatter(df_in, yvars, xvar, wvar=None, fit_var=None, labels={}, n_bins=20
         ax.scatter(by_bin[xvar].values, by_bin[yvar].values, 
                    s=bin_scale, **bin_kwargs_new,
                     )
+        
+    # if include45:
+    #     assert not include0
+    #     plot_lb, plot_ub = get_45_bounds(by_bin, xvar, yvar)
+    #     plt.plot([plot_lb, plot_ub], [plot_lb, plot_ub], 'k--')
+    # elif include0:
+    #     plot_lb = np.amin(by_bin[xvar].values)
+    #     plot_ub = np.amin(by_)
     
     plt.xlabel(labels.get(xvar, xvar))
     
@@ -945,7 +964,18 @@ def binscatter(df_in, yvars, xvar, wvar=None, fit_var=None, labels={}, n_bins=20
                 tot_range = bin_max - bin_min
                 ylim = (bin_min - 0.1 * tot_range, bin_max + 0.1 * tot_range)
                 if all([np.isfinite(val) for val in ylim]):
-                    plt.ylim(ylim)
+                    plt.ylim(ylim)   
+                    
+    if include0 or include45:
+        assert (xlim != 'default') and (ylim != 'default')
+        
+    if include45:
+        assert not include0
+        plot_lb = min(xlim[0], ylim[0])
+        plot_ub = max(xlim[1], ylim[1])
+        plt.plot([plot_lb, plot_ub], [plot_lb, plot_ub], 'k--')
+    elif include0:
+        plt.plot(xlim, np.zeros(2), 'k--')
 
     if title is not None:
         plt.title(title)
@@ -960,6 +990,33 @@ def binscatter(df_in, yvars, xvar, wvar=None, fit_var=None, labels={}, n_bins=20
     plt.close(fig)
     
     return by_bin
+
+def scatter(df, yvar, xvar, labels={},
+            multicolor=False, cmap_name='plasma', color='C0', 
+            include45=False, filepath=None):
+    
+    if multicolor:
+        cmap = plt.get_cmap(cmap_name)
+        colors = cmap(np.linspace(0.0, 1.0, len(df)))[::-1]
+    else:
+        colors = color
+    
+    fig = plt.figure()
+    plt.scatter(df[xvar], df[yvar], c=colors, edgecolor='gray', alpha=0.75)
+    
+    if include45:
+        plot_lb, plot_ub = get_45_bounds(df, xvar, yvar)
+        plt.plot([plot_lb, plot_ub], [plot_lb, plot_ub], 'k--')
+    
+    plt.xlabel(labels[xvar])
+    plt.ylabel(labels[yvar])
+    plt.tight_layout()
+    
+    if filepath is None:
+        plt.show()
+    else:
+        plt.savefig(filepath)
+    plt.close(fig)
     
 def state_scatter_inner(ax, this_df, yvar, xvar):
     for ii, state in enumerate(this_df.index):

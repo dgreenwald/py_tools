@@ -10,7 +10,31 @@ import numpy as np
 import pandas as pd
 #import cPickle as pickle
 
-from py_tools import in_out
+from py_tools import in_out, stats as st
+
+def get_weighted_quantile_inner(df, var_list, weight_var, q, **kwargs):
+    
+    weights = df[weight_var].values
+    
+    data = {
+        var : st.weighted_quantile(df[var].values, weights, [q], **kwargs)
+        for var in var_list
+        }
+    
+    return pd.DataFrame(data=data)
+
+def collapse_quantile(df, by_list, weight_var=None, var_list=None, q=0.5, **kwargs):
+    
+    if var_list is None:
+        var_list = [var for var in df.columns if var not in (by_list + [weight_var])]
+    
+    if weight_var is None:
+        return df.groupby(by_list)[var_list].median()
+    
+    df_out = df.groupby(by_list).apply(get_weighted_quantile_inner, var_list, weight_var, q, **kwargs)
+    df_out = df_out.reset_index().drop(columns=['level_1']).set_index(by_list)
+    # df_out.index = df_out.index.get_level_values(0)
+    return df_out
 
 def concat(collapser_list, check=True):
     
@@ -132,7 +156,7 @@ class Collapser:
             
         return df_out
             
-    def collapse(self, by_list=[], inplace=False):
+    def collapse(self, by_list=[], inplace=False, method='mean'):
         
         
         singleton = (not by_list)
@@ -143,7 +167,11 @@ class Collapser:
         else:
             dfc_old = self.dfc
         
-        dfc_new = dfc_old.groupby(by_list).agg(np.nansum)
+        if method == 'mean':
+            dfc_new = dfc_old.groupby(by_list).agg(np.nansum)
+        elif method == 'median':
+            dfc_new = dfc_old.groupby(by_list).agg(st.weighted_quantile, )
+            
         if singleton:
             dfc_new = dfc_new.reset_index().drop(columns=['TEMP'])
             

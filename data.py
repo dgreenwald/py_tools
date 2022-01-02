@@ -117,7 +117,8 @@ def absorb(df, groups, value_var, weight_var=None, restore_mean=True, tol=1e-12,
 
     return x
 
-def compute_binscatter(df_in, yvar, xvar, wvar=None, n_bins=10, bins=None, median=False):
+def compute_binscatter(df_in, yvar, xvar, wvar=None, n_bins=10, bins=None, median=False, 
+                       control=[], absorb=[]):
     
     if median:
         assert wvar is None
