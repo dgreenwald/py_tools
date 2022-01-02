@@ -936,35 +936,23 @@ def binscatter(df_in, yvars, xvar, wvar=None, fit_var=None, labels={}, n_bins=20
         yvar = yvars[0]
         plt.ylabel(labels.get(yvar, yvar))
     
-    if xlim != 'default':
-        if xlim is not None:
-            plt.xlim(xlim)
+    if xlim is None:
+        if plot_raw_data:
+            xlim = stats.weighted_quantile(df[xvar].values, weights, [0.005, 0.995])
         else:
-            if plot_raw_data:
-                xlim = stats.weighted_quantile(df[xvar].values, weights, [0.005, 0.995])
-                plt.xlim(xlim)
-            else:
-                bin_min = np.amin(by_bin[xvar].values)
-                bin_max = np.amax(by_bin[xvar].values)
-                tot_range = bin_max - bin_min
-                xlim = (bin_min - 0.05 * tot_range, bin_max + 0.05 * tot_range)
-                if all([np.isfinite(val) for val in xlim]):
-                    plt.xlim(xlim)
+            bin_min = np.amin(by_bin[xvar].values)
+            bin_max = np.amax(by_bin[xvar].values)
+            tot_range = bin_max - bin_min
+            xlim = (bin_min - 0.05 * tot_range, bin_max + 0.05 * tot_range)
 
-    if ylim != 'default':
-        if ylim is not None:
-            plt.ylim(ylim)
+    if ylim is None:
+        if plot_raw_data:
+            ylim = stats.weighted_quantile(df[yvar].values, weights, [0.005, 0.995])
         else:
-            if plot_raw_data:
-                ylim = stats.weighted_quantile(df[yvar].values, weights, [0.005, 0.995])
-                plt.ylim(ylim)
-            else:
-                bin_min = np.amin(by_bin[yvar].values)
-                bin_max = np.amax(by_bin[yvar].values)
-                tot_range = bin_max - bin_min
-                ylim = (bin_min - 0.1 * tot_range, bin_max + 0.1 * tot_range)
-                if all([np.isfinite(val) for val in ylim]):
-                    plt.ylim(ylim)   
+            bin_min = np.amin(by_bin[yvar].values)
+            bin_max = np.amax(by_bin[yvar].values)
+            tot_range = bin_max - bin_min
+            ylim = (bin_min - 0.1 * tot_range, bin_max + 0.1 * tot_range)
                     
     if include0 or include45:
         assert (xlim != 'default') and (ylim != 'default')
@@ -976,6 +964,12 @@ def binscatter(df_in, yvars, xvar, wvar=None, fit_var=None, labels={}, n_bins=20
         plt.plot([plot_lb, plot_ub], [plot_lb, plot_ub], 'k--')
     elif include0:
         plt.plot(xlim, np.zeros(2), 'k--')
+        
+    if (xlim is not None) and (xlim != 'default') and all([np.isfinite(val) for val in xlim]):
+        plt.xlim(xlim)   
+        
+    if (ylim is not None) and (ylim != 'default') and all([np.isfinite(val) for val in ylim]):
+        plt.ylim(ylim)   
 
     if title is not None:
         plt.title(title)
