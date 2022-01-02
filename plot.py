@@ -961,9 +961,15 @@ def binscatter(df_in, yvars, xvar, wvar=None, fit_var=None, labels={}, n_bins=20
         assert not include0
         plot_lb = min(xlim[0], ylim[0])
         plot_ub = max(xlim[1], ylim[1])
+        xlim = (plot_lb, plot_ub)
+        ylim = (plot_lb, plot_ub)
         plt.plot([plot_lb, plot_ub], [plot_lb, plot_ub], 'k--')
     elif include0:
         plt.plot(xlim, np.zeros(2), 'k--')
+        if ylim[0] > 0.0:
+            ylim = (-0.1 * ylim[1], ylim[1])
+        elif ylim[1] < 0.0:
+            ylim = (ylim[0], -0.1 * ylim[0])
         
     if (xlim is not None) and (xlim != 'default') and all([np.isfinite(val) for val in xlim]):
         plt.xlim(xlim)   

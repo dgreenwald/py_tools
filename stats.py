@@ -6,6 +6,10 @@ def weighted_quantile(values_in, weights_in, quantiles, sort=True, C=0.5):
     # assert (np.all(np.isfinite(values_in)) and np.all(np.isfinite(weights_in)))
     
     ix_keep = np.isfinite(values_in) & np.isfinite(weights_in) & (weights_in > 0.0)
+    if np.sum(ix_keep) == 1:
+        return np.full(len(quantiles), values_in[ix_keep][0])
+    elif np.sum(ix_keep) == 0:
+        return np.full(len(quantiles), np.nan)
 
     if sort:
         sorter = np.argsort(values_in[ix_keep])
