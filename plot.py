@@ -1007,6 +1007,7 @@ def scatter(df, yvar, xvar, labels={},
     if include45:
         plot_lb, plot_ub = get_45_bounds(df, xvar, yvar)
         plt.plot([plot_lb, plot_ub], [plot_lb, plot_ub], 'k--')
+        # plt.xlim((plot_lb, plot_ub))
     
     plt.xlabel(labels[xvar])
     plt.ylabel(labels[yvar])

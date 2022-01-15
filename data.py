@@ -6,7 +6,6 @@ import patsy
 
 import statsmodels.api as sm
 import statsmodels.formula.api as smf
-from statsmodels.tsa import stattools
 
 from . import stats
 
@@ -757,62 +756,4 @@ def collapse(df, method='mean', var_list=None, by=[], wvar=None):
 def safe_sum(x):
     
     return x.sum(skipna=False)
-
-def chow_lin_V_default(a, N):
-    """Default V matrix: AR(1) correlation structure"""
-    
-    V = np.zeros((N, N))
-    for tt in range(N):
-        V[tt, :] = a ** np.abs(np.arange(N) - tt)
-        
-    return V
-
-def chow_lin(Y, Z, B, Vfcn=chow_lin_V_default, a0=0.9, tol=1e-4):
-    """Use the Chow-Lin method to approximate the target series X using a
-    coarser series Y and a proxy series Z. The inputs should be:
-        
-        Y: the Nt_coarse x 1 target series with limited availability
-        Z: the Nt_fine x k target series
-        B: the Nx_fine x Nt_coarse matrix relating Y and X
-        Vfcn: a function for computing the error matrix V given the correlation parameter a
-        a0: a scalar guess for the correlation parameter
-        tol: the scalar tolerance for the iterative process to converge
-        
-    The function returns:
-        
-        X_hat: the approximated series for X
-    """
-    
-    a = a0
-    done = False
-    
-    N = Z.shape[0]
-    
-    while not done:
-        
-        V = Vfcn(a, N)
-        
-        ZB = Z.T @ B
-        BV = B.T @ V
-        BVB = BV @ B
-        
-        ZB_BVB_inv = np.linalg.solve(BVB.T, ZB.T).T
-        
-        bet_hat = np.linalg.solve(ZB_BVB_inv @ ZB.T,
-                                  ZB_BVB_inv @ Y)
-        
-        X_hat = Z @ bet_hat + BV.T @ np.linalg.solve(
-            BVB, Y - B.T @ (Z @ bet_hat)
-            )
-        
-        u_hat = X_hat - Z @ bet_hat
-        a_new = stattools.acf(u_hat, nlags=1, fft=False)[1]
-        
-        a_err = np.abs(a_new - a)
-        if a_err < tol:
-            done = True
-            
-        a = a_new
-            
-    return X_hat
         

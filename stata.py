@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 
-def read_coefficients(file_stem=None, file_b=None, file_V=None):
+def read_coefficients(file_stem=None, file_b=None, file_V=None, to_numpy=False):
     """Read coefficients from saved mat2txt files"""
 
     if file_b is None:
@@ -17,5 +17,10 @@ def read_coefficients(file_stem=None, file_b=None, file_V=None):
     # se_names = [name + '_se' for name in V.columns]
     
     se = pd.DataFrame(data=se_data[np.newaxis, :], columns=V.columns)
+    
+    if to_numpy:
+        b = b.values.ravel()
+        V = V.values
+        se = se.values.ravel()
 
     return b, V, se
