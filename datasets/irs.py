@@ -28,12 +28,12 @@ def compute_fips(df_t):
     df_t['countyfips'] = pd.to_numeric(df_t['countyfips'], errors='coerce')
     df_t['statefips'] = pd.to_numeric(df_t['statefips'], errors='coerce')
 
-    df_t = df_t.dropna(subset=['countyfips', 'statefips'])
+    df_t.dropna(subset=['countyfips', 'statefips'], inplace=True)
     for name in ['countyfips', 'statefips']:
         df_t[name] = df_t[name].astype(np.int64)
 
     ix = (df_t['countyfips'] > 0) & (df_t['statefips'] > 0)
-    df_t = df_t.loc[ix, :]
+    df_t = df_t.loc[ix].copy()
         
     df_t['fips'] = df_t['countyfips'] + 1000 * df_t['statefips']
 
@@ -41,6 +41,7 @@ def compute_fips(df_t):
 
 def load_state_county_year(filename, skiprows, target_cols):
     
+    # print(filename)
     df_state = pd.read_excel(filename, skiprows=skiprows, header=None)
     
     # Drop excess columns
@@ -62,6 +63,20 @@ def load_county_year(year, data_dir=default_dir, reimport=False):
             df_t = import_county_year_2010(year, data_dir=default_dir)
         else:
             df_t = import_geo_year_from_2011(year, 'county', data_dir=default_dir)
+        
+        # print(df_t.columns)
+        for var in df_t.columns:
+            if var == 'county_name':
+                df_t[var] = df_t[var].astype(str)
+            elif var == 'date':
+                df_t[var] = pd.to_datetime(df_t[var])
+            elif df_t.dtypes[var] == 'object':
+                print("converting to numeric: " + var)
+                df_t[var] = pd.to_numeric(df_t[var], errors='coerce')
+        
+            # if var[:2] == 'n_':
+            #     print("converting to int: " + var)
+            #     df_t[var] = np.round(df_t[var]).astype('Int64')
 
         df_t.to_parquet(parquet_file)
     else:
@@ -141,7 +156,7 @@ def import_geo_year_from_2011(year, geo, data_dir=default_dir):
     df_by_cat = df_by_cat.rename(columns=final_map)
     
     ix = df_by_cat['n_returns'] >= 1
-    df_by_cat = df_by_cat.loc[ix, :]
+    df_by_cat = df_by_cat.loc[ix].copy()
 
     if geo == 'county':
         df_by_cat = compute_fips(df_by_cat)
@@ -458,7 +473,7 @@ def load_zip3_from_county(data_dir=default_dir, reimport=False, county_kwargs={}
         
         df = load_county(**county_kwargs)
         cw = crosswalk.county_to_zip(zip_level=3, **crosswalk_kwargs)
-        df = pd.merge(df.reset_index(), cw, on='fips', how='right')
+        df = pd.merge(df.reset_index(), cw, on='fips', how='inner')
         
         # Scale variables
         for var in df:
