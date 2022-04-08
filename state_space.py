@@ -39,10 +39,14 @@ class StateSpaceModel:
 
         # Set sizes
         self.Nx, self.Ne = R.shape
-        self.Ny, _ = Z.shape
+        
+        if self.Z is not None:
+            self.Ny, _ = Z.shape
+        else:
+            self.Ny = 0
 
         # Check sizes
-        assert all([var == self.Nx for var in [self.A.shape[0], self.A.shape[1], self.Z.shape[1]]])
+        assert all([var == self.Nx for var in [self.A.shape[0], self.A.shape[1]]])
         assert all([var == self.Ne for var in [self.Q.shape[0], self.Q.shape[1]]])
 
         # Set constant terms if needed
@@ -61,7 +65,8 @@ class StateSpaceModel:
         self.RQR = self.R @ self.QR
         
         self.CQT = nm.robust_cholesky(self.Q, min_eig=0.0).T
-        self.CHT = nm.robust_cholesky(self.H, min_eig=0.0).T
+        if H is not None:
+            self.CHT = nm.robust_cholesky(self.H, min_eig=0.0).T
         
     def unconditional_cov(self, fixed_init=[]):
         
