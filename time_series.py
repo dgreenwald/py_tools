@@ -6,7 +6,7 @@ from scipy.linalg import solve_discrete_lyapunov
 from tabulate import tabulate
 
 from statsmodels.tsa import stattools
-import statsmodels.tsa.arima_model as arima
+import statsmodels.tsa.arima.model as arima
 
 # from py_tools.debug import disp 
 # import py_tools.data as dt
@@ -312,8 +312,8 @@ def ARMA(df, var, p, q, freq='QS', trend='c', display=False):
     
     ix = pd.notnull(df[var])
     series = df.loc[ix, var]
-    mod = arima.ARMA(series, (p, q), freq=freq)
-    res = mod.fit(trend=trend, disp=-1)
+    mod = arima.ARIMA(series, order=(p, 0, q), freq=freq, trend=trend)
+    res = mod.fit()
     if display: print(res.summary())
     
     return dt.FullResults(res, ix=ix, Xs=None, zs=None)
