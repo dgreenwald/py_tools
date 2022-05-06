@@ -40,6 +40,29 @@ def county_to_zip(year=2000, zip_level=5, data_dir=default_dir, reimport=False):
 
     return df
 
+def county_to_zip_hud(data_dir=default_dir, reimport=True):
+    
+    parquet_file = data_dir + 'county_to_zip_hud.parquet'
+    if reimport or (not os.path.exists(parquet_file)):
+        df = pd.read_excel(data_dir + 'COUNTY_ZIP_122021.xlsx')
+        df.to_parquet(parquet_file)
+    else:
+        df = pd.read_parquet(parquet_file)
+        
+    return df
+
+def zip_to_county_hud(data_dir=default_dir, reimport=True):
+    
+    parquet_file = data_dir + 'zip_to_county_hud.parquet'
+    if reimport or (not os.path.exists(parquet_file)):
+        df = pd.read_excel(data_dir + 'ZIP_COUNTY_122021.xlsx')
+        df.to_parquet(parquet_file)
+    else:
+        df = pd.read_parquet(parquet_file)
+        
+    return df
+        
+
 #def load(origin='county', destination='zip', year=2000, data_dir=default_dir, reimport=False):
 #
 #    intermediate_dests = {
