@@ -40,6 +40,7 @@ def two_axis(df_in, var1, var2, filepath=None, loc1='upper left',
              flip2=False, legend=True,
              single_legend=False, print_legend_axis=True, labels={},
              leglabels={}, drop=True, kwargs1={}, kwargs2={}, format_dates=False,
+             title=None,
              savefig_kwargs={}):
     
     kwargs1_copy = kwargs1.copy()
@@ -139,6 +140,9 @@ def two_axis(df_in, var1, var2, filepath=None, loc1='upper left',
         ax2.set_ylim(ax2_ylim_new)
 
     plt.xlim(df.index[[0, -1]])
+    
+    if title is not None:
+        plt.title(title)
     
     if format_dates:
         fig.autofmt_xdate()
