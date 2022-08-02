@@ -1,4 +1,5 @@
 import numpy as np
+import pandas as pd
 import os
 import pickle
 import struct
@@ -71,10 +72,10 @@ def read_numeric(filename):
         
     return val
 
-def read_zipped(zip_path, file_name):
+def read_zipped(zip_path, file_name, **kwargs):
     
     with zipfile.ZipFile(zip_path) as zf:
         with zf.open(file_name) as fid:
-            df = pd.read_csv(fid)
+            df = pd.read_csv(fid, **kwargs)
             
     return df

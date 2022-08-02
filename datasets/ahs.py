@@ -1,4 +1,5 @@
 import pandas as pd
+import os
 
 from . import defaults
 default_dir = defaults.base_dir() + 'ahs/'
@@ -7,7 +8,7 @@ def load(year, reimport=False, raw_dir='/data/ahs/', data_dir=default_dir,
          **kwargs):
 
     year_str = str(year)
-    year_dir = raw_data_dir + year_str + '/'
+    year_dir = raw_dir + year_str + '/'
     short_year = year_str[-2:]
 
     pkl_file = data_dir + 'ahs_{}.pkl'.format(year)
