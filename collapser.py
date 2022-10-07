@@ -73,6 +73,13 @@ def collapse(df, by_list, var_list=[], weight_var=None, weight_suffix=False):
     
     return coll.get_data(weight_suffix=weight_suffix)
 
+def collapse_multiweight(df, weight_dict, by_list=[]):
+    
+    return pd.concat(
+        [collapse(df, by_list, var_list=[var], weight_var=weight_var)
+         for var, weight_var in weight_dict.items()],
+        axis=1)
+
 class Collapser:
     
     """Class for flexibly collapsing data sets"""
@@ -158,7 +165,6 @@ class Collapser:
             
     def collapse(self, by_list=[], inplace=False, method='mean'):
         
-        
         singleton = (not by_list)
         if singleton:
             dfc_old = self.dfc.copy()
@@ -170,7 +176,8 @@ class Collapser:
         if method == 'mean':
             dfc_new = dfc_old.groupby(by_list).agg(np.nansum)
         elif method == 'median':
-            dfc_new = dfc_old.groupby(by_list).agg(st.weighted_quantile, )
+            raise Exception
+            # dfc_new = dfc_old.groupby(by_list).agg(st.weighted_quantile, )
             
         if singleton:
             dfc_new = dfc_new.reset_index().drop(columns=['TEMP'])
