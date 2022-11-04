@@ -93,6 +93,18 @@ def ghquad_norm(degree, mu=0.0, sig=1.0):
 
     return x, w
 
+def gauss_legendre_norm(degree, a=-1.0, b=1.0):
+    
+    x, w = np.polynomial.legendre.leggauss(degree)
+    
+    # Re-scale weights
+    w *= 0.5 * (b - a)
+    
+    # Re-scale nodes
+    x = 0.5 * ((x + 1.0) * (b - a)) + a
+    
+    return x, w
+
 def logit(x, lb=0.0, ub=1.0):
     return np.log(x - lb) - np.log(ub - x)
 

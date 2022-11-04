@@ -200,7 +200,7 @@ def load_from_source(dataset, data_dir, **kwargs):
 
     elif dataset == 'fernald':
 
-        infile = data_dir + 'fernald_tfp.xls'
+        infile = data_dir + 'fernald_tfp.xlsx'
         df = pd.read_excel(
             infile,
             skiprows=1,

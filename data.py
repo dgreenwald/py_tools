@@ -546,10 +546,9 @@ def mv_ols(df, lhs, rhs, match='inner', ix=None, nw_lags=0):
         print("Need to code")
         raise Exception
 
-    X = df.ix[:, rhs].values
-    z = df.ix[:, lhs].values
+    X = df[rhs].values
+    z = df[lhs].values
 
-    match=match
     ix, Xs, zs = match_xy(X, z, how=match, ix=ix)
 
     # Get sizes
