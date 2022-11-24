@@ -74,8 +74,8 @@ class AimObj:
         self.tol = tol
         # self.eig_bnd = 1.0
 
-        self.left = range(self.hcols - self.neq)
-        self.right = range(self.hcols - self.neq, self.hcols)
+        self.left = np.arange(self.hcols - self.neq)
+        self.right = np.arange(self.hcols - self.neq, self.hcols)
 
         self.iz = 0
         self.zrows = int(self.neq * self.nlead)
@@ -145,7 +145,7 @@ class AimObj:
         self.A[-self.neq:, :] = Gam
 
         # Delete inessential lags
-        self.js = list(range(self.zcols))
+        self.js = np.arange(self.zcols)
         drop = np.sum(np.abs(self.A), axis=0) < self.tol
         while np.any(drop):
             ix = np.arange(len(drop))[drop]
