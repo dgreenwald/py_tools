@@ -145,7 +145,7 @@ class AimObj:
         self.A[-self.neq:, :] = Gam
 
         # Delete inessential lags
-        self.js = list(range(self.zcols))
+        self.js = np.arange(self.zcols)
         drop = np.sum(np.abs(self.A), axis=0) < self.tol
         while np.any(drop):
             ix = np.arange(len(drop))[drop]
