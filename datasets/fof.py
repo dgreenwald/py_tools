@@ -157,6 +157,7 @@ def load(dataset, usecols=None, data_dir=default_dir, vintage='2003',
     return df
 
 def load_table(table, data_dir=default_dir, vintage='2003', fof_vintage=None,
+               update_names=False, annual=False,
                **kwargs):
     """Load single table"""
     
@@ -167,13 +168,35 @@ def load_table(table, data_dir=default_dir, vintage='2003', fof_vintage=None,
     infile = data_dir + 'all_csv/{0}/csv/{1}.csv'.format(vintage, table)
     df = pd.read_csv(infile)
     
-    year = df['date'].str[:4].astype(int)
-    q = df['date'].str[-1].astype(int)
+    if annual:
+        year = df['date']
+        df['q'] = 1
+        q = df['q']
+    else:
+        year = df['date'].str[:4].astype(int)
+        q = df['date'].str[-1].astype(int)
     
     df['date'] = ts.date_from_qtr(year, q)
     df = df.set_index('date').sort_index()
     
     df = df.apply(pd.to_numeric, errors='coerce')
+    
+    if update_names:
+        
+        infile_names = data_dir + 'all_csv/{0}/data_dictionary/{1}.txt'.format(vintage, table)
+        df_names = pd.read_csv(infile_names, sep='\t', header=None, names=['code', 'name', 'line', 'table', 'notes'])
+        
+        if annual:
+            df_names['code'] = df_names['code'].str.replace('.Q', '.A', regex=False)
+        
+        df_names = df_names.set_index('code')
+        names = df_names['name']
+        names = names.str.lower().str.strip().str.replace('\W+', '_', regex=True)
+        names = names.str.replace('households_and_nonprofit_organizations', 'hh_np', regex=False)
+        names = names.str.replace('households', 'hh', regex=False)
+        
+        name_dict = names.to_dict()
+        df = df.rename(name_dict, axis=1)
     
     return df
 

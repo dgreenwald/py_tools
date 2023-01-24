@@ -147,8 +147,10 @@ class Collapser:
         # else:
         #     suffix = ''
         
-        df_num = self.dfc[[var + '_num' for var in self.var_list]].rename({var + '_num' : var for var in self.var_list}, axis=1)
-        df_denom = self.dfc[[var + '_denom' for var in self.var_list]].rename({var + '_denom' : var for var in self.var_list}, axis=1)
+        # df_num = self.dfc[[var + '_num' for var in self.var_list]].rename({var + '_num' : var for var in self.var_list}, axis=1)
+        # df_denom = self.dfc[[var + '_denom' for var in self.var_list]].rename({var + '_denom' : var for var in self.var_list}, axis=1)
+        
+        df_num, df_denom = self.get_numerators_and_denominators()
         
         df_out = df_num / df_denom
         if weight_suffix:
@@ -162,6 +164,13 @@ class Collapser:
             df_out = pd.concat([df_out, self.dfc[[var + '_denom' for var in self.var_list]]], axis=1)
             
         return df_out
+    
+    def get_numerators_and_denominators(self):
+        
+        df_num = self.dfc[[var + '_num' for var in self.var_list]].rename({var + '_num' : var for var in self.var_list}, axis=1)
+        df_denom = self.dfc[[var + '_denom' for var in self.var_list]].rename({var + '_denom' : var for var in self.var_list}, axis=1)
+        
+        return df_num, df_denom
             
     def collapse(self, by_list=[], inplace=False, method='mean'):
         
