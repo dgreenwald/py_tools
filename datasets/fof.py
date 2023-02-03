@@ -156,7 +156,7 @@ def load(dataset, usecols=None, data_dir=default_dir, vintage='2003',
     # df = df.apply(pd.to_numeric, errors='coerce')
     return df
 
-def load_table(table, data_dir=default_dir, vintage='2003', fof_vintage=None,
+def load_table(table, data_dir=default_dir, vintage='2207', fof_vintage=None,
                update_names=False, annual=False,
                **kwargs):
     """Load single table"""
@@ -183,6 +183,12 @@ def load_table(table, data_dir=default_dir, vintage='2003', fof_vintage=None,
     
     if update_names:
         
+        replacements = [
+            ('households_and_nonprofit_organization', 'hh_np'),
+            ('households', 'hh'),
+            ('nonfinancial_corporate_business', 'nfc'),
+            ]
+        
         infile_names = data_dir + 'all_csv/{0}/data_dictionary/{1}.txt'.format(vintage, table)
         df_names = pd.read_csv(infile_names, sep='\t', header=None, names=['code', 'name', 'line', 'table', 'notes'])
         
@@ -192,8 +198,8 @@ def load_table(table, data_dir=default_dir, vintage='2003', fof_vintage=None,
         df_names = df_names.set_index('code')
         names = df_names['name']
         names = names.str.lower().str.strip().str.replace('\W+', '_', regex=True)
-        names = names.str.replace('households_and_nonprofit_organizations', 'hh_np', regex=False)
-        names = names.str.replace('households', 'hh', regex=False)
+        for old, new in replacements:
+            names = names.str.replace(old, new, regex=False)
         
         name_dict = names.to_dict()
         df = df.rename(name_dict, axis=1)
