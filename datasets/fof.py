@@ -168,6 +168,9 @@ def load_table(table, data_dir=default_dir, vintage='2207', fof_vintage=None,
     infile = data_dir + 'all_csv/{0}/csv/{1}.csv'.format(vintage, table)
     df = pd.read_csv(infile)
     
+    if table[0] == 's':
+        annual = True
+    
     if annual:
         year = df['date']
         df['q'] = 1
