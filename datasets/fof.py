@@ -7,7 +7,7 @@ default_dir = defaults.base_dir() + 'fof/'
 # data_dir = '/home/dan/Dropbox/data/fof/'
 
 def load(dataset, usecols=None, data_dir=default_dir, vintage='2003', 
-         named_only=False, fof_vintage=None):
+         named_only=False, fof_vintage=None, update_names=False):
     """Load pre-packaged set of variables"""
     
     if fof_vintage is not None:
@@ -67,6 +67,7 @@ def load(dataset, usecols=None, data_dir=default_dir, vintage='2003',
             'net_financial_assets' : ('f103', 'FA104090005'),
             'net_liabilities' : ('f103', 'FA104194005'),
             'discrepancy' : ('f103', 'FA107005005'),
+            'misc_liabilities' : ('b103', 'FL103190005'),
         }
         
     elif dataset == 'household':
@@ -134,7 +135,7 @@ def load(dataset, usecols=None, data_dir=default_dir, vintage='2003',
         these_cols = ['date'] + these_codes
 
         df_tab = load_table(table, data_dir=data_dir, usecols=these_cols,
-                            vintage=vintage)
+                            vintage=vintage, update_names=update_names)
         df_tab.rename(columns=code_index, inplace=True)
         
         if named_only:
