@@ -65,7 +65,7 @@ def absorb(df, groups, value_var, weight_var=None, restore_mean=True, tol=1e-12,
         
         err = 0.0
         for ii, group in enumerate(groups):
-            group_means = gbfe_list[ii]['_res_weight'].transform(np.nansum) / sum_weight_list[ii]
+            group_means = (gbfe_list[ii]['_res_weight'].transform(np.nansum) / sum_weight_list[ii]).fillna(0.0)
             err += np.sqrt((group_means @ group_means) / len(group_means))
             
         return err
