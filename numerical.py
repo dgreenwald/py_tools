@@ -7,18 +7,30 @@ def quad_form(A, X):
 def rsolve(b, A):
     return np.linalg.solve(A.T, b.T).T
 
-def gradient(f, x, args=(), step=1e-5):
+def gradient(f, x, args=(), kwargs={}, step=1e-5, two_sided=True, f_val=None):
+
+    if (not two_sided) and (f_val is None):
+        f_val = f(x, *args, **kwargs)
 
     grad = None
     for ii in range(len(x)):
 
         x[ii] += step
-        f_hi = f(x, *args)
-        x[ii] -= (2.0 * step)
-        f_lo = f(x, *args)
-        x[ii] += step
+        f_hi = f(x, *args, **kwargs)
+        
+        if two_sided:
+        
+            x[ii] -= (2.0 * step)
+            f_lo = f(x, *args, **kwargs)
+            x[ii] += step
+            
+            df_i = np.array(f_hi - f_lo) / (2.0 * step)
+            
+        else:
+            
+            x[ii] -= step
 
-        df_i = np.array(f_hi - f_lo) / (2.0 * step)
+            df_i = np.array(f_hi - f_val) / step
 
         if grad is None:
 
