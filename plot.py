@@ -16,6 +16,11 @@ from py_tools import data as dt, stats
 
 pd.plotting.register_matplotlib_converters()
 
+def set_fontsizes(ax, fontsize):
+    for item in ([ax.title, ax.xaxis.label, ax.yaxis.label] +
+                 ax.get_xticklabels() + ax.get_yticklabels()):
+        item.set_fontsize(fontsize)
+
 def save_hist(vals, path, **kwargs):
 
     h = np.histogram(vals, **kwargs)

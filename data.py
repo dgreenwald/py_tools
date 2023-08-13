@@ -9,6 +9,12 @@ import statsmodels.formula.api as smf
 
 from . import stats
 
+def pivot_no_hierarchical_columns(df, *args, **kwargs):
+    
+    df = pd.pivot(df, *args, **kwargs)
+    df.columns = df.columns.get_level_values(1)
+    return df
+
 def lowercase(df):
     
     return df.rename(columns={var : var.lower() for var in df.columns})
