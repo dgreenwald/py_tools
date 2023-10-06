@@ -14,8 +14,9 @@ def load(table, data_dir=default_dir+'/spf/', reimport=False):
     pkl_file = filebase + '.pkl'
     
     if reimport or not os.path.exists(pkl_file):
-        excel_file = filebase + '.xlsx'
-        df = pd.read_excel(excel_file)
+        # excel_file = filebase + '.xlsx'
+        # df = pd.read_excel(excel_file)
+        df = pd.read_csv(filebase + '.csv')
         df['date'] = ts.date_from_qtr(df['YEAR'], df['QUARTER'])
         df = df.set_index('date')[[table.upper()]]
         df.to_pickle(pkl_file)
