@@ -7,6 +7,7 @@ if os.environ.get('USE_MATPLOTLIB_AGG', 0):
 # import warnings
 import math
 import matplotlib.pyplot as plt
+import matplotlib.style as plt_style
 import numpy as np
 import pandas as pd
 from scipy.stats import norm
@@ -15,6 +16,11 @@ from scipy.stats import norm
 from py_tools import data as dt, stats
 
 pd.plotting.register_matplotlib_converters()
+
+def set_fontsizes(ax, fontsize):
+    for item in ([ax.title, ax.xaxis.label, ax.yaxis.label] +
+                 ax.get_xticklabels() + ax.get_yticklabels()):
+        item.set_fontsize(fontsize)
 
 def save_hist(vals, path, **kwargs):
 
@@ -36,12 +42,15 @@ def load_hist_npy(base_path):
 
 def two_axis(df_in, var1, var2, filepath=None, loc1='upper left', 
              loc2='upper right', loc_single=None, legend_font=10, label_font=12,
-             normalize=False, color1='#1f77b4', color2='#ff7f0e', flip1=False,
+             normalize=False, color1=None, color2=None, colors={}, flip1=False,
              flip2=False, legend=True,
              single_legend=False, print_legend_axis=True, labels={},
              leglabels={}, drop=True, kwargs1={}, kwargs2={}, format_dates=False,
-             title=None,
-             savefig_kwargs={}, fig_kw={}):
+             title=None, figsize=None, style=None,
+             savefig_kwargs={}):
+    
+    if style is not None:
+        plt_style.use(style)
     
     kwargs1_copy = kwargs1.copy()
     kwargs1 = {'linewidth' : 2,}
@@ -63,7 +72,12 @@ def two_axis(df_in, var1, var2, filepath=None, loc1='upper left',
             if these_kwargs.get('markevery', None) is None:
                 these_kwargs['markevery'] = np.round(len(df) / 20)
 
-    fig, ax1 = plt.subplots(**fig_kw)
+    if color1 is None:
+        color1 = colors.get(var1, '#1f77b4')
+    if color2 is None:
+        color2 = colors.get(var2, '#ff7f0e')
+
+    fig, ax1 = plt.subplots(figsize=figsize)
 
     label1 = labels.get(var1, var1)
     label2 = labels.get(var2, var2)

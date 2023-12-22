@@ -136,6 +136,14 @@ def load_dataset(dataset, master_dirs={}, **kwargs):
                 'corp_taxes' : ('f103', 'FA106231005'),
                 'iva' : ('f103', 'FA105020601'),
                 'foreign_ret_earnings' : ('f103', 'FA106006065'),
+                'gross_investment_fin' : ('f108', 'FA795090005'),
+                'closed_end_funds' : ('l123', 'LM554090005'),
+                'closed_end_funds_net_issues' : ('f123', 'FA554090005'),
+                'exchange_traded_funds' : ('l124', 'LM564090005'),
+                'exchange_traded_funds_net_issues' : ('f124', 'FA564090005'),
+                'mutual_fund_shares_liab' : ('l108', 'LM653164205'),
+                'corp_equities_asset_fin' : ('l108', 'LM793064105'),
+                'corp_equities_asset' : ('b103', 'LM103064103'),
             }
 
         full_list = sorted(list(var_index.keys()))

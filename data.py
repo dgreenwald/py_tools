@@ -9,6 +9,12 @@ import statsmodels.formula.api as smf
 
 from . import stats
 
+def pivot_no_hierarchical_columns(df, *args, **kwargs):
+    
+    df = pd.pivot(df, *args, **kwargs)
+    df.columns = df.columns.get_level_values(1)
+    return df
+
 def lowercase(df):
     
     return df.rename(columns={var : var.lower() for var in df.columns})
@@ -65,7 +71,7 @@ def absorb(df, groups, value_var, weight_var=None, restore_mean=True, tol=1e-12,
         
         err = 0.0
         for ii, group in enumerate(groups):
-            group_means = gbfe_list[ii]['_res_weight'].transform(np.nansum) / sum_weight_list[ii]
+            group_means = (gbfe_list[ii]['_res_weight'].transform(np.nansum) / sum_weight_list[ii]).fillna(0.0)
             err += np.sqrt((group_means @ group_means) / len(group_means))
             
         return err
