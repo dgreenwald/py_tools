@@ -41,7 +41,7 @@ def two_axis(df_in, var1, var2, filepath=None, loc1='upper left',
              single_legend=False, print_legend_axis=True, labels={},
              leglabels={}, drop=True, kwargs1={}, kwargs2={}, format_dates=False,
              title=None,
-             savefig_kwargs={}):
+             savefig_kwargs={}, fig_kw={}):
     
     kwargs1_copy = kwargs1.copy()
     kwargs1 = {'linewidth' : 2,}
@@ -63,7 +63,7 @@ def two_axis(df_in, var1, var2, filepath=None, loc1='upper left',
             if these_kwargs.get('markevery', None) is None:
                 these_kwargs['markevery'] = np.round(len(df) / 20)
 
-    fig, ax1 = plt.subplots()
+    fig, ax1 = plt.subplots(**fig_kw)
 
     label1 = labels.get(var1, var1)
     label2 = labels.get(var2, var2)
