@@ -65,6 +65,13 @@ def write_numeric(val, filename, precision='4.3f'):
         
     return None
 
+def write_text(string, filename):
+    
+    with open(filename, 'w') as fid:
+        fid.write(string)
+        
+    return None
+
 def read_numeric(filename):
     
     with open(filename, 'r') as fid:
