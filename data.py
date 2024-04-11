@@ -761,4 +761,3 @@ def collapse(df, method='mean', var_list=None, by=[], wvar=None):
 def safe_sum(x):
     
     return x.sum(skipna=False)
-        
