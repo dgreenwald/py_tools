@@ -16,8 +16,10 @@ def reghdfe(df, yvar, xvars, **kwargs):
     formula = '{0} ~ {1}'.format(yvar, ' + '.join(xvars))
     return reghdfe_formula(df, formula, **kwargs)
 
-def reghdfe_formula(df, formula, fes=[], weight_var=None, se_type='robust', 
+def reghdfe_formula(df, formula, fes=None, weight_var=None, se_type='robust', 
                     tol=1e-12, cluster=None):
+
+    if fes is None: fes = []
     
     unweighted = (weight_var is None)
     

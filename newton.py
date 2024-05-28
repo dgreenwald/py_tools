@@ -9,8 +9,13 @@ Created on Fri Jul  7 14:15:16 2023
 import numpy as np
 from . import numerical as nm
 
-def root(fun, x0, args=(), kwargs={}, grad=None, tol=1e-8, gradient_kwargs={},
-         max_iterations=50, max_backstep_iterations=10, verbose=True):
+def root(fun, x0, args=None, kwargs=None, grad=None, tol=1e-8,
+         gradient_kwargs=None, max_iterations=50, max_backstep_iterations=10,
+         verbose=True):
+
+    if args is None: args = ()
+    if kwargs is None: kwargs = {}
+    if gradient_kwargs is None: gradient_kwargs = {}
     
     # Initialization
     x = np.array(x0).copy()

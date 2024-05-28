@@ -56,7 +56,9 @@ def concat(collapser_list, check=True):
     col.collapse(by_list, inplace=True)
     return col
 
-def load_collapser(filename, add_suffix=True, by_list=[], weight_var=None):
+def load_collapser(filename, add_suffix=True, by_list=None, weight_var=None):
+
+    if by_list is None: by_list = []
         
     col = Collapser(by_list=by_list, weight_var=weight_var)
     col.load(filename, add_suffix=add_suffix)
@@ -66,14 +68,18 @@ def create_suffix(by_list, weight_var):
     
     return '_'.join([''] + by_list + ['wtd_by', weight_var])
 
-def collapse(df, by_list, var_list=[], weight_var=None, weight_suffix=False):
+def collapse(df, by_list, var_list=None, weight_var=None, weight_suffix=False):
+
+    if var_list is None: var_list = []
     
     coll = Collapser(df, var_list=var_list, by_list=by_list, 
                      weight_var=weight_var)
     
     return coll.get_data(weight_suffix=weight_suffix)
 
-def collapse_multiweight(df, weight_dict, by_list=[]):
+def collapse_multiweight(df, weight_dict, by_list=None):
+
+    if by_list is None: by_list = []
     
     return pd.concat(
         [collapse(df, by_list, var_list=[var], weight_var=weight_var)
@@ -84,8 +90,11 @@ class Collapser:
     
     """Class for flexibly collapsing data sets"""
     
-    def __init__(self, df=None, var_list=[], weight_var=None, by_list=[], 
+    def __init__(self, df=None, var_list=None, weight_var=None, by_list=None, 
                  dfc=None, **kwargs):
+
+        if by_list is None: by_list = []
+        if var_list is None: var_list = []
     
         assert (df is None) or (dfc is None)
         
@@ -172,7 +181,9 @@ class Collapser:
         
         return df_num, df_denom
             
-    def collapse(self, by_list=[], inplace=False, method='mean'):
+    def collapse(self, by_list=None, inplace=False, method='mean'):
+
+        if by_list is None: by_list = []
         
         singleton = (not by_list)
         if singleton:

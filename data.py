@@ -123,7 +123,10 @@ def absorb(df, groups, value_var, weight_var=None, restore_mean=True, tol=1e-12,
     return x
 
 def compute_binscatter(df_in, yvar, xvar, wvar=None, n_bins=10, bins=None, median=False, 
-                       control=[], absorb=[]):
+                       control=None, absorb=None):
+
+    if control is None: control = []
+    if absorb is None: absorb = []
     
     if median:
         assert wvar is None
@@ -315,9 +318,12 @@ def match_xy(X, z, how='inner', ix=None):
     return (ix, Xs, zs)
 
 
-def regression(df, lhs, rhs, fes=[], absorb_vars=[], intercept=True, formula_extra=None, ix=None, 
+def regression(df, lhs, rhs, fes=None, absorb_vars=None, intercept=True, formula_extra=None, ix=None, 
                trend=None, cluster_var=None, cluster_groups=None, weight_var=None, **kwargs):
     """Run regression from pandas dataframe"""
+
+    if fes is None: fes = []
+    if absorb_vars is None: absorb_vars = []
 
     if isinstance(rhs, str):
         rhs = [rhs]
@@ -732,7 +738,9 @@ def sum_regression_params(positions, *args, **kwargs):
 
     return weight_regression_params(e_vec, *args, **kwargs)
 
-def collapse(df, method='mean', var_list=None, by=[], wvar=None):
+def collapse(df, method='mean', var_list=None, by=None, wvar=None):
+
+    if by is None: by = []
     
     assert by
     assert method in ['mean', 'sum']

@@ -15,7 +15,6 @@ from . import in_out
 class RandomForestWrapper:
     
     def __init__(self, data=None, infile=None, rf=None,
-                 # label_var=None, continuous_vars=[], category_vars=[],
                  **kwargs):
         
         self.data = data
@@ -33,7 +32,11 @@ class RandomForestWrapper:
     def set_data(self, data):
         self.data = data
         
-    def set_labels_features(self, label_var, continuous_vars=[], category_vars=[], features_only=False):
+    def set_labels_features(self, label_var, continuous_vars=None,
+                            category_vars=None, features_only=False):
+
+        if continuous_vars is None: continuous_vars = []
+        if category_vars is None: category_vars = []
         
         self.label_var = label_var
         self.continuous_vars = continuous_vars
@@ -109,9 +112,12 @@ class RandomForestWrapper:
         
         plot_importance_random_forest(self.rf, self.names, plotpath=plotpath)
         
-def complete_estimation(df, label_var, continuous_vars=[], category_vars=[], 
+def complete_estimation(df, label_var, continuous_vars=None, category_vars=None, 
                         train_size=0.25, test_size=0.75, outfile=None,
                         evaluate=False, plot=False, plotpath=None, **kwargs):
+
+    if continuous_vars is None: continuous_vars = []
+    if category_vars is None: category_vars = []
     
     rfw = RandomForestWrapper(data=df, **kwargs)
     rfw.set_labels_features(label_var, continuous_vars, category_vars)
@@ -204,8 +210,12 @@ def plot_importance_random_forest(rf, names, plotpath=None):
 
     plt.close(fig)
     
-def get_labels_features(df, label_var, continuous_vars=[], category_vars=[], features_only=False):
+def get_labels_features(df, label_var, continuous_vars=None,
+                        category_vars=None, features_only=False):
     
+    if continuous_vars is None: continuous_vars = []
+    if category_vars is None: category_vars = []
+
     feature_list = [df[continuous_vars]]
     for var in category_vars:
         dummies = pd.get_dummies(df[var])
@@ -275,7 +285,7 @@ def get_labels_features(df, label_var, continuous_vars=[], category_vars=[], fea
 
 #     return df, feature_vars
 
-# def get_labels_features(df, label_var, feature_vars, categorical_vars=[], **kwargs):
+# def get_labels_features(df, label_var, feature_vars, categorical_vars=None, **kwargs):
 
 #     df, feature_vars = encode_dummies(df, feature_vars, categorical_vars)
 #     train_features, test_features, train_labels, test_labels = train_test_split(

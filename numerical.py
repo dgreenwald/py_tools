@@ -7,7 +7,10 @@ def quad_form(A, X):
 def rsolve(b, A):
     return np.linalg.solve(A.T, b.T).T
 
-def gradient(f, x, args=(), kwargs={}, step=1e-5, two_sided=True, f_val=None):
+def gradient(f, x, args=None, kwargs=None, step=1e-5, two_sided=True, f_val=None):
+
+    if args is None: args = ()
+    if kwargs is None: kwargs = {}
 
     if (not two_sided) and (f_val is None):
         f_val = f(x, *args, **kwargs)
