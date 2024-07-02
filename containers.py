@@ -1,5 +1,6 @@
 import re
-from collections import Mapping, OrderedDict, UserDict
+from collections import OrderedDict, UserDict
+from collections.abc import Mapping
 
 class MySet(set):
     """Set plus addition operator"""
