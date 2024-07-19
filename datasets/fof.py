@@ -51,6 +51,7 @@ def load(dataset, usecols=None, data_dir=default_dir, vintage='2003',
             'capex' : ('f103', 'FA105050005'),
             'debt_securities' : ('b103', 'FL104122005'),
             'loans' : ('b103', 'FL104123005'),
+            'loans_depository' : ('b103', 'FL103168005'),
             'foreign_deposits' : ('b103', 'FL103091003'),
             'checkable_deposits' : ('b103', 'FL103020000'),
             'time_savings_deposits' : ('b103', 'FL103030003'),
@@ -80,6 +81,7 @@ def load(dataset, usecols=None, data_dir=default_dir, vintage='2003',
             'disposable_income' : ('f101', 'FA156012005'),
             'gross_income' : ('f101', 'FA156010001'),
             'personal_taxes' : ('f101', 'FA156210005'),
+            'net_worth' : ('b101', 'FL152090005'),
             }
         
     elif dataset == 'financial':

@@ -969,6 +969,109 @@ def bandpass_filter(series, period_lb=None, period_ub=None,
     filtered = filtered_ub - filtered_lb
     return filtered
 
+def bandpass_filter_christiano(series, period_lb, period_ub, detrend=False):
+    
+    # assert period_lb > 1
+    
+    Nt = len(series)
+    
+    if detrend:
+        dx = (series[-1] - series[0]) / (Nt - 1)
+        series = series - np.arange(Nt) * dx
+    
+    if period_ub is None:
+        a = 0.0
+    else:
+        a = 2.0 * np.pi / np.float64(period_ub)
+    b = 2.0 * np.pi / np.float64(period_lb)
+    
+    grid = np.arange(1, Nt)
+    B1 = (np.sin(grid * b) - np.sin(grid * a)) / (np.pi * grid)
+    B0 = (b - a) / np.pi
+    B = np.hstack((B0, B1))
+    
+    Bc = np.hstack((0.0, np.cumsum(B1)))
+    B_til = -0.5 * B0 - Bc
+    # Bc_descending = np.cumsum(B[::-1])
+    
+    B_two_sided = np.hstack((B1[::-1], B0, B1))
+
+    BP_mat = np.zeros((Nt, Nt))
+    for tt in range(Nt):
+        start_ix = Nt-1-tt
+        BP_mat[tt, :] = B_two_sided[start_ix : start_ix + Nt]
+        
+    BP_mat[:, 0] += B_til
+    BP_mat[:, -1] += B_til[::-1]
+    
+    series_new = BP_mat @ series
+    return series_new
+
+# def bandpass_filter_christiano_alt(series, period_lb, period_ub, detrend=True):
+    
+#     assert period_lb > 1
+    
+#     Nt = len(series)
+    
+#     if detrend:
+#         dx = (series[-1] - series[0]) / (Nt - 1)
+#         series = series - np.arange(Nt) * dx
+    
+#     if period_ub is None:
+#         a = 0.0
+#     else:
+#         a = 2.0 * np.pi / np.float64(period_ub)
+#     b = 2.0 * np.pi / np.float64(period_lb)
+    
+#     grid = np.arange(1, Nt)
+#     B1 = (np.sin(grid * b) - np.sin(grid * a)) / (np.pi * grid)
+#     B0 = (b - a) / np.pi
+#     B_old = np.hstack((B0, B1))
+    
+#     Bc = np.hstack((0.0, np.cumsum(B1)))
+#     B_til = -0.5 * B0 - Bc
+#     # Bc_descending = np.cumsum(B_old[::-1])
+    
+#     B_two_sided = np.hstack((B1[::-1], B0, B1))
+
+#     BP_mat = np.zeros((Nt, Nt))
+#     for tt in range(Nt):
+#         start_ix = Nt-1-tt
+#         BP_mat[tt, :] = B_two_sided[start_ix : start_ix + Nt]
+        
+#     BP_mat[:, 0] += B_til
+#     BP_mat[:, -1] += B_til[::-1]
+    
+#     series_new = BP_mat @ series
+    
+#     # New code
+#     J = np.arange(1, Nt+1)
+#     B = (np.sin(b * J) - np.sin(a * J)) / (np.pi * J)
+#     B = np.hstack(((b-a)/np.pi, B))
+    
+#     B_main = B[:Nt].copy()
+#     B_tmp = B[:Nt].copy()
+    
+#     n2 = Nt - 1
+#     n1 = 0
+#     Y = np.zeros(len(series))
+    
+#     for tt in range(Nt):
+        
+#         B_end = np.sum(B_tmp[n2:])
+#         B_start = np.sum(B_tmp[n1:])
+        
+#         BB = B_main.copy()
+#         BB[0] = B_start
+#         BB[-1] = B_end
+        
+#         # foo = np.sum(series * (BB @ np.ones(len(BB))))
+#         Y[tt] = series @ BB
+        
+#         B_main = np.hstack((B[tt+1], B_main[:-1]))
+    
+#     return Y
+
 def chow_lin_V_default(a, N):
     """Default V matrix: AR(1) correlation structure"""
     
@@ -977,6 +1080,28 @@ def chow_lin_V_default(a, N):
         V[tt, :] = a ** np.abs(np.arange(N) - tt)
         
     return V
+
+def chow_lin_inner(Y, Z, B, a, Vfcn=chow_lin_V_default):
+    
+    N = Z.shape[0]
+    V = Vfcn(a, N)
+    
+    ZB = Z.T @ B
+    BV = B.T @ V
+    BVB = BV @ B
+    
+    ZB_BVB_inv = np.linalg.solve(BVB.T, ZB.T).T
+    
+    bet_hat = np.linalg.solve(ZB_BVB_inv @ ZB.T,
+                              ZB_BVB_inv @ Y)
+    
+    X_hat = Z @ bet_hat + BV.T @ np.linalg.solve(
+        BVB, Y - B.T @ (Z @ bet_hat)
+        )
+    
+    u_hat = X_hat - Z @ bet_hat
+    
+    return bet_hat, X_hat, u_hat
 
 def chow_lin(Y, Z, B, Vfcn=chow_lin_V_default, a0=0.9, tol=1e-4):
     """Use the Chow-Lin method to approximate the target series X using a
@@ -997,26 +1122,10 @@ def chow_lin(Y, Z, B, Vfcn=chow_lin_V_default, a0=0.9, tol=1e-4):
     a = a0
     done = False
     
-    N = Z.shape[0]
-    
     while not done:
         
-        V = Vfcn(a, N)
+        bet_hat, X_hat, u_hat = chow_lin_inner(Y, Z, B, a, Vfcn=Vfcn)
         
-        ZB = Z.T @ B
-        BV = B.T @ V
-        BVB = BV @ B
-        
-        ZB_BVB_inv = np.linalg.solve(BVB.T, ZB.T).T
-        
-        bet_hat = np.linalg.solve(ZB_BVB_inv @ ZB.T,
-                                  ZB_BVB_inv @ Y)
-        
-        X_hat = Z @ bet_hat + BV.T @ np.linalg.solve(
-            BVB, Y - B.T @ (Z @ bet_hat)
-            )
-        
-        u_hat = X_hat - Z @ bet_hat
         a_new = stattools.acf(u_hat, nlags=1, fft=False)[1]
         
         a_err = np.abs(a_new - a)

@@ -383,7 +383,8 @@ def load_xls(nipa_table, vintage='1706', nipa_quarterly=True,
     # Combine datasets
     start_date = df_curr.index[0]
     df_hist_sample = df_hist.loc[:start_date, :]
-    df = df_hist_sample.iloc[:-1, :].append(df_curr)
+    df = pd.concat([df_hist_sample.iloc[:-1], df_curr], axis=0)
+    # df = df_hist_sample.iloc[:-1, :].append(df_curr)
 
     ################################################################################
     # RENAME SERIES

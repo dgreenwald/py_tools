@@ -80,6 +80,13 @@ def toc(start, display=True):
     print("Time elapsed: {:4.3g} seconds".format(elapsed))
     return elapsed
 
+def timer(func):
+    def wrapper(*args, **kwargs):
+        start = tic()
+        func(*args, **kwargs)
+        toc(start)
+    return wrapper
+
 def log_if_pos(x):
     """
     Compute the log of an array if positive, otherwise return NaNs

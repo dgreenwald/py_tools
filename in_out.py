@@ -1,7 +1,9 @@
 import numpy as np
+import pandas as pd
 import os
 import pickle
 import struct
+import zipfile
 
 def load_eigen(filename, dtype='float64'):
 
@@ -69,3 +71,11 @@ def read_numeric(filename):
         val = float(fid.read())
         
     return val
+
+def read_zipped(zip_path, file_name, **kwargs):
+    
+    with zipfile.ZipFile(zip_path) as zf:
+        with zf.open(file_name) as fid:
+            df = pd.read_csv(fid, **kwargs)
+            
+    return df

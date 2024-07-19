@@ -32,9 +32,13 @@ def collapse_quantile(df, by_list, weight_var=None, var_list=None, q=0.5, **kwar
         return df.groupby(by_list)[var_list].median()
     
     df_out = df.groupby(by_list).apply(get_weighted_quantile_inner, var_list, weight_var, q, **kwargs)
-    df_out = df_out.reset_index().drop(columns=['level_1']).set_index(by_list)
+    col_name = 'level_{}'.format(len(by_list))
+    #df_out = df_out.reset_index().drop(columns=['level_1']).set_index(by_list)
+    # PD: does not necessarily called level_1
+    df_out = df_out.reset_index().drop(columns= col_name).set_index(by_list)
     # df_out.index = df_out.index.get_level_values(0)
     return df_out
+
 
 def concat(collapser_list, check=True):
     
@@ -72,6 +76,33 @@ def collapse(df, by_list, var_list=[], weight_var=None, weight_suffix=False):
                      weight_var=weight_var)
     
     return coll.get_data(weight_suffix=weight_suffix)
+
+def collapse_multiweight(df, weight_dict, by_list=[]):
+    
+    return pd.concat(
+        [collapse(df, by_list, var_list=[var], weight_var=weight_var)
+         for var, weight_var in weight_dict.items()],
+        axis=1)
+
+def collapse_multiquantile(df, by_list, q_list, weight_var=None, var_list=None, **kwargs):
+    
+    dfout_list = []
+    for q in q_list:
+        dfout = collapse_quantile(df, by_list, 
+                                  weight_var= weight_var,
+                                  var_list=var_list, q=q, **kwargs)
+        
+        dfout.columns = [col + '_p{}'.format(q*100) for col in dfout.columns]
+        dfout_list.append(dfout)
+    return pd.concat(dfout_list, axis=1)
+        
+def collapse_multiweight_multiquantile(df, weight_dict, q_list, by_list= []):
+    return pd.concat(
+        [collapse_multiquantile(df, by_list, q_list = q_list, weight_var = weight_var, var_list=[var])
+         for var, weight_var in weight_dict.items()],
+        axis=1)
+    
+
 
 class Collapser:
     
@@ -158,7 +189,6 @@ class Collapser:
             
     def collapse(self, by_list=[], inplace=False, method='mean'):
         
-        
         singleton = (not by_list)
         if singleton:
             dfc_old = self.dfc.copy()
@@ -170,7 +200,8 @@ class Collapser:
         if method == 'mean':
             dfc_new = dfc_old.groupby(by_list).agg(np.nansum)
         elif method == 'median':
-            dfc_new = dfc_old.groupby(by_list).agg(st.weighted_quantile, )
+            raise Exception
+            # dfc_new = dfc_old.groupby(by_list).agg(st.weighted_quantile, )
             
         if singleton:
             dfc_new = dfc_new.reset_index().drop(columns=['TEMP'])
