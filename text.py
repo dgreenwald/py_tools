@@ -2,6 +2,9 @@ from tabulate import tabulate
 
 import py_tools.utilities as ut
 
+TSTRUT = '\\rule{0pt}{2.6ex}'
+BSTRUT = '\\rule[-0.9ex]{0pt}{0pt}'
+
 class Table:
     """Latex table class.
     
@@ -104,7 +107,7 @@ class Table:
 
         return table_text
 
-    def tabular(self, booktabs=True, width=r'\textwidth'):
+    def tabular(self, booktabs=True, width=r'\textwidth', include_tstrut=True):
         """Format contents as latex tabular"""
 
         table_text = ''
@@ -113,9 +116,6 @@ class Table:
                            + self.alignment + '}\n')
         else:
             table_text += r'\begin{tabular}{' + self.alignment + '}\n'
-
-        tstrut = '\\rule{0pt}{2.6ex}'
-        bstrut = '\\rule[-0.9ex]{0pt}{0pt}'
 
         if self.super_header is not None:
             table_text += '\t&'.join(self.super_header) + '\\\\\n'
@@ -126,7 +126,23 @@ class Table:
         else:
             table_text += r'\hline \hline' + '\n'
 
-        include_tstrut = True
+        table_text += self.body(booktabs=booktabs, include_tstrut=include_tstrut)
+
+        if booktabs:
+            table_text += r'\bottomrule' + '\n'
+        else:
+            table_text += r'\hline \hline' + '\n'
+
+        if self.tabu:
+            table_text += r'\end{tabu}' + '\n'
+        else:
+            table_text += r'\end{tabular}' + '\n'
+
+        return table_text
+
+    def body(self, booktabs=True, include_tstrut=True):
+
+        table_text = ''
 
         # Body of table
         for i_row, row in enumerate(self.contents):
@@ -142,11 +158,11 @@ class Table:
             
             # Bottom strut
             if include_tstrut:
-                table_text += tstrut
+                table_text += TSTRUT
                 include_tstrut = False
 
             if i_row in self.clines or i_row in self.hlines or i_row + 1 == self.n_rows():
-                table_text += bstrut
+                table_text += BSTRUT
 
             table_text += '\t' + r'\\' 
             table_text += ' \n'
@@ -156,24 +172,14 @@ class Table:
                     table_text += '\\cline{{{0}-{1}}}'.format(start, end)
                 table_text += '\n'
                 include_tstrut = True
-                # table_text += tstrut + '%\n'
+                # table_text += TSTRUT + '%\n'
             elif i_row in self.hlines:
                 if booktabs:
                     table_text += r'\midrule' + '\n'
                 else:
                     table_text += r'\hline' + '\n'
-                # table_text += tstrut  + '%\n'
+                # table_text += TSTRUT  + '%\n'
                 include_tstrut = True
-
-        if booktabs:
-            table_text += r'\bottomrule' + '\n'
-        else:
-            table_text += r'\hline \hline' + '\n'
-
-        if self.tabu:
-            table_text += r'\end{tabu}' + '\n'
-        else:
-            table_text += r'\end{tabular}' + '\n'
 
         return table_text
 

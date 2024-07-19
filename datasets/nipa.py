@@ -272,36 +272,29 @@ def load_flat(nipa_table=None, data_dir=default_dir+'nipa/', var_list=None,
         vintage = nipa_vintage
 
     vintage_dir = data_dir + vintage + '/'
-    pkl_file = vintage_dir + 'nipadata{}.pkl'.format(freq)
+    parquet_file = vintage_dir + 'nipadata{}.parquet'.format(freq)
 
-    if not os.path.exists(pkl_file) or reimport:
+    if (not os.path.exists(parquet_file)) or reimport:
         infile = 'nipadata{}.txt'.format(freq)
-        df = pd.read_csv(vintage_dir + infile).rename(columns={'%SeriesCode' : 'Series'})
+        df = pd.read_csv(vintage_dir + infile, thousands=',').rename(columns={'%SeriesCode' : 'Series'})
         
         # Convert numbers
-        df['Value'] = df['Value'].str.replace(',', '')
+        # df['Value'] = df['Value'].str.replace(',', '')
         df['Value'] = pd.to_numeric(df['Value'], errors='coerce')
 
-        # Convert dates
-        if freq == 'Q':
-            df[['y', 'q']] = df['Period'].str.split(pat='Q', expand=True)
-            df['q'] = df['q'].astype(np.int64)
-            df['m'] = df['q'] * 3 - 2
-            df['Date'] = df['y'].astype(str) + '-' + df['m'].astype(str) + '-01'
-            df = df.drop(columns=['y', 'q', 'm', 'Period'])
-        elif freq == 'A':
-            df['Date'] = df['Period'].astype(str) + '-01-01'
-            df = df.drop(columns=['Period'])
-        else:
+        df['Date'] = pd.to_datetime(df['Period'].astype(str))
+        if freq == 'A':
+            print("CHECK DATE CONVERSION")
+            print(df)
             raise Exception
-            
-        df['Date'] = pd.to_datetime(df['Date'])
+
+        df = df.drop(columns=['Period'])
 
         df['Series'] = df['Series'].astype(str)
         df = df.set_index(['Series', 'Date'])
-        df.to_pickle(pkl_file)
+        df.to_parquet(parquet_file)
     else:
-        df = pd.read_pickle(pkl_file)
+        df = pd.read_parquet(parquet_file)
 
     if var_index is None:
         assert nipa_table is not None
