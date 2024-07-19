@@ -269,8 +269,17 @@ def hist(df_in, var, label=None, xlabel=None, ylabel=None, wvar=None,
 
 def compute_hist(df, var, bins, wvar=None):
 
-    df['bin'] = pd.cut(df[var], bins, labels=bins[:-1])
-    hist = df.groupby('bin')[wvar].sum()
+    this_list = [var]
+    if wvar is not None:
+        this_list.append(wvar)
+        
+    _df = df[this_list].copy()
+    if wvar is None:
+        wvar = '_ONES_'
+        _df[wvar] = 1.0
+    
+    _df['bin'] = pd.cut(_df[var], bins, labels=bins[:-1])
+    hist = _df.groupby('bin')[wvar].sum()
     hist /= np.sum(hist)
 
     return hist

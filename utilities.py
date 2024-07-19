@@ -1,5 +1,5 @@
 import os
-from collections import Mapping
+from collections.abc import Mapping
 import itertools
 import numpy as np
 from time import time
