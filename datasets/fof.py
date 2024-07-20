@@ -173,6 +173,7 @@ def load(dataset, usecols=None, data_dir=default_dir, vintage='2003',
 
 def load_table(table, data_dir=default_dir, vintage='2207', fof_vintage=None,
                update_names=False, annual=False,
+               add_flow_labels=False,
                **kwargs):
     """Load single table"""
     
@@ -222,6 +223,22 @@ def load_table(table, data_dir=default_dir, vintage='2207', fof_vintage=None,
         names = names.str.lower().str.strip().str.replace('\W+', '_', regex=True)
         for old, new in replacements:
             names = names.str.replace(old, new, regex=False)
+        
+        if add_flow_labels:
+            
+            these_prefixes = names.index.str[:2]
+            
+            ix = these_prefixes.isin(['FA', 'FU'])
+            names.loc[ix] += '_flow'
+            
+            ix = these_prefixes.isin(['FV'])
+            names.loc[ix] += '_volume'
+            
+            ix = these_prefixes.isin(['FR'])
+            names.loc[ix] += '_revaluation'
+            
+            ix = these_prefixes.isin(['FL', 'LM'])
+            names.loc[ix] += '_level'
         
         name_dict = names.to_dict()
         df = df.rename(name_dict, axis=1)
