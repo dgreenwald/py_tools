@@ -5,7 +5,7 @@ from scipy.stats import multivariate_normal as mvn
 import copy
 
 from py_tools import numerical as nm, stats as st
-from py_tools.utilities import tic, toc
+# from py_tools.utilities import tic, toc
 
 def init_to_val(shape, val):
 
