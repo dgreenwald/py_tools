@@ -42,12 +42,19 @@ def load_hist_npy(base_path):
 
 def two_axis(df_in, var1, var2, filepath=None, loc1='upper left', 
              loc2='upper right', loc_single=None, legend_font=10, label_font=12,
-             normalize=False, color1=None, color2=None, colors={}, flip1=False,
+             normalize=False, color1=None, color2=None, colors=None, flip1=False,
              flip2=False, legend=True,
-             single_legend=False, print_legend_axis=True, labels={},
-             leglabels={}, drop=True, kwargs1={}, kwargs2={}, format_dates=False,
+             single_legend=False, print_legend_axis=True, labels=None,
+             leglabels=None, drop=True, kwargs1=None, kwargs2=None, format_dates=False,
              title=None, figsize=None, style=None,
-             savefig_kwargs={}):
+             savefig_kwargs=None):
+
+    if colors is None: colors = {}
+    if labels is None: labels = {}
+    if leglabels is None: leglabels = {}
+    if kwargs1 is None: kwargs1 = {}
+    if kwargs2 is None: kwargs2 = {}
+    if savefig_kwargs is None: savefig_kwargs = {}
     
     if style is not None:
         plt_style.use(style)
@@ -171,7 +178,7 @@ def two_axis(df_in, var1, var2, filepath=None, loc1='upper left',
 
     return None
 
-def normalized(df, var_list, filepath=None, invert_list=[]):
+def normalized(df, var_list, filepath=None, invert_list=None):
     
     if invert_list is None:
         invert_list = len(var_list) * [False]
@@ -207,7 +214,9 @@ def normalized(df, var_list, filepath=None, invert_list=[]):
 def hist(df_in, var, label=None, xlabel=None, ylabel=None, wvar=None, 
          bins=None, xlim=None, ylim=None, filepath=None,
          legend_font=10, label_font=12, copy_path=None, x_vertline=None,
-         vertline_kwargs={}, **kwargs):
+         vertline_kwargs=None, **kwargs):
+
+    if vertline_kwargs is None: vertline_kwargs = {}
 
     df = dt.clean(df_in, [var, wvar])
 
@@ -260,8 +269,17 @@ def hist(df_in, var, label=None, xlabel=None, ylabel=None, wvar=None,
 
 def compute_hist(df, var, bins, wvar=None):
 
-    df['bin'] = pd.cut(df[var], bins, labels=bins[:-1])
-    hist = df.groupby('bin')[wvar].sum()
+    this_list = [var]
+    if wvar is not None:
+        this_list.append(wvar)
+        
+    _df = df[this_list].copy()
+    if wvar is None:
+        wvar = '_ONES_'
+        _df[wvar] = 1.0
+    
+    _df['bin'] = pd.cut(_df[var], bins, labels=bins[:-1])
+    hist = _df.groupby('bin')[wvar].sum()
     hist /= np.sum(hist)
 
     return hist
@@ -271,13 +289,15 @@ def multi_hist(dfs, labels=None, xvar=None, xvars=None, bins=None, wvar=None, wv
                 ylim=None, legend_font=10, label_font=12, copy_paths=None,
                 colors=None, edgecolor='black', alpha=0.5, use_bar=False, 
                 kwarg_list=None, x_vertline=None,
-                vertline_kwargs={}, topcode=False, bottomcode=False, 
+                vertline_kwargs=None, topcode=False, bottomcode=False, 
                 density=True,
                 **kwargs):
     """Plots double histogram overlaying var1 from df1 and var2 from df2
 
     Arguments:
     """
+
+    if vertline_kwargs is None: vertline_kwargs = {}
 
     def get_length(x):
         if isinstance(x, list):
@@ -421,12 +441,17 @@ def double_hist(df1, df2=None, label1=None, label2=None, var=None,
                 wvar2=None, filepath=None, xlabel=None, ylabel=None, xlim=None,
                 ylim=None, legend_font=10, label_font=12, copy_path1=None,
                 copy_path2=None, color1=None, color2=None, edgecolor='black', 
-                alpha=0.5, use_bar=False, labels={}, kwargs1={}, kwargs2={}, x_vertline=None,
-                vertline_kwargs={}, topcode=False, bottomcode=False, **kwargs):
+                alpha=0.5, use_bar=False, labels=None, kwargs1=None, kwargs2=None, x_vertline=None,
+                vertline_kwargs=None, topcode=False, bottomcode=False, **kwargs):
     """Plots double histogram overlaying var1 from df1 and var2 from df2
 
     Arguments:
     """
+
+    if labels is None: labels = {}
+    if kwargs1 is None: kwargs1 = {}
+    if kwargs2 is None: kwargs2 = {}
+    if vertline_kwargs is None: vertline_kwargs = {}
 
     kwargs1.update(kwargs)
     kwargs2.update(kwargs)
@@ -584,8 +609,10 @@ def double_hist(df1, df2=None, label1=None, label2=None, var=None,
 
     return True
 
-def var_irfs(irfs, var_list, shock_list=None, titles={}, filepath=None,
+def var_irfs(irfs, var_list, shock_list=None, titles=None, filepath=None,
              n_per_row=None, plot_scale=3):
+
+    if titles is None: titles = {}
 
     if shock_list is None:
         shock_list = var_list
@@ -627,14 +654,21 @@ def var_irfs(irfs, var_list, shock_list=None, titles={}, filepath=None,
 
     return None 
 
-def plot_series(df_in, var_names, filepath=None, directory=None, filename=None, labels={},
-                linestyles={}, markers={}, colors={}, markevery=8,
+def plot_series(df_in, var_names, filepath=None, directory=None, filename=None, labels=None,
+                linestyles=None, markers=None, colors=None, markevery=8,
                 markersize=5, mew=2, fillstyle='none', fontsize=12,
                 # plot_type='pdf', 
                 plot_type=None,
                 ylabel=None, sample='outer', title=None, 
                 single_legend=True, vertline_ix=None,
-                vertline_kwargs={}, linewidths={}, ylim=None, dpi=None):
+                vertline_kwargs=None, linewidths=None, ylim=None, dpi=None):
+
+    if labels is None: labels = {}
+    if linestyles is None: linestyles = {}
+    if markers is None: markers = {}
+    if colors is None: colors = {}
+    if vertline_kwargs is None: vertline_kwargs = {}
+    if linewidths is None: linewidths = {}
 
     matplotlib.rcParams.update({'font.size' : fontsize})
     
@@ -781,13 +815,21 @@ def get_45_bounds(df, xvar, yvar, margin=0.05):
     
     return plot_lb, plot_ub
 
-def binscatter(df_in, yvars, xvar, wvar=None, fit_var=None, labels={}, n_bins=20, bins=None,
+def binscatter(df_in, yvars, xvar, wvar=None, fit_var=None, labels=None, n_bins=20, bins=None,
                filepath=None, xlim=None, ylim=None, plot_line=True, 
-               control=[], absorb=[], bin_scale=None, raw_scale=10.0,
-               plot_raw_data=False, bin_kwargs={}, raw_kwargs={}, line_kwargs={},
+               control=None, absorb=None, bin_scale=None, raw_scale=10.0,
+               plot_raw_data=False, bin_kwargs=None, raw_kwargs=None, line_kwargs=None,
                legend_font=10, label_font=12, use_legend=True, median=False,
                restore_mean=False, title=None, include45=False, include0=False,
                **kwargs):
+
+    if control is None: control = []
+    if absorb is None: absorb = []
+
+    if labels is None: labels = {}
+    if bin_kwargs is None: bin_kwargs = {}
+    if raw_kwargs is None: raw_kwargs = {}
+    if line_kwargs is None: line_kwargs = {}
         
     matplotlib.rcParams.update({'font.size' : label_font})
     
@@ -1009,9 +1051,11 @@ def binscatter(df_in, yvars, xvar, wvar=None, fit_var=None, labels={}, n_bins=20
     
     return by_bin
 
-def scatter(df, yvar, xvar, labels={},
+def scatter(df, yvar, xvar, labels=None,
             multicolor=False, cmap_name='plasma', color='C0', 
             include45=False, filepath=None):
+
+    if labels is None: labels = {}
     
     if multicolor:
         cmap = plt.get_cmap(cmap_name)

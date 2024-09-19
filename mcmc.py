@@ -223,7 +223,7 @@ class MonteCarlo:
     """Master class for Monte Carlo samplers"""
 
     def __init__(self, log_like=None, prior=Prior(), args=(), lb=None, ub=None,
-                 names=None, bounds_dict={}, out_dir=None, suffix=None,
+                 names=None, bounds_dict=None, out_dir=None, suffix=None,
                  Nx=None):
         """
         Parameters
@@ -249,6 +249,8 @@ class MonteCarlo:
         Nx : int
             number of parameters
         """
+
+        if bounds_dict is None: bounds_dict = {}
 
         self.log_like = log_like
         self.prior = prior
@@ -443,7 +445,10 @@ class MonteCarlo:
 
         return None
     
-    def save_list(self, np_list=[], pkl_list=[], **kwargs):
+    def save_list(self, np_list=None, pkl_list=None, **kwargs):
+
+        if np_list is None: np_list = []
+        if pkl_list is None: pkl_list = []
 
         for var in np_list:
             self.save_item(var, **kwargs)
@@ -453,7 +458,10 @@ class MonteCarlo:
 
         return None
     
-    def load_list(self, np_list=[], pkl_list=[], **kwargs):
+    def load_list(self, np_list=None, pkl_list=None, **kwargs):
+
+        if np_list is None: np_list = []
+        if pkl_list is None: pkl_list = []
 
         for var in np_list:
             try:

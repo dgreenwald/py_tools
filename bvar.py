@@ -259,7 +259,9 @@ class BVAR:
     """Bayesian VAR"""
 
     def __init__(self, df_in, y_vars, p=1, hyperparams_init=None, rwlist=None, glp_prior=False,
-                 data_augmentation_vars=[]):
+                 data_augmentation_vars=None):
+
+        if data_augmentation_vars is None: data_augmentation_vars = []
 
         # Copy data
         self.y_vars = y_vars

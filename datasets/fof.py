@@ -173,6 +173,7 @@ def load(dataset, usecols=None, data_dir=default_dir, vintage='2003',
 
 def load_table(table, data_dir=default_dir, vintage='2207', fof_vintage=None,
                update_names=False, annual=False,
+               add_flow_labels=False,
                **kwargs):
     """Load single table"""
     
@@ -205,6 +206,10 @@ def load_table(table, data_dir=default_dir, vintage='2207', fof_vintage=None,
             ('households_and_nonprofit_organization', 'hh_np'),
             ('households', 'hh'),
             ('nonfinancial_corporate_business', 'nfc'),
+            ('domestic_financial_sectors', 'fc'),
+            ('consumption_of_fixed_capital_structures_equipment_and_intellectual_property_products_including_equity_reit_residential_structures_nipa_basis_', 'cons_fixed_capital'),
+            ('capital_formation_net_includes_equity_reit_residential_structures_ima_', 'net_capital_formation'),
+            ('gross_fixed_capital_formation_with_equity_reit_residential_structures_ima_', 'gross_capital_formation'),
             ]
         
         infile_names = data_dir + 'all_csv/{0}/data_dictionary/{1}.txt'.format(vintage, table)
@@ -218,6 +223,22 @@ def load_table(table, data_dir=default_dir, vintage='2207', fof_vintage=None,
         names = names.str.lower().str.strip().str.replace('\W+', '_', regex=True)
         for old, new in replacements:
             names = names.str.replace(old, new, regex=False)
+        
+        if add_flow_labels:
+            
+            these_prefixes = names.index.str[:2]
+            
+            ix = these_prefixes.isin(['FA', 'FU'])
+            names.loc[ix] += '_flow'
+            
+            ix = these_prefixes.isin(['FV'])
+            names.loc[ix] += '_volume'
+            
+            ix = these_prefixes.isin(['FR'])
+            names.loc[ix] += '_revaluation'
+            
+            ix = these_prefixes.isin(['FL', 'LM'])
+            names.loc[ix] += '_level'
         
         name_dict = names.to_dict()
         df = df.rename(name_dict, axis=1)

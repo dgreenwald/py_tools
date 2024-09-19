@@ -68,7 +68,8 @@ def get_formula(horizon, y_var, shock_var, control_vars, fe_vars, shock_lags,
 
     return formula
 
-def estimate(df_in, y_var, shock_var, control_vars=[], fe_vars=[], shock_lags=2, y_lags=1, periods=20, control_lags={}):
+def estimate(df_in, y_var, shock_var, control_vars=None, fe_vars=None,
+             shock_lags=2, y_lags=1, periods=20, control_lags=None):
     """
     df_in: pandas dataframe
     y_var: LHS variable
@@ -80,6 +81,10 @@ def estimate(df_in, y_var, shock_var, control_vars=[], fe_vars=[], shock_lags=2,
     periods: maximum horizon
     control_lags: dict containing number of lags for each linear control
     """
+
+    if control_vars is None: control_vars = []
+    if fe_vars is None: fe_vars = []
+    if control_lags is None: control_lags = {}
 
     # Copy relevant dataframe columns
     unique_controls = [var for var in control_vars if var not in [y_var, shock_var]]

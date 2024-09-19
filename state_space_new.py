@@ -112,7 +112,9 @@ class StateSpaceModel:
     # def b(self, tt):
     #     return get_t(self.b_, tt)
     
-    def unconditional_cov(self, fixed_init=[]):
+    def unconditional_cov(self, fixed_init=None):
+
+        if fixed_init is None: fixed_init = []
         
         if not fixed_init:
 
@@ -295,7 +297,9 @@ class StateSpaceEstimates:
     Associated with StateSpaceModel ssm
     """
 
-    def __init__(self, ssm, y, x_init=None, P_init=None, fixed_init=[]):
+    def __init__(self, ssm, y, x_init=None, P_init=None, fixed_init=None):
+
+        if fixed_init is None: fixed_init = []
 
         # Fixed vars for initial condition
         self.fixed_init = fixed_init        

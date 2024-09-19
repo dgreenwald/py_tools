@@ -797,7 +797,9 @@ def fit_ar1(df_in, var, **kwargs):
 
     return dt.regression(df, var, ['L_' + var], **kwargs)
 
-def rolling_forecast(df_in, lhs, rhs=[], use_const=True, **kwargs):
+def rolling_forecast(df_in, lhs, rhs=None, use_const=True, **kwargs):
+
+    if rhs is None: rhs = []
 
     df, ix = dt.dropna_ix(df_in[lhs + rhs])
     
@@ -848,7 +850,10 @@ def rolling_forecast_internal(y, X, t_min=None):
 
     return forecast
 
-def local_projection(df_in, y_var, shock_var, controls=[], periods=16, shock_lags=2, **kwargs):
+def local_projection(df_in, y_var, shock_var, controls=None, periods=16,
+                     shock_lags=2, **kwargs):
+
+    if controls is None: controls = []
     
     df = df_in[[y_var, shock_var] + controls].copy()
     
@@ -1135,3 +1140,44 @@ def chow_lin(Y, Z, B, Vfcn=chow_lin_V_default, a0=0.9, tol=1e-4):
         a = a_new
             
     return X_hat
+
+def interpolate_to_high_frequency(z, freq=4, A=None):
+
+    freq_inv = 1.0 / freq   
+
+    K = len(z)
+    N = K * freq
+    
+    # If A is not provided, assume that z averages over freq periods
+    if A is None:
+        
+        A = np.zeros((K, N))
+        for kk in range(K):
+            A[kk, freq*kk : freq*(kk+1)] = freq_inv
+        
+    B = np.zeros((N, N))
+    
+    # j = 0
+    B[0, 0] = 1.0
+    B[0, 1] = -1.0
+    
+    # j = N - 1
+    B[-1, -1] = 1.0
+    B[-1, -2] = -1.0
+    
+    for jj in range(1, N-1):
+        B[jj, jj-1] = -1.0
+        B[jj, jj] = 2.0
+        B[jj, jj+1] = -1.0
+    
+    Phi = np.vstack((
+        np.hstack((B, A.T)),
+        np.hstack((A, np.zeros((K, K))))
+        ))
+    
+    c = np.hstack((np.zeros(N), z))
+    
+    x_lam = np.linalg.solve(Phi, c)
+    x_star = x_lam[:N]
+    
+    return x_star

@@ -8,7 +8,10 @@ Created on Tue Oct 10 10:01:55 2023
 
 class ModSpec:
     
-    def __init__(self, mod=None, add_list=[], remove_list=[], label=None):
+    def __init__(self, mod=None, add_list=None, remove_list=None, label=None):
+
+        if add_list is None: add_list = []
+        if remove_list is None: remove_list = []
         
         self.features = add_list.copy()
         if mod is not None:
