@@ -1,11 +1,11 @@
-import os
+import glob, os
 import numpy as np
 import pandas as pd
 
 from . import defaults, misc
 default_dir = defaults.base_dir() + 'census/'
 
-def load_pop(level, year, data_dir=default_dir):
+def load_pop(level, year, data_dir=default_dir, infile=None):
 
     year_dir = data_dir + '{:d}_pop/'.format(year)
 
@@ -19,7 +19,8 @@ def load_pop(level, year, data_dir=default_dir):
 
     level_str = level_str_map.get(level, level)
 
-    infile = year_dir + 'nhgis0001_ds146_2000_' + level_str + '.csv'
+    if infile is None:
+        infile = year_dir + 'nhgis0001_ds146_2000_' + level_str + '.csv'
 
     df = pd.read_csv(infile, encoding='latin1')
     df = df.rename(columns={name : name.lower() for name in df.columns})
