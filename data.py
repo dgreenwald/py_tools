@@ -71,7 +71,7 @@ def absorb(df, groups, value_var, weight_var=None, restore_mean=True, tol=1e-12,
         
         err = 0.0
         for ii, group in enumerate(groups):
-            group_means = (gbfe_list[ii]['_res_weight'].transform(np.nansum) / sum_weight_list[ii]).fillna(0.0)
+            group_means = (gbfe_list[ii]['_res_weight'].transform('sum') / sum_weight_list[ii]).fillna(0.0)
             err += np.sqrt((group_means @ group_means) / len(group_means))
             
         return err
@@ -79,7 +79,7 @@ def absorb(df, groups, value_var, weight_var=None, restore_mean=True, tol=1e-12,
     # Prep across groups
     fe_list = ['_fe' + str(ii) for ii in range(Ng)]
     gbfe_list = [_df.groupby(group) for group in groups]
-    sum_weight_list = [gbfe['_weight'].transform(np.nansum) for gbfe in gbfe_list]
+    sum_weight_list = [gbfe['_weight'].transform('sum') for gbfe in gbfe_list]
     for fe_var in fe_list:
         _df[fe_var] = 0.0
         _df[fe_var + '_weight'] = 0.0
@@ -96,7 +96,7 @@ def absorb(df, groups, value_var, weight_var=None, restore_mean=True, tol=1e-12,
             for ii, group in enumerate(groups):
                 fe_var = fe_list[ii]
                 _df['_temp'] = _df['_res_weight'] + _df[fe_var + '_weight']
-                _df[fe_var] = gbfe_list[ii]['_temp'].transform(np.nansum) / sum_weight_list[ii]
+                _df[fe_var] = gbfe_list[ii]['_temp'].transform('sum') / sum_weight_list[ii]
                 
             _df['_res_weight'] = _df['_x_weight'] - np.nansum(_df[fe_list], axis=1)
             
@@ -105,7 +105,7 @@ def absorb(df, groups, value_var, weight_var=None, restore_mean=True, tol=1e-12,
             for ii, group in enumerate(groups):
                 fe_var = fe_list[ii]
                 _df['_res_weight'] += _df[fe_var + '_weight']
-                _df[fe_var] = gbfe_list[ii]['_res_weight'].transform(np.nansum) / sum_weight_list[ii]
+                _df[fe_var] = gbfe_list[ii]['_res_weight'].transform('sum') / sum_weight_list[ii]
                 _df[fe_var + '_weight'] = _df[fe_var] * _df['_weight']
                 _df['_res_weight'] -= _df[fe_var + '_weight']
                 
@@ -147,14 +147,14 @@ def compute_binscatter(df_in, yvar, xvar, wvar=None, n_bins=10, bins=None, media
         
     if median:
         
-        by_bin = df.groupby('x_bin')[[xvar, yvar]].median()
+        by_bin = df.groupby('x_bin', observed=False)[[xvar, yvar]].median()
     
     else:
 
         df[xvar] *= df[wvar]
         df[yvar] *= df[wvar]
         
-        by_bin = df.groupby('x_bin')[[xvar, yvar, wvar]].sum()
+        by_bin = df.groupby('x_bin', observed=False)[[xvar, yvar, wvar]].sum()
         by_bin[xvar] /= by_bin[wvar]
         by_bin[yvar] /= by_bin[wvar]
         

@@ -194,7 +194,7 @@ class Collapser:
             dfc_old = self.dfc
         
         if method == 'mean':
-            dfc_new = dfc_old.groupby(by_list).agg(np.nansum)
+            dfc_new = dfc_old.groupby(by_list).sum()
         elif method == 'median':
             raise Exception
             # dfc_new = dfc_old.groupby(by_list).agg(st.weighted_quantile, )
@@ -212,7 +212,7 @@ class Collapser:
         
     def resample(self, by_list, time_var, freq, inplace=False):
         
-        dfc_new = self.dfc.groupby(by_list).resample(freq, level=time_var).agg(np.nansum)
+        dfc_new = self.dfc.groupby(by_list).resample(freq, level=time_var).sum()
         by_list_new = list(dfc_new.index.names)
         
         if inplace:
