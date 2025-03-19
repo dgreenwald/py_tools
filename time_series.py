@@ -976,7 +976,18 @@ def bandpass_filter_christiano(series, period_lb, period_ub, detrend=False):
     return series_new
 
 def chow_lin_V_default(a, N):
-    """Default V matrix: AR(1) correlation structure"""
+    """Compute the default V matrix for the Chow-Lin method assuming an AR(1)
+    correlation structure
+
+    Parameters:
+
+        a: the correlation parameter
+        N: the number of observations in the X series
+
+    Returns:
+
+        V: the N x N matrix
+    """
     
     V = np.zeros((N, N))
     for tt in range(N):
@@ -985,6 +996,22 @@ def chow_lin_V_default(a, N):
     return V
 
 def chow_lin_inner(Y, Z, B, a, Vfcn=chow_lin_V_default):
+    """Perform the inner loop computations of the Chow-Lin method.
+
+    Parameters:
+
+        Y: the Nt_coarse x 1 target series with limited availability
+        Z: the Nt_fine x k proxy series
+        B: the Nx_fine x Nt_coarse matrix relating Y and X
+        a: the correlation parameter
+        Vfcn: a function for computing the error matrix V given the correlation parameter a
+
+    Returns:
+
+        bet_hat: the estimated coefficients of the Chow-Lin regression 
+        X_hat: the approximated series for X
+        u_hat: the residuals of the Chow-Lin regression
+    """
     
     N = Z.shape[0]
     V = Vfcn(a, N)
@@ -1008,8 +1035,10 @@ def chow_lin_inner(Y, Z, B, a, Vfcn=chow_lin_V_default):
 
 def chow_lin(Y, Z, B, Vfcn=chow_lin_V_default, a0=0.9, tol=1e-4):
     """Use the Chow-Lin method to approximate the target series X using a
-    coarser series Y and a proxy series Z. The inputs should be:
+    coarser series Y and a proxy series Z. 
         
+    Parameters:
+
         Y: the Nt_coarse x 1 target series with limited availability
         Z: the Nt_fine x k proxy series
         B: the Nx_fine x Nt_coarse matrix relating Y and X
@@ -1017,7 +1046,7 @@ def chow_lin(Y, Z, B, Vfcn=chow_lin_V_default, a0=0.9, tol=1e-4):
         a0: a scalar guess for the correlation parameter
         tol: the scalar tolerance for the iterative process to converge
         
-    The function returns:
+    Returns:
         
         X_hat: the approximated series for X
     """
