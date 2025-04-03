@@ -8,7 +8,6 @@ Created on Mon Feb  3 22:08:09 2020
 
 import numpy as np
 import pandas as pd
-#import cPickle as pickle
 
 from py_tools import in_out, stats as st
 
@@ -33,7 +32,7 @@ def collapse_quantile(df, by_list, weight_var=None, var_list=None, q=0.5, **kwar
     
     df_out = df.groupby(by_list).apply(get_weighted_quantile_inner, var_list, weight_var, q, **kwargs)
     df_out = df_out.reset_index().drop(columns=['level_1']).set_index(by_list)
-    # df_out.index = df_out.index.get_level_values(0)
+    
     return df_out
 
 def concat(collapser_list, check=True):
@@ -151,23 +150,11 @@ class Collapser:
             
     def get_data(self, weight_suffix=False, include_denom=False):
         
-        # if weight_suffix:
-        #     suffix = '_' + self.weight_var
-        # else:
-        #     suffix = ''
-        
-        # df_num = self.dfc[[var + '_num' for var in self.var_list]].rename({var + '_num' : var for var in self.var_list}, axis=1)
-        # df_denom = self.dfc[[var + '_denom' for var in self.var_list]].rename({var + '_denom' : var for var in self.var_list}, axis=1)
-        
         df_num, df_denom = self.get_numerators_and_denominators()
         
         df_out = df_num / df_denom
         if weight_suffix:
             df_out = df_out.rename({var : var + '_' + self.weight_var for var in self.var_list}, axis=1)
-        
-        # df_out = pd.DataFrame(index=self.dfc.index.copy())
-        # for var in self.var_list:
-        #     df_out[var + suffix] = self.dfc[var + '_num'] / self.dfc[var + '_denom']
             
         if include_denom:
             df_out = pd.concat([df_out, self.dfc[[var + '_denom' for var in self.var_list]]], axis=1)

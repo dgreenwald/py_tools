@@ -7,7 +7,7 @@ from tabulate import tabulate
 from statsmodels.tsa import stattools
 import statsmodels.tsa.arima.model as arima
 
-import py_tools.data as dt, py_tools.numerical as nm
+import py_tools.data as dt
 
 def panel_resampler(df, time_var, freq):
 
@@ -77,8 +77,6 @@ def resample(df, methods_vars, freq='QS'):
 
             df_new = getattr(df[var_list].resample(freq), method)()
 
-            # if len(var_list) == 1:
-                # df_new = df_new.to_frame()
             if df_resamp is None:
                 df_resamp = df_new
             else:
@@ -187,8 +185,12 @@ def add_lags(df, var, n_lags, init_lag=1):
 
     return lag_list
 
+<<<<<<< HEAD
 def transform(df, var_list, lag=0, diff=0, other=None,
               ):
+=======
+def transform(df, var_list, lag=0, diff=0, other=None):
+>>>>>>> 2b284c8728e3a1b95ebe6868cffc63d5892dd606
 
     new_var_list = []
     for var in var_list:
@@ -504,7 +506,8 @@ class LongHorizonVAR:
 
         # OLS
         bet_lh = np.linalg.solve(cov_xx, cov_xy)
-        R2 = nm.quad_form(bet_lh, cov_xx) / var_y
+        # R2 = nm.quad_form(bet_lh, cov_xx) / var_y
+        R2 = np.dot(bet_lh.T, np.dot(cov_xx, bet_lh)) / var_y
 
         if display:
             # Print first table
@@ -676,7 +679,7 @@ def detrend_time(df, varlist, time_var=None, suffix='detrend_time'):
         
     varlist_detrend = [var + '_' + suffix for var in varlist]
 
-    return df, varlist
+    return df, varlist_detrend
 
 def get_time_trend(df, var, time_var=None):
 
@@ -944,7 +947,7 @@ def bandpass_filter_christiano(series, period_lb, period_ub, detrend=False):
     grid = np.arange(1, Nt)
     B1 = (np.sin(grid * b) - np.sin(grid * a)) / (np.pi * grid)
     B0 = (b - a) / np.pi
-    B = np.hstack((B0, B1))
+    # B = np.hstack((B0, B1))
     
     Bc = np.hstack((0.0, np.cumsum(B1)))
     B_til = -0.5 * B0 - Bc
@@ -963,7 +966,18 @@ def bandpass_filter_christiano(series, period_lb, period_ub, detrend=False):
     return series_new
 
 def chow_lin_V_default(a, N):
-    """Default V matrix: AR(1) correlation structure"""
+    """Compute the default V matrix for the Chow-Lin method assuming an AR(1)
+    correlation structure
+
+    Parameters:
+
+        a: the correlation parameter
+        N: the number of observations in the X series
+
+    Returns:
+
+        V: the N x N matrix
+    """
     
     V = np.zeros((N, N))
     for tt in range(N):
@@ -972,6 +986,22 @@ def chow_lin_V_default(a, N):
     return V
 
 def chow_lin_inner(Y, Z, B, a, Vfcn=chow_lin_V_default):
+    """Perform the inner loop computations of the Chow-Lin method.
+
+    Parameters:
+
+        Y: the Nt_coarse x 1 target series with limited availability
+        Z: the Nt_fine x k proxy series
+        B: the Nx_fine x Nt_coarse matrix relating Y and X
+        a: the correlation parameter
+        Vfcn: a function for computing the error matrix V given the correlation parameter a
+
+    Returns:
+
+        bet_hat: the estimated coefficients of the Chow-Lin regression 
+        X_hat: the approximated series for X
+        u_hat: the residuals of the Chow-Lin regression
+    """
     
     N = Z.shape[0]
     V = Vfcn(a, N)
@@ -995,8 +1025,10 @@ def chow_lin_inner(Y, Z, B, a, Vfcn=chow_lin_V_default):
 
 def chow_lin(Y, Z, B, Vfcn=chow_lin_V_default, a0=0.9, tol=1e-4):
     """Use the Chow-Lin method to approximate the target series X using a
-    coarser series Y and a proxy series Z. The inputs should be:
+    coarser series Y and a proxy series Z. 
         
+    Parameters:
+
         Y: the Nt_coarse x 1 target series with limited availability
         Z: the Nt_fine x k proxy series
         B: the Nx_fine x Nt_coarse matrix relating Y and X
@@ -1004,7 +1036,7 @@ def chow_lin(Y, Z, B, Vfcn=chow_lin_V_default, a0=0.9, tol=1e-4):
         a0: a scalar guess for the correlation parameter
         tol: the scalar tolerance for the iterative process to converge
         
-    The function returns:
+    Returns:
         
         X_hat: the approximated series for X
     """

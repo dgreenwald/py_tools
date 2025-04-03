@@ -1,6 +1,5 @@
 import numpy as np
 import pandas as pd
-# import pdb
 import pickle
 import patsy
 
@@ -197,13 +196,9 @@ def winsorize(df_in, var_list, wvar=None, p_val=0.98):
     """Replace values of var_list outside the center p_val quantile mass with
     values at the edge of the mass"""
 
-    # if p_val is not None:
-        # assert (p_lo is None) and (p_hi is None)
     tail_prob = 0.5 * (1.0 - p_val)
     p_lo = tail_prob
     p_hi = 1.0 - tail_prob
-    # else:
-        # assert (p_lo is not None) and (p_hi is not None)
 
     keep_vars = var_list
     if wvar is not None:
@@ -358,16 +353,13 @@ def regression(df, lhs, rhs, fes=None, absorb_vars=None, intercept=True, formula
     
     ix_samp, _ = match_sample(_df.values, how='inner')
     if ix is None:
-#        ix, _ = match_sample(_df.values, how='inner')
         ix = ix_samp.copy()
     
     ix_both = np.logical_and(ix, ix_samp)
 
     if absorb_vars:
         for var in [lhs] + rhs:
-            # old_values = _df.loc[ix_both, var].copy()
             _df.loc[ix_both, var] = absorb(_df.loc[ix_both, :], absorb_vars, var, weight_var=weight_var, restore_mean=True)
-            # _df.loc[ix_both, var + '_FE'] = old_values - _df.loc[ix_both]
         
     Xs = _df.loc[ix_both, rhs].values
     zs = _df.loc[ix_both, lhs].values
@@ -450,12 +442,6 @@ def get_cluster_groups(df, cluster_var):
 
 def formula_regression(df, formula, ix=None, nw_lags=0, cluster_groups=None, display=False):
 
-    # if var_list is not None:
-        # ix, Xs, zs = match_sample(df[var_list].values, how=match, ix=ix)
-    # else:
-        # Xs = None
-        # zs = None
-
     if ix is None:
         model = smf.ols(formula=formula, data=df)
     else:
@@ -532,23 +518,6 @@ class MVOLSResults:
         self.bic = bic
         self.hqc = hqc
 
-    # def __init__(self, df, lhs, rhs, match='inner', ix=None, nw_lags=0):
-
-        # if 'const' in rhs and 'const' not in df:
-            # df['const'] = 1.0
-
-        # X = df.ix[:, rhs].values
-        # z = df.ix[:, lhs].values
-
-        # self.match=match
-        # self.ix, self.Xs, self.zs = match_xy(X, z, how=self.match, ix=ix)
-
-        # self.nobs = X.shape[0]
-        # self.params = least_sq(self.Xs, self.zs)
-        # self.fittedvalues = np.dot(self.Xs, self.params)
-        # self.resid = self.zs - self.fittedvalues
-        # self.cov_e = np.dot(self.resid.T, self.resid) / self.nobs
-
 def mv_ols(df, lhs, rhs, match='inner', ix=None, nw_lags=0):
 
     if 'const' in rhs and 'const' not in df:
@@ -582,15 +551,6 @@ def mv_ols(df, lhs, rhs, match='inner', ix=None, nw_lags=0):
     HC0_tstat = params / HC0_se
 
     # Heteroskedastic covariance
-    # cov_xeex = np.zeros((nz*k, nz*k))
-    # for tt in range(T):
-        # x_t = Xs[tt, :][:, np.newaxis]
-        # e_t = resid[tt, :][:, np.newaxis]
-        # cov_xeex += np.kron(np.dot(x_t, x_t.T), np.dot(e_t, e_t.T))
-
-    # cov_xeex /= T
-    # cov_HC1 = np.dot(cov_X_inv, np.dot(cov_xeex, cov_X_inv))
-
     # NOTE: for now, computing both HC0 and HC1
     cov_HC1, _ = hc1(Xs, resid)
     HC1_se = standard_errors(cov_HC1, T).reshape(params.shape)

@@ -220,7 +220,7 @@ def load_table(table, data_dir=default_dir, vintage='2207', fof_vintage=None,
         
         df_names = df_names.set_index('code')
         names = df_names['name']
-        names = names.str.lower().str.strip().str.replace('\W+', '_', regex=True)
+        names = names.str.lower().str.strip().str.replace(r'\W+', '_', regex=True)
         for old, new in replacements:
             names = names.str.replace(old, new, regex=False)
         
