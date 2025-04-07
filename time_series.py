@@ -185,12 +185,7 @@ def add_lags(df, var, n_lags, init_lag=1):
 
     return lag_list
 
-<<<<<<< HEAD
-def transform(df, var_list, lag=0, diff=0, other=None,
-              ):
-=======
 def transform(df, var_list, lag=0, diff=0, other=None):
->>>>>>> 2b284c8728e3a1b95ebe6868cffc63d5892dd606
 
     new_var_list = []
     for var in var_list:
