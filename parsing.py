@@ -30,18 +30,6 @@ def bma_search(pattern, text):
     
     match = re.search(pattern, text)
     return match_to_bma(match, text)
-    # if match is None:
-    #     before = text
-    #     middle = ''
-    #     after = ''
-    #     matched = False
-    # else:
-    #     before = text[:match.start()]
-    #     middle = text[match.start():match.end()]
-    #     after = text[match.end():]
-    #     matched = True
-        
-    # return BmaMatch(before, middle, after, match, matched)
 
 def expand_to_target(text, target=None, depth=1, target_depth=1, left_bracket='(', right_bracket=')',
                      before_text=''):
@@ -63,14 +51,6 @@ def expand_to_target(text, target=None, depth=1, target_depth=1, left_bracket='(
     bma = bma_search(pattern, text)
     if not bma.matched:
         raise Exception
-        
-    # match = re.search(pattern, text)
-    # if match is None:
-    #     raise Exception
-        
-    # before_text += text[:match.start()]
-    # matched_text = text[match.start():match.end()]
-    # after_text = text[match.end():]
     
     before_text += bma.before
         
