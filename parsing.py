@@ -26,9 +26,9 @@ def match_to_bma(match, text):
         
     return BmaMatch(before, middle, after, match, matched)
 
-def bma_search(pattern, text):
+def bma_search(pattern, text, *args, **kwargs):
     
-    match = re.search(pattern, text)
+    match = re.search(pattern, text, *args, **kwargs)
     return match_to_bma(match, text)
 
 def expand_to_target(text, target=None, depth=1, target_depth=1, left_bracket='(', right_bracket=')',
