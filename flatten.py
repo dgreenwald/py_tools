@@ -6,7 +6,7 @@ Created on Tue Apr  8 14:34:39 2025
 @author: dan
 """
 
-import os
+import os, shutil
 from py_tools import parsing as par
 import re
 from collections import namedtuple
@@ -171,13 +171,13 @@ def replace_refs(text, refs_to_replace):
         
     return text
 
-def replace_figures(text, figs_to_replace):
+# def replace_figures(text, figs_to_replace):
     
-    for orig, repl in figs_to_replace:
-        pattern = re.escape(orig)
-        text = re.sub(pattern, repl, text)
+#     for orig, repl in figs_to_replace:
+#         pattern = re.escape(orig)
+#         text = re.sub(pattern, repl, text)
         
-    return text
+#     return text
 
 def get_commands(text):
     
@@ -277,23 +277,6 @@ def remove_unused_commands(text, command_list=None, defn_list=None):
             
     return text
 
-def get_aux_labels(aux_file):
-    
-    with open(aux_file, 'rt') as fid:
-        aux_lines = fid.readlines()
-        
-    refs_to_replace = []
-    for line in aux_lines:
-        pattern = r'\\newlabel{'
-        bma = par.bma_search(pattern, line)
-        if bma.matched:
-            tag, matched_bracket, after = par.expand_to_target(bma.after, left_bracket='{')
-            label_match = re.match(r'{{(\w+\.?\w*)}', after)
-            label = label_match.groups(1)[0]
-            refs_to_replace.append((tag, label))
-            
-    return refs_to_replace
-
 def replace_commands_dynamic(text, commands_to_replace, names_to_replace=None):
     
     current_names = [cmd.name for cmd in commands_to_replace]
@@ -349,36 +332,69 @@ def replace_commands_dynamic(text, commands_to_replace, names_to_replace=None):
     
     return text_new
 
-# def replace_body_definition(text, name, content_current=None, replaced_text=''):
+def get_aux_labels(aux_file):
     
-#     defn_pattern = r'^\s*\\def\s*\\' + re.escape(name) + '\s*{\s*'
-#     bma = par.bma_search(defn_pattern, text, re.MULTILINE)
-    
-#     before = bma.before
-#     if content_current is not None:
-#         before = replace_command()
+    with open(aux_file, 'rt') as fid:
+        aux_lines = fid.readlines()
         
-#     content_new, _, after = par.expand_to_target(bma.after, left_bracket='{')
+    labels_to_numbers = []
+    for line in aux_lines:
+        match = re.match(r'\\newlabel{(.*?)}{{(.*?)}{(.*?)}}', line)
+        if match:
+            label = match.group(1)
+            doc_number = match.group(2)
+        
+            labels_to_numbers.append((label, doc_number))
+            
+    return labels_to_numbers
 
-# def replace_body_definitions(text):
+def get_figure_labels(text):
     
-#     defns = get_definitions(text)
-#     names = [defn.name for defn in defns]
+    figure_blocks = re.findall(r'\\begin{figure}.*?\\end{figure}', text, re.DOTALL)
     
+    figures = []
+    for block in figure_blocks:
+        image_match = re.search(r'\\includegraphics(?:\[.*?\])?{(.*?)}', block)
+        label_match = re.search(r'\\label{(.*?)}', block)
     
-#     # for ii, defn in enumerate(defns):
-#     #     start_point = 
+        if image_match and label_match:
+            figures.append((label_match.group(1), image_match.group(1)))
+            
+    return figures
+
+def replace_figures(text, aux_file, out_dir):
+    
+    figures = get_figure_labels(text)
+    aux_labels = get_aux_labels(aux_file)
+    aux_labels_dict = {
+        label : doc_number for label, doc_number in aux_labels
+        }
+    
+    for label, image_path in figures:
+        if os.path.exists(image_path) and (label in aux_labels_dict):
+            
+            _, ext = os.path.splitext(image_path)
+            doc_number = aux_labels_dict[label]
+            new_path = os.path.join(out_dir, f'fig{doc_number}{ext}')
+            shutil.copy2(image_path, new_path)
+            
+            text = re.sub(
+                rf'(\\includegraphics(?:\[.*?\])?){{{re.escape(image_path)}}}',
+                rf'\1{{{new_path}}}',
+                text
+            )
+            
+    return text
     
 def flatten_text(text, flattened_text='', commands_to_replace=None, 
-                 # defns_to_replace=None, 
-                 remove_comments_from_text=True, 
+                 do_remove_comments_from_text=True, 
                  names_to_replace=None):
     
     # Replace any definitions in the body of the text
     if commands_to_replace is None:
         commands_to_replace = []
     
-    if remove_comments_from_text:
+    if do_remove_comments_from_text:
         text = remove_comments(text)
         
     text = replace_commands_dynamic(text, commands_to_replace,
@@ -406,7 +422,6 @@ def flatten_text(text, flattened_text='', commands_to_replace=None,
         # It worked, load in the text (after recursively flattening)
         flattened_text += flatten_text(
             input_text, commands_to_replace=commands_to_replace,
-            # defns_to_replace=defns_to_replace,
             names_to_replace=names_to_replace,
             )
     else:
@@ -416,25 +431,23 @@ def flatten_text(text, flattened_text='', commands_to_replace=None,
 
     # Continue through rest of the file
     flattened_text += flatten_text(after_input, commands_to_replace=commands_to_replace,
-                                   # defns_to_replace=defns_to_replace,
                                    names_to_replace=names_to_replace)
             
     return flattened_text
 
 def flatten(infile=None, outfile=None, names_to_replace=None, 
-            aux_reference_file=None, remove_comments_from_text=True, 
-            remove_comments_from_preamble=False, remove_unused=False):
+            aux_reference_file=None, do_remove_comments_from_text=True, 
+            do_remove_comments_from_preamble=False, do_remove_unused=False,
+            do_replace_figures=False):
     
     if names_to_replace is None:
         names_to_replace = []
-    
-    # if text is None:
         
-    #     assert infile is not None
+    head_in, tail_in = os.path.split(infile)
+    if head_in != '':
+        os.chdir(head_in)
         
-    head, tail = os.path.split(infile)
-    if head != '':
-        os.chdir(head)
+    head_out, tail_out = os.path.split(outfile)
 
     with open(infile, 'rt') as fid:
         text = fid.read()
@@ -455,14 +468,13 @@ def flatten(infile=None, outfile=None, names_to_replace=None,
     # Flatten the text after preamble
     after_preamble_new = flatten_text(
         bma_preamble.after, commands_to_replace=commands_and_defns_to_replace,
-        # defns_to_replace=defns_to_replace,
-        remove_comments_from_text=remove_comments_from_text,
+        do_remove_comments_from_text=do_remove_comments_from_text,
         names_to_replace=names_to_replace,
         )
 
     # Remove preamble comments?
     preamble_new = bma_preamble.before
-    if remove_comments_from_preamble:
+    if do_remove_comments_from_preamble:
         preamble_new = remove_comments(preamble_new)
 
     # Reassemble
@@ -475,8 +487,13 @@ def flatten(infile=None, outfile=None, names_to_replace=None,
         text = replace_refs(text, refs_to_replace)
         
     # Get rid of unneeded commands
-    if remove_unused:
+    if do_remove_unused:
         text = remove_unused_commands(text, command_list=command_list, defn_list=defn_list)
+        
+    # Replace figures
+    if do_replace_figures:
+        this_aux_file = infile.replace('.tex', '.aux')
+        text = replace_figures(text, this_aux_file, head_out)
     
     if outfile is not None:
         with open(outfile, 'wt') as fid:
