@@ -49,22 +49,14 @@ def replace_content(text, command):
 
 def replace_command(text, command):
     
-    # pattern = r'\\' + command.name + r'\b'
     pattern = r'\\' + command.name + r'(?=[\W_])'
     bma = par.bma_search(pattern, text)
     if not bma.matched:
         replaced_any = False
         return text, replaced_any
-        # replaced_text += text
-        # return replaced_text, replaced_any
     
-    # Add text up to command
-    # replaced_text = bma.before
-    
+    # Substitute out the command
     new_content, after_text = replace_content(bma.after, command)
-    
-    # Add new text replacing command
-    # replaced_text += new_content
     
     # Add remaining text
     after_new, _ = replace_command(after_text, command)
@@ -72,32 +64,6 @@ def replace_command(text, command):
     replaced_text = bma.before + new_content + after_new
     replaced_any = True
     return replaced_text, replaced_any
-
-# def replace_commands_and_defns(text, commands, defns, names_to_replace=None):
-    
-#     done = False
-#     while not done:
-#         done = True
-        
-#         text, replaced_any_commands = replace_commands(text, commands)
-            
-#         text, replaced_any_defns = replace_definitions(
-#             text, defns, names_to_replace=names_to_replace
-#             )
-        
-#         done = done and (not (replaced_any_commands or replaced_any_defns))
-            
-#     return text
-
-# def replace_commands(text, commands):
-    
-#     # Loop through until we stop finding any commands
-#     replaced_any = False
-#     for command in commands:
-#         text, this_replaced_any = replace_command(text, command)
-#         replaced_any = replaced_any or this_replaced_any
-            
-#     return text, replaced_any
 
 def replace_commands_static(text, commands):
     
