@@ -339,11 +339,12 @@ def get_aux_labels(aux_file):
         
     labels_to_numbers = []
     for line in aux_lines:
-        match = re.match(r'\\newlabel{(.*?)}{{(.*?)}{(.*?)}}', line)
-        if match:
-            label = match.group(1)
-            doc_number = match.group(2)
-        
+        pattern = r'\\newlabel{'
+        bma = par.bma_search(pattern, line)
+        if bma.matched:
+            label, matched_bracket, after = par.expand_to_target(bma.after, left_bracket='{')
+            doc_number_match = re.match(r'{{(\w+\.?\w*)}', after)
+            doc_number = doc_number_match.groups(1)[0]
             labels_to_numbers.append((label, doc_number))
             
     return labels_to_numbers
@@ -371,9 +372,15 @@ def replace_figures(text, aux_file, out_dir):
         }
     
     for label, image_path in figures:
+        
+        stem, ext = os.path.splitext(image_path)
+        if ext == '':
+            ext = '.pdf'
+            image_path = stem + ext
+        
         if os.path.exists(image_path) and (label in aux_labels_dict):
             
-            _, ext = os.path.splitext(image_path)
+            # _, ext = os.path.splitext(image_path)
             doc_number = aux_labels_dict[label]
             new_path = os.path.join(out_dir, f'fig{doc_number}{ext}')
             shutil.copy2(image_path, new_path)
@@ -383,6 +390,8 @@ def replace_figures(text, aux_file, out_dir):
                 rf'\1{{{new_path}}}',
                 text
             )
+        else:
+            print(f'Could not replace {image_path}')
             
     return text
     
