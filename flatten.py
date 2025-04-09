@@ -363,7 +363,10 @@ def get_figure_labels(text):
             
     return figures
 
-def replace_figures(text, aux_file, out_dir):
+def replace_figures(text, aux_file, figure_dir=None):
+    
+    if figure_dir is None:
+        figure_dir = ''
     
     figures = get_figure_labels(text)
     aux_labels = get_aux_labels(aux_file)
@@ -382,7 +385,7 @@ def replace_figures(text, aux_file, out_dir):
             
             # _, ext = os.path.splitext(image_path)
             doc_number = aux_labels_dict[label]
-            new_path = os.path.join(out_dir, f'fig{doc_number}{ext}')
+            new_path = os.path.join(figure_dir, f'fig{doc_number}{ext}')
             shutil.copy2(image_path, new_path)
             
             text = re.sub(
@@ -447,7 +450,7 @@ def flatten_text(text, flattened_text='', commands_to_replace=None,
 def flatten(infile=None, outfile=None, names_to_replace=None, 
             aux_reference_file=None, do_remove_comments_from_text=True, 
             do_remove_comments_from_preamble=False, do_remove_unused=False,
-            do_replace_figures=False):
+            do_replace_figures=False, figure_dir=None):
     
     if names_to_replace is None:
         names_to_replace = []
@@ -502,7 +505,7 @@ def flatten(infile=None, outfile=None, names_to_replace=None,
     # Replace figures
     if do_replace_figures:
         this_aux_file = infile.replace('.tex', '.aux')
-        text = replace_figures(text, this_aux_file, head_out)
+        text = replace_figures(text, this_aux_file, figure_dir=figure_dir)
     
     if outfile is not None:
         with open(outfile, 'wt') as fid:
