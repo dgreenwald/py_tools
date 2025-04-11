@@ -13,6 +13,8 @@ def load(dataset, usecols=None, data_dir=default_dir, vintage='2003',
     if fof_vintage is not None:
         print("Change to keyword vintage")
         vintage = fof_vintage
+        
+    var_index_backup = []
     
     if dataset == 'corporate':
         
@@ -84,6 +86,11 @@ def load(dataset, usecols=None, data_dir=default_dir, vintage='2003',
             'corp_equities_asset' : ('b103', 'LM103064103'),
         }
         
+        var_index_backup += [
+            ('net_new_equity', 'f103', 'FA103164105'),
+            ('checkable_deposits', 'b103', 'FL103020005'),
+            ]
+        
     elif dataset == 'household':
         
         var_index = {
@@ -151,6 +158,10 @@ def load(dataset, usecols=None, data_dir=default_dir, vintage='2003',
         df_tab = load_table(table, data_dir=data_dir, usecols=these_cols,
                             vintage=vintage, update_names=update_names)
         df_tab.rename(columns=code_index, inplace=True)
+        
+        for key, this_table, this_code in var_index_backup:
+            if (this_table == table) and (key not in df_tab):
+                df_tab = df_tab.rename(columns={this_code + '.Q' : key})
         
         if named_only:
             drop_cols = [var for var in df_tab.columns if var not in var_list + ['date']]
