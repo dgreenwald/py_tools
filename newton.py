@@ -84,6 +84,7 @@ def root(fun, x0, args=None, kwargs=None, grad=None, tol=1e-8,
             grad_val = grad(x, *args, **kwargs)
             
         # Use Jacobian to compute step size
+        # print(grad_val)
         step = -np.linalg.solve(grad_val.T, f_val)
         
         # Move in step direction

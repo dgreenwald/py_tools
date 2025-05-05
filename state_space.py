@@ -5,7 +5,7 @@ from scipy.stats import multivariate_normal as mvn
 import copy
 
 from py_tools import numerical as nm, stats as st
-from py_tools.utilities import tic, toc
+# from py_tools.utilities import tic, toc
 
 def init_to_val(shape, val):
 
@@ -326,6 +326,9 @@ class StateSpaceEstimates:
             
         x_pred_t = self.x_init
         P_pred_t = self.P_init
+        
+        # x_pred_t = np.dot(self.ssm.A, self.x_init)
+        # P_pred_t = self.ssm.A @ self.P_init @ self.ssm.A.T + self.ssm.RQR
 
         self.err = np.zeros((self.Nt, self.Ny))
 
@@ -355,11 +358,12 @@ class StateSpaceEstimates:
             PZ = np.dot(P_pred_t, Z_t.T)
             F_t = np.dot(Z_t, PZ) + H_t
             
-            try:
-                self.log_like += mvn.logpdf(err_t, mean=np.zeros(np.sum(ix_t)), cov=F_t) 
-            except:
-                self.log_like = -1e+10
-                return None
+            if np.any(ix_t):
+                try:
+                    self.log_like += mvn.logpdf(err_t, mean=np.zeros(np.sum(ix_t)), cov=F_t) 
+                except:
+                    self.log_like = -1e+10
+                    return None
             
             # Update step (DK style)
             ZFi_t = nm.rsolve(Z_t.T, F_t)

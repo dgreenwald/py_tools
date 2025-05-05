@@ -1,4 +1,3 @@
-# import ipdb
 import numpy as np
 import pandas as pd
 import re
@@ -8,18 +7,7 @@ from tabulate import tabulate
 from statsmodels.tsa import stattools
 import statsmodels.tsa.arima.model as arima
 
-# from py_tools.debug import disp 
-# import py_tools.data as dt
-import py_tools.data as dt, py_tools.numerical as nm
-# from py_tools.datasets import loader
-# import py_tools.utilities as ut
-
-# def year_q_to_date(year, qtr):
-#     """Converts series x of years into series of dates"""
-    
-#     month = 3 * qtr - 2
-#     date_str = year.astype(str) + '-' + month.astype(str) + '-01'
-#     return pd.to_datetime(date_str, errors='coerce')
+import py_tools.data as dt
 
 def panel_resampler(df, time_var, freq):
 
@@ -89,8 +77,6 @@ def resample(df, methods_vars, freq='QS'):
 
             df_new = getattr(df[var_list].resample(freq), method)()
 
-            # if len(var_list) == 1:
-                # df_new = df_new.to_frame()
             if df_resamp is None:
                 df_resamp = df_new
             else:
@@ -136,7 +122,6 @@ def deflate(df, var_list, index='cpi', log=False, diff=False, per_capita=False,
 
     from py_tools.datasets.loader import load
     
-    # index_var = 'FRED_' + index + '_index'
     new_var_list = []
 
     if per_capita:
@@ -150,9 +135,6 @@ def deflate(df, var_list, index='cpi', log=False, diff=False, per_capita=False,
             new_var = 'PC_' + var
         else:
             new_var = 'DEF' + index.upper() + '_' + var
-        # if per_capita:
-            # new_var += 'PC_'
-        # new_var += var
 
         new_var_list.append(new_var)
 
@@ -182,15 +164,8 @@ def deflate(df, var_list, index='cpi', log=False, diff=False, per_capita=False,
                     df_new[index_var] = df_new['NIPA_20100_real_disp_inc'] / df_new['NIPA_20100_real_pc_disp_inc']
 
                 df = pd.merge(df, df_new[index_var].to_frame(), left_index=True, right_index=True)
-
-            # if per_capita and 'pop' not in df:
-                # df_new = dt.load(['nipa_20100'], reimport=reimport)
-                # df_new['pop'] = df_new['NIPA_20100_real_disp_inc'] / df_new['NIPA_20100_real_pc_disp_inc']
-                # df = pd.merge(df, df_new['pop'].to_frame(), left_index=True, right_index=True)
                 
             scale = np.log(df[index_var])
-            # if per_capita:
-                # scale += np.log(df['pop'])
 
             if diff:
                 scale = scale.diff()
@@ -210,11 +185,7 @@ def add_lags(df, var, n_lags, init_lag=1):
 
     return lag_list
 
-def transform(df, var_list, lag=0, diff=0, other=None,
-              # , deflate=False, 
-              # deflate_ix='cpi', deflate_log=False, deflate_diff=False,
-              # deflate_reimport=False
-              ):
+def transform(df, var_list, lag=0, diff=0, other=None):
 
     new_var_list = []
     for var in var_list:
@@ -245,11 +216,6 @@ def transform(df, var_list, lag=0, diff=0, other=None,
         if new_var not in df:
             df[new_var] = df[var]
 
-            # if deflate:
-                # _ = dt.deflate(df, new_var, index=deflate_ix, log=deflate_log, 
-                               # diff=deflate_diff, reimport=deflate_reimport,
-                               # new_var=new_var)
-
             if other is not None:
                 df[new_var] = eval('np.{}(df[new_var])'.format(other))
 
@@ -273,8 +239,6 @@ def long_horizon_contemp(df, lhs, rhs, horizon, **kwargs):
 
 def long_horizon_predictive(df_in, lhs, rhs, horizon, norm_lhs=False, **kwargs):
 
-    # lhs_long = transform(df, [lhs], lag=-1, diff=horizon, other='cumsum')[0]
-
     df = df_in[[lhs] + rhs].copy()
     lhs_long = '{0}_{1}_Per_Diff'.format(lhs, horizon)
     df[lhs_long] = 0
@@ -291,16 +255,12 @@ def MA(df, lhs_var, rhs_vars, init_lag=1, default_lags=16,
        lags_by_var={}, **kwargs):
 
     lhs = lhs_var
-    # lhs += transform(df, [lhs_var], 
-    # lhs.append(add_lag(df, lhs_var, lag=0, diff=0))
 
-    # rhs = ['const']
     rhs = []
     for var in rhs_vars:
         this_lag = lags_by_var.get(var, default_lags)
         for lag in range(init_lag, this_lag + init_lag):
             rhs += transform(df, [var], lag=lag)
-            # rhs.append(add_lag(df, var, lag=lag))
 
     # Get sample indices
     ix, _, _ = dt.match_xy(df[rhs_vars].values, df[lhs_var].values)
@@ -337,10 +297,6 @@ def arma_regression(series, p, q, freq='QS', ix=None):
     ix_stage2[ix] = fr.ix
     
     fr.ix = ix_stage2
-    
-#    this_ix = ix.copy()
-#    this_ix[ix] = fr.ix
-#    fr.ix = this_ix
     
     return fr
 
@@ -497,20 +453,14 @@ class LongHorizonVAR:
         self.C = []
         self.C.append(solve_discrete_lyapunov(self.A, self.Q))
 
-        # if predictive:
-            # C_sum = np.zeros(self.C[0].shape)
-
         for jj in range(1, self.horizon + 1):
             self.C.append(np.dot(self.A, self.C[jj-1]))
-            # if predictive:
-                # C_sum += self.C[jj]
 
         self.Vk = self.horizon * self.C[0]
         for jj in range(1, self.horizon):
             self.Vk += (self.horizon - jj) * (self.C[jj] + self.C[jj].T)
 
         # Long-horizon regressions
-        # TODO: right now lhs var must be ordered first
         self.lhs_ix = 0
 
     def predictive_reg(self):
@@ -551,7 +501,8 @@ class LongHorizonVAR:
 
         # OLS
         bet_lh = np.linalg.solve(cov_xx, cov_xy)
-        R2 = nm.quad_form(bet_lh, cov_xx) / var_y
+        # R2 = nm.quad_form(bet_lh, cov_xx) / var_y
+        R2 = np.dot(bet_lh.T, np.dot(cov_xx, bet_lh)) / var_y
 
         if display:
             # Print first table
@@ -723,7 +674,7 @@ def detrend_time(df, varlist, time_var=None, suffix='detrend_time'):
         
     varlist_detrend = [var + '_' + suffix for var in varlist]
 
-    return df, varlist
+    return df, varlist_detrend
 
 def get_time_trend(df, var, time_var=None):
 
@@ -736,11 +687,9 @@ def get_time_trend(df, var, time_var=None):
 
     trend = pd.Series(index=df.index)
     trend.loc[fr.ix] = fr.results.fittedvalues
-    # trend.loc[~fr.ix] = np.nan
 
     cycle = pd.Series(index=df.index)
     cycle.loc[fr.ix] = fr.results.resid
-    # cycle.loc[~fr.ix] = np.nan
 
     return trend, cycle
 
@@ -993,11 +942,10 @@ def bandpass_filter_christiano(series, period_lb, period_ub, detrend=False):
     grid = np.arange(1, Nt)
     B1 = (np.sin(grid * b) - np.sin(grid * a)) / (np.pi * grid)
     B0 = (b - a) / np.pi
-    B = np.hstack((B0, B1))
+    # B = np.hstack((B0, B1))
     
     Bc = np.hstack((0.0, np.cumsum(B1)))
     B_til = -0.5 * B0 - Bc
-    # Bc_descending = np.cumsum(B[::-1])
     
     B_two_sided = np.hstack((B1[::-1], B0, B1))
 
@@ -1012,73 +960,19 @@ def bandpass_filter_christiano(series, period_lb, period_ub, detrend=False):
     series_new = BP_mat @ series
     return series_new
 
-# def bandpass_filter_christiano_alt(series, period_lb, period_ub, detrend=True):
-    
-#     assert period_lb > 1
-    
-#     Nt = len(series)
-    
-#     if detrend:
-#         dx = (series[-1] - series[0]) / (Nt - 1)
-#         series = series - np.arange(Nt) * dx
-    
-#     if period_ub is None:
-#         a = 0.0
-#     else:
-#         a = 2.0 * np.pi / np.float64(period_ub)
-#     b = 2.0 * np.pi / np.float64(period_lb)
-    
-#     grid = np.arange(1, Nt)
-#     B1 = (np.sin(grid * b) - np.sin(grid * a)) / (np.pi * grid)
-#     B0 = (b - a) / np.pi
-#     B_old = np.hstack((B0, B1))
-    
-#     Bc = np.hstack((0.0, np.cumsum(B1)))
-#     B_til = -0.5 * B0 - Bc
-#     # Bc_descending = np.cumsum(B_old[::-1])
-    
-#     B_two_sided = np.hstack((B1[::-1], B0, B1))
-
-#     BP_mat = np.zeros((Nt, Nt))
-#     for tt in range(Nt):
-#         start_ix = Nt-1-tt
-#         BP_mat[tt, :] = B_two_sided[start_ix : start_ix + Nt]
-        
-#     BP_mat[:, 0] += B_til
-#     BP_mat[:, -1] += B_til[::-1]
-    
-#     series_new = BP_mat @ series
-    
-#     # New code
-#     J = np.arange(1, Nt+1)
-#     B = (np.sin(b * J) - np.sin(a * J)) / (np.pi * J)
-#     B = np.hstack(((b-a)/np.pi, B))
-    
-#     B_main = B[:Nt].copy()
-#     B_tmp = B[:Nt].copy()
-    
-#     n2 = Nt - 1
-#     n1 = 0
-#     Y = np.zeros(len(series))
-    
-#     for tt in range(Nt):
-        
-#         B_end = np.sum(B_tmp[n2:])
-#         B_start = np.sum(B_tmp[n1:])
-        
-#         BB = B_main.copy()
-#         BB[0] = B_start
-#         BB[-1] = B_end
-        
-#         # foo = np.sum(series * (BB @ np.ones(len(BB))))
-#         Y[tt] = series @ BB
-        
-#         B_main = np.hstack((B[tt+1], B_main[:-1]))
-    
-#     return Y
-
 def chow_lin_V_default(a, N):
-    """Default V matrix: AR(1) correlation structure"""
+    """Compute the default V matrix for the Chow-Lin method assuming an AR(1)
+    correlation structure
+
+    Parameters:
+
+        a: the correlation parameter
+        N: the number of observations in the X series
+
+    Returns:
+
+        V: the N x N matrix
+    """
     
     V = np.zeros((N, N))
     for tt in range(N):
@@ -1087,6 +981,22 @@ def chow_lin_V_default(a, N):
     return V
 
 def chow_lin_inner(Y, Z, B, a, Vfcn=chow_lin_V_default):
+    """Perform the inner loop computations of the Chow-Lin method.
+
+    Parameters:
+
+        Y: the Nt_coarse x 1 target series with limited availability
+        Z: the Nt_fine x k proxy series
+        B: the Nx_fine x Nt_coarse matrix relating Y and X
+        a: the correlation parameter
+        Vfcn: a function for computing the error matrix V given the correlation parameter a
+
+    Returns:
+
+        bet_hat: the estimated coefficients of the Chow-Lin regression 
+        X_hat: the approximated series for X
+        u_hat: the residuals of the Chow-Lin regression
+    """
     
     N = Z.shape[0]
     V = Vfcn(a, N)
@@ -1110,8 +1020,10 @@ def chow_lin_inner(Y, Z, B, a, Vfcn=chow_lin_V_default):
 
 def chow_lin(Y, Z, B, Vfcn=chow_lin_V_default, a0=0.9, tol=1e-4):
     """Use the Chow-Lin method to approximate the target series X using a
-    coarser series Y and a proxy series Z. The inputs should be:
+    coarser series Y and a proxy series Z. 
         
+    Parameters:
+
         Y: the Nt_coarse x 1 target series with limited availability
         Z: the Nt_fine x k proxy series
         B: the Nx_fine x Nt_coarse matrix relating Y and X
@@ -1119,7 +1031,7 @@ def chow_lin(Y, Z, B, Vfcn=chow_lin_V_default, a0=0.9, tol=1e-4):
         a0: a scalar guess for the correlation parameter
         tol: the scalar tolerance for the iterative process to converge
         
-    The function returns:
+    Returns:
         
         X_hat: the approximated series for X
     """
