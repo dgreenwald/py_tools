@@ -987,7 +987,7 @@ def chow_lin_inner(Y, Z, B, a, Vfcn=chow_lin_V_default):
 
         Y: the Nt_coarse x 1 target series with limited availability
         Z: the Nt_fine x k proxy series
-        B: the Nx_fine x Nt_coarse matrix relating Y and X
+        B: the Nt_fine x Nt_coarse matrix relating Y and X
         a: the correlation parameter
         Vfcn: a function for computing the error matrix V given the correlation parameter a
 
