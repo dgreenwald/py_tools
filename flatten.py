@@ -363,10 +363,10 @@ def get_figure_labels(text):
             
     return figures
 
-def replace_figures(text, aux_file, figure_dir=None):
+def replace_figures(text, aux_file, figure_dir_in_text=None, figure_dir_actual_location=None):
     
-    if figure_dir is None:
-        figure_dir = ''
+    if figure_dir_in_text is None:
+        figure_dir_in_text = ''
     
     figures = get_figure_labels(text)
     aux_labels = get_aux_labels(aux_file)
@@ -385,12 +385,13 @@ def replace_figures(text, aux_file, figure_dir=None):
             
             # _, ext = os.path.splitext(image_path)
             doc_number = aux_labels_dict[label]
-            new_path = os.path.join(figure_dir, f'fig{doc_number}{ext}')
+            new_path = os.path.join(figure_dir_actual_location, f'fig{doc_number}{ext}')
+            new_path_in_text = os.path.join(figure_dir_in_text, f'fig{doc_number}{ext}')
             shutil.copy2(image_path, new_path)
             
             text = re.sub(
-                rf'(\\includegraphics(?:\[.*?\])?){{{re.escape(image_path)}}}',
-                rf'\1{{{new_path}}}',
+                rf'(\\includegraphics(?:\[.*?\])?){{{re.escape(stem)}(?:{re.escape(ext)})?}}',
+                rf'\1{{{new_path_in_text}}}',
                 text
             )
         else:
@@ -450,7 +451,7 @@ def flatten_text(text, flattened_text='', commands_to_replace=None,
 def flatten(infile=None, outfile=None, names_to_replace=None, 
             aux_reference_file=None, do_remove_comments_from_text=True, 
             do_remove_comments_from_preamble=False, do_remove_unused=False,
-            do_replace_figures=False, figure_dir=None):
+            do_replace_figures=False, figure_dir_in_text=None, figure_dir_actual_location=None):
     
     if names_to_replace is None:
         names_to_replace = []
@@ -505,7 +506,10 @@ def flatten(infile=None, outfile=None, names_to_replace=None,
     # Replace figures
     if do_replace_figures:
         this_aux_file = infile.replace('.tex', '.aux')
-        text = replace_figures(text, this_aux_file, figure_dir=figure_dir)
+        if figure_dir_actual_location is None:
+            figure_dir_actual_location = head_out + '/'
+        text = replace_figures(text, this_aux_file, figure_dir_in_text=figure_dir_in_text,
+                               figure_dir_actual_location=figure_dir_actual_location)
     
     if outfile is not None:
         with open(outfile, 'wt') as fid:
