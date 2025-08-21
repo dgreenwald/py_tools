@@ -47,7 +47,7 @@ def two_axis(df_in, var1, var2, filepath=None, loc1='upper left',
              single_legend=False, print_legend_axis=True, labels=None,
              leglabels=None, drop=True, kwargs1=None, kwargs2=None, format_dates=False,
              title=None, figsize=None, style=None,
-             savefig_kwargs=None):
+             savefig_kwargs=None, axvline=None, axvline_kwargs=None):
 
     if colors is None: colors = {}
     if labels is None: labels = {}
@@ -55,6 +55,7 @@ def two_axis(df_in, var1, var2, filepath=None, loc1='upper left',
     if kwargs1 is None: kwargs1 = {}
     if kwargs2 is None: kwargs2 = {}
     if savefig_kwargs is None: savefig_kwargs = {}
+    if axvline_kwargs is None: axvline_kwargs = {}
     
     if style is not None:
         plt_style.use(style)
@@ -159,6 +160,9 @@ def two_axis(df_in, var1, var2, filepath=None, loc1='upper left',
 
         ax1.set_ylim(ax1_ylim_new)
         ax2.set_ylim(ax2_ylim_new)
+        
+    if axvline is not None:
+        ax1.axvline(axvline, **axvline_kwargs)
 
     plt.xlim(df.index[[0, -1]])
     
