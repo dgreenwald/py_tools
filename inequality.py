@@ -28,7 +28,7 @@ def compute_gini(df, var, wvar=None):
     c_shares = np.cumsum(df_by_var['w_share'].values)
     c_weight = np.cumsum(df_by_var['weight'].values)
 
-    area_under = integrate.simps(c_shares, c_weight)
+    area_under = integrate.simpson(c_shares, c_weight)
     gini_coeff = 1.0 - 2.0 * area_under
 
     return gini_coeff, c_weight, c_shares

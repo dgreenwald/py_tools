@@ -457,6 +457,37 @@ def regression_table(results, var_names=None, vertical=False, tstat=False,
 
     return Table(contents, has_header=has_header, floatfmt=floatfmt, **kwargs)
 
+
+def write_values_tex(data: dict, path="values.tex", prop_name="g_myvals_prop", prefix=None):
+    """
+    Write a LaTeX file defining key-value pairs accessible as \val{key}.
+    
+    Example output:
+        \ExplSyntaxOn
+        \prop_new:N \g_myvals_prop
+        \prop_gput:Nnn \g_myvals_prop {key} {value}
+        ...
+        \cs_new:Npn \val #1 { \prop_item:Nn \g_myvals_prop {#1} }
+        \ExplSyntaxOff
+    """
+    with open(path, "w", encoding="utf-8") as f:
+        f.write("\\ExplSyntaxOn\n")
+        f.write(f"\\prop_new:N \\{prop_name}\n")
+
+        for key, value in data.items():
+            if prefix is None:
+                key_new = key
+            else:
+                key_new = f'{prefix}_{key}'
+            # Convert Python values to TeX-safe strings
+            val_str = str(value)
+            # Escape braces if they appear in value strings
+            val_str = val_str.replace("{", "\\{").replace("}", "\\}")
+            f.write(f"\\prop_gput:Nnn \\{prop_name} {{{key_new}}} {{{val_str}}}\n")
+
+        f.write(f"\\cs_new:Npn \\val #1 {{ \\prop_item:Nn \\{prop_name} {{#1}} }}\n")
+        f.write("\\ExplSyntaxOff\n")
+
 # def write_table(fid, table, caption=None, notes=None, position='h!',
                 # headers=None, alignment=None, booktabs=True, floatfmt='4.3f'):
 
