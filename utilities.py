@@ -2,7 +2,7 @@ import os
 from collections.abc import Mapping
 import itertools
 import numpy as np
-from time import time
+from time import time, perf_counter
 
 def as_list(x):
 
@@ -72,11 +72,11 @@ def swap_all_axes(a, target_axes, count=0):
 
 def tic():
 
-    return time()
+    return perf_counter()
 
 def toc(start, display=True):
 
-    elapsed = time() - start
+    elapsed = perf_counter() - start
     print("Time elapsed: {:4.3g} seconds".format(elapsed))
     return elapsed
 
