@@ -28,7 +28,7 @@ def load(dataset, usecols=None, data_dir=default_dir, vintage='2003',
             # 'liabilities_book' : ('b103', 'FL104190005'),
             'net_worth_book' : ('b103', 'FL102090005'),
             'net_worth_market' : ('b103', 'FL102090005'),
-            'equities_outstanding_market' : ('b103', 'LM103164103'),
+            'equities_outstanding_market' : ('b103', 'LM103164105'),
             'fdi_equity' : ('b103', 'LM103192105'),
             # 'net_dividends' : ('u103', 'FU106121075'),
             # 'net_new_equity' : ('u103', 'FU103164103'),
@@ -91,6 +91,7 @@ def load(dataset, usecols=None, data_dir=default_dir, vintage='2003',
         var_index_backup += [
             ('net_new_equity', 'f103', 'FA103164105'),
             ('checkable_deposits', 'b103', 'FL103020005'),
+            ('equities_outstanding_market', 'b103', 'LM103164103'),
             ]
         
     elif dataset == 'household':

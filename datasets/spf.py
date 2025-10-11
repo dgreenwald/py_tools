@@ -25,11 +25,7 @@ def load(table, data_dir=default_dir+'/spf/', reimport=False):
     
     return df
 
-def load_table_from_master(table=None, data_dir=default_dir + '/spf/', 
-                reimport=False, growth=False, vintage=None):
-    
-    if vintage is not None:
-        data_dir += f'{vintage}/'
+def load_master(table, data_dir=default_dir + '/spf/', reimport=False, growth=False):
     
     if growth:
         base_name = 'meanGrowth'
@@ -56,17 +52,4 @@ def load_table_from_master(table=None, data_dir=default_dir + '/spf/',
         
         df = pd.read_pickle(pkl_file)
         
-    return df
-
-def load_tables_from_master(tables=None, data_dir=default_dir + '/spf/', 
-                reimport=False, growth=False, vintage=None):
-    
-    df_list = []
-    for table in tables:
-        this_df = load_table_from_master(
-            table=table, data_dir=data_dir, reimport=reimport, growth=growth, 
-            vintage=vintage)
-        df_list.append(this_df)
-        
-    df = pd.concat(df_list, axis=1)
     return df

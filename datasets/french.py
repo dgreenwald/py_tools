@@ -27,16 +27,16 @@ def load(source, data_dir=default_dir):
 
     return df
     
-# def load_table(table, data_dir=default_dir):
+def load_table(table, data_dir=default_dir):
     
-    # if table == 'beta':
-        # infile = data_dir + 'beta_portfolios_monthly.csv'
-    # elif table == 'bm':
-        # infile = data_dir + 'bm_portfolios_monthly.csv'
+    if table == 'beta':
+        infile = data_dir + 'beta_portfolios_monthly.csv'
+    elif table == 'bm':
+        infile = data_dir + 'bm_portfolios_monthly.csv'
         
-    # df = pd.read_csv(infile)
-    # df.columns = ['date'] + [f'p{ii:d}' for ii in range(1, 11)]
-    # df = df.dropna(subset=['date']).copy()
-    # df['date'] = pd.to_datetime(df['date'].astype(int).astype(str), format='%Y%m')
-    # df = df.set_index('date')
-    # return df
+    df = pd.read_csv(infile)
+    df.columns = ['date'] + [f'p{ii:d}' for ii in range(1, 11)]
+    df = df.dropna(subset=['date']).copy()
+    df['date'] = pd.to_datetime(df['date'].astype(int).astype(str), format='%Y%m')
+    df = df.set_index('date')
+    return df

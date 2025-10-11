@@ -146,18 +146,6 @@ def two_axis(df_in, var1, var2, filepath=None, loc1='upper left',
         ax1_ylim_new = df[var1].std() * ylim_norm + df[var1].mean()
         ax2_ylim_new = df[var2].std() * ylim_norm + df[var2].mean()
 
-        # ax1_ylim_new = tuple([
-            # df[var1].std() * (val - df[var1].mean()) / df[var1].std() 
-            # + df[var2].mean()
-            # for val in ax1_ylim
-        # ])
-
-        # ax2_ylim = tuple([
-            # df[var2].std() * (val - df[var1].mean()) / df[var1].std() 
-            # + df[var2].mean()
-            # for val in ax1_ylim
-        # ])
-
         ax1.set_ylim(ax1_ylim_new)
         ax2.set_ylim(ax2_ylim_new)
         
