@@ -458,7 +458,13 @@ def regression_table(results, var_names=None, vertical=False, tstat=False,
     return Table(contents, has_header=has_header, floatfmt=floatfmt, **kwargs)
 
 
-def write_values_tex(data: dict, path="values.tex", prop_name="g_myvals_prop", prefix=None):
+def to_camel_case(s: str) -> str:
+    parts = s.split('_')
+    return parts[0] + ''.join(word.capitalize() for word in parts[1:])
+
+
+def write_values_tex(data: dict, path="values.tex", prop_name="g_myvals_prop", 
+                     prefix=None, command_str=None, add_prefix_to_command=True):
     """
     Write a LaTeX file defining key-value pairs accessible as \val{key}.
     
@@ -470,6 +476,12 @@ def write_values_tex(data: dict, path="values.tex", prop_name="g_myvals_prop", p
         \cs_new:Npn \val #1 { \prop_item:Nn \g_myvals_prop {#1} }
         \ExplSyntaxOff
     """
+    if command_str is None:
+        if add_prefix_to_command and (prefix is not None):
+            command_str = to_camel_case('val_' + prefix)
+        else:
+            command_str = 'val'
+    
     with open(path, "w", encoding="utf-8") as f:
         f.write("\\ExplSyntaxOn\n")
         f.write(f"\\prop_new:N \\{prop_name}\n")
@@ -485,7 +497,7 @@ def write_values_tex(data: dict, path="values.tex", prop_name="g_myvals_prop", p
             val_str = val_str.replace("{", "\\{").replace("}", "\\}")
             f.write(f"\\prop_gput:Nnn \\{prop_name} {{{key_new}}} {{{val_str}}}\n")
 
-        f.write(f"\\cs_new:Npn \\val #1 {{ \\prop_item:Nn \\{prop_name} {{#1}} }}\n")
+        f.write(f"\\cs_new:Npn \\{command_str} #1 {{ \\prop_item:Nn \\{prop_name} {{#1}} }}\n")
         f.write("\\ExplSyntaxOff\n")
 
 # def write_table(fid, table, caption=None, notes=None, position='h!',

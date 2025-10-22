@@ -68,6 +68,19 @@ def date_from_month(yr, mon):
     date = yr.astype(str) + '-' + mon.astype(str) + '-01'
     return pd.to_datetime(date, errors='coerce')
 
+def date_from_q_string(s):
+    
+    s = s.astype(str)
+    codes, uniq = pd.factorize(s, sort=False)      # uniques only once
+    
+    y = uniq.str[:4].astype('int32')
+    q = uniq.str[-1].astype('int8')
+    m = (q - 1) * 3 + 1
+    u_dt = pd.to_datetime(y * 100 + m, format='%Y%m').to_numpy()
+    dates = pd.DatetimeIndex(u_dt[codes])             # rebuild full series
+
+    return dates
+
 def resample(df, methods_vars, freq='QS'):
     df_resamp = None
 

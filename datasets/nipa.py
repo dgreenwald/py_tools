@@ -275,14 +275,21 @@ def load_flat(nipa_table=None, data_dir=default_dir+'nipa/', var_list=None,
     parquet_file = vintage_dir + 'nipadata{}.parquet'.format(freq)
 
     if (not os.path.exists(parquet_file)) or reimport:
-        infile = 'nipadata{}.txt'.format(freq)
-        df = pd.read_csv(vintage_dir + infile, thousands=',').rename(columns={'%SeriesCode' : 'Series'})
+        
+        if vintage == '2510':
+            filestem = 'NipaData'
+        else:
+            filestem = 'nipadata'
+            
+        infile = f'{vintage_dir}{filestem}{freq}.txt'
+        
+        df = pd.read_csv(infile, thousands=',').rename(columns={'%SeriesCode' : 'Series'})
         
         # Convert numbers
         # df['Value'] = df['Value'].str.replace(',', '')
         df['Value'] = pd.to_numeric(df['Value'], errors='coerce')
-
-        df['Date'] = pd.to_datetime(df['Period'].astype(str))
+        df['Date'] = ts.date_from_q_string(df['Period'])
+        
         if freq == 'A':
             print("CHECK DATE CONVERSION")
             print(df)
