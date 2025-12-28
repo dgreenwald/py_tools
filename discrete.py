@@ -5,7 +5,7 @@ Created on Sat Mar  5 07:09:18 2016
 @author: dan
 """
 
-import matplotlib.pyplot as plt
+# import matplotlib.pyplot as plt
 import numpy as np
 import scipy.sparse as sp
 
