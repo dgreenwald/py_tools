@@ -303,7 +303,7 @@ def load_from_source(dataset, data_dir, **kwargs):
     elif dataset == 'vrp':
 
         infile = data_dir + 'VRPtable.txt'
-        df = pd.read_table(infile, sep='\s+')
+        df = pd.read_table(infile, sep=r'\s+')
         df['date'] = ts.date_from_month(df['Year'], df['Month'])
         df = df.drop(columns=['Year', 'Month']).set_index('date').sort_index()
 
