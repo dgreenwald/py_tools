@@ -4,6 +4,7 @@ import os
 import pickle
 import struct
 import zipfile
+import json
 
 def load_eigen(filename, dtype='float64'):
 
@@ -72,6 +73,13 @@ def write_text(string, filename):
         
     return None
 
+def write_json(obj, filename, **kwargs):
+
+    with open(filename, 'w') as fid:
+        json.dump(obj, fid, **kwargs)
+
+    return None
+
 def read_numeric(filename):
     
     with open(filename, 'r') as fid:
@@ -86,3 +94,8 @@ def read_zipped(zip_path, file_name, **kwargs):
             df = pd.read_csv(fid, **kwargs)
             
     return df
+
+def read_json(filename, **kwargs):
+
+    with open(filename, 'r') as fid:
+        return json.load(fid)
