@@ -12,6 +12,7 @@ except PackageNotFoundError:
     __version__ = "0.0.0+local"
 
 __all__ = (
+    "bayesian",
     "data",
     "datasets",
     "numerical",
