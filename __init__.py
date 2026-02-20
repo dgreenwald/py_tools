@@ -13,6 +13,7 @@ except PackageNotFoundError:
 
 __all__ = (
     "bayesian",
+    "compute",
     "data",
     "datasets",
     "econ",

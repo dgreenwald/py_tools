@@ -5,9 +5,10 @@ import scipy.optimize as opt
 # from scipy.special import logsumexp
 from scipy.stats import multivariate_normal as mv
 # import py_tools.numerical as nm
-from py_tools import in_out as io, numerical as nm, mpi_array as mp
+import py_tools.compute.mpi_array as mp
+from py_tools import in_out as io, numerical as nm
 from py_tools.bayesian.prior import Prior
-from py_tools.mpi_array import MPIArray
+from py_tools.compute.mpi_array import MPIArray
 
 from mpi4py import MPI
 
