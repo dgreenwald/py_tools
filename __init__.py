@@ -16,6 +16,7 @@ __all__ = (
     "compute",
     "data",
     "datasets",
+    "econometrics",
     "econ",
     "in_out",
     "numerical",
