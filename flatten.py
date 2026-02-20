@@ -7,7 +7,7 @@ Created on Tue Apr  8 14:34:39 2025
 """
 
 import os, shutil
-from py_tools import parsing as par
+from py_tools.text import parsing as par
 import re
 from collections import namedtuple
 

@@ -20,6 +20,7 @@ __all__ = (
     "plot",
     "state_space",
     "stats",
+    "text",
     "time_series",
     "utilities",
 )
