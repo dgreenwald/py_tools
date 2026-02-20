@@ -51,11 +51,12 @@ all = [
 ]
 
 [tool.setuptools]
-packages = ["py_tools", "py_tools.bayesian", "py_tools.datasets", "py_tools.econ", "py_tools.in_out", "py_tools.numerical", "py_tools.plot", "py_tools.stats", "py_tools.text", "py_tools.time_series", "py_tools.utilities"]
+packages = ["py_tools", "py_tools.bayesian", "py_tools.data", "py_tools.datasets", "py_tools.econ", "py_tools.in_out", "py_tools.numerical", "py_tools.plot", "py_tools.stats", "py_tools.text", "py_tools.time_series", "py_tools.utilities"]
 
 [tool.setuptools.package-dir]
 py_tools = "."
 "py_tools.bayesian" = "bayesian"
+"py_tools.data" = "data"
 "py_tools.datasets" = "datasets"
 "py_tools.econ" = "econ"
 "py_tools.in_out" = "in_out"

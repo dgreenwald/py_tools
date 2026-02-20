@@ -6,7 +6,7 @@ import patsy
 import statsmodels.api as sm
 import statsmodels.formula.api as smf
 
-from . import stats
+from py_tools import stats
 
 def pivot_no_hierarchical_columns(df, *args, **kwargs):
     
