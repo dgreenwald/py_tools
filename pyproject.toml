@@ -51,13 +51,14 @@ all = [
 ]
 
 [tool.setuptools]
-packages = ["py_tools", "py_tools.bayesian", "py_tools.datasets", "py_tools.in_out"]
+packages = ["py_tools", "py_tools.bayesian", "py_tools.datasets", "py_tools.in_out", "py_tools.utilities"]
 
 [tool.setuptools.package-dir]
 py_tools = "."
 "py_tools.bayesian" = "bayesian"
 "py_tools.datasets" = "datasets"
 "py_tools.in_out" = "in_out"
+"py_tools.utilities" = "utilities"
 
 [tool.pytest.ini_options]
 addopts = "-ra"
