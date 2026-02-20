@@ -56,3 +56,16 @@ packages = ["py_tools", "py_tools.datasets"]
 [tool.setuptools.package-dir]
 py_tools = "."
 "py_tools.datasets" = "datasets"
+
+[tool.pytest.ini_options]
+addopts = "-ra"
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+norecursedirs = [
+    "examples",
+    "old",
+    "build",
+    "dist",
+    ".eggs",
+    "*.egg-info",
+]
