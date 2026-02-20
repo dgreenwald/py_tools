@@ -13,6 +13,7 @@ except PackageNotFoundError:
 
 __all__ = (
     "bayesian",
+    "config",
     "compute",
     "data",
     "datasets",
@@ -21,6 +22,7 @@ __all__ = (
     "in_out",
     "numerical",
     "plot",
+    "scraping",
     "state_space",
     "stats",
     "text",

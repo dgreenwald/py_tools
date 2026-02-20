@@ -1,31 +1,10 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-Created on Tue Oct 10 10:01:55 2023
+import warnings
 
-@author: dan
-"""
+warnings.warn(
+    "Importing from py_tools.modspec is deprecated. "
+    "Use py_tools.config.modspec instead.",
+    DeprecationWarning,
+    stacklevel=2,
+)
 
-class ModSpec:
-    
-    def __init__(self, mod=None, add_list=None, remove_list=None, label=None):
-
-        if add_list is None: add_list = []
-        if remove_list is None: remove_list = []
-        
-        self.features = add_list.copy()
-        if mod is not None:
-            self.features += [feature for feature in mod.features if feature not in remove_list]
-            
-        self.features = sorted(list(set(self.features)))
-        
-        if label is None:
-            self.label = '_'.join(self.features)
-
-    def __contains__(self, key):
-
-        return (key in self.features)
-    
-    def __str__(self):
-        
-        return self.label
+from py_tools.config.modspec import *  # noqa: F401,F403
