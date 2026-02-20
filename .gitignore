@@ -1,4 +1,17 @@
-__pycache__
-*.swp
+__pycache__/
 *.pyc
+*.pyo
+*.swp
 *.npy
+
+# Packaging / build artifacts
+build/
+dist/
+*.egg-info/
+.eggs/
+pip-wheel-metadata/
+
+# Test/cache artifacts
+.pytest_cache/
+.coverage
+htmlcov/
