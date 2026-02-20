@@ -1,8 +1,10 @@
-import numpy as np
+import warnings
 
-def get_coupon(rm, freq=1, years=30):
+warnings.warn(
+    "Importing from py_tools.financial is deprecated. "
+    "Use py_tools.econ.financial instead.",
+    DeprecationWarning,
+    stacklevel=2,
+)
 
-    rm_t = (1.0 + rm) ** (1.0 / float(freq)) - 1.0
-    q_star = rm_t / (1 - (1.0 / ((1.0 + rm_t) ** (years * freq))))
-    
-    return q_star
+from py_tools.econ.financial import *  # noqa: F401,F403

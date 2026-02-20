@@ -15,6 +15,7 @@ __all__ = (
     "bayesian",
     "data",
     "datasets",
+    "econ",
     "in_out",
     "numerical",
     "plot",

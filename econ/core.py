@@ -7,7 +7,7 @@ Created on Sat Mar  5 07:46:14 2016
 
 import numpy as np
 import scipy.sparse as sp
-from . import walker
+from py_tools import walker
 # from walker import WalkerRandomSampling
 
 # def lse(x, axis=None):
