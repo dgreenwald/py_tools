@@ -77,7 +77,12 @@ py_tools/
 │   ├── bootstrap.py       # Bootstrap inference
 │   ├── local_projections.py  # LP / LP-IV
 │   ├── reghdfe.py         # High-dimensional fixed effects
-│   └── modspec.py         # Model specification
+│   └── machine_learning.py  # ML utilities
+│
+├── bayesian/              # Bayesian inference tools
+│   ├── __init__.py
+│   ├── mcmc.py            # MCMC sampling
+│   └── prior.py           # Prior distributions
 │
 ├── time_series/           # Time series models
 │   ├── __init__.py
@@ -86,15 +91,12 @@ py_tools/
 │   ├── bvar.py            # Bayesian VAR
 │   ├── state_space.py     # State space models (consolidated)
 │   ├── kalman.py          # Kalman filter
-│   ├── hidden_markov.py   # Hidden Markov models
-│   └── aim.py             # AIM solver
+│   └── hidden_markov.py   # Hidden Markov models
 │
 ├── stats/                 # Statistical tools
 │   ├── __init__.py
 │   ├── core.py            # Statistical functions (from stats.py)
-│   ├── discrete.py        # Discrete choice models
 │   ├── inequality.py      # Inequality measures
-│   ├── prior.py           # Prior distributions
 │   └── walker.py          # Walker alias sampling
 │
 ├── numerical/             # Numerical methods
@@ -105,45 +107,54 @@ py_tools/
 │
 ├── compute/               # Parallel & high-performance computing
 │   ├── __init__.py
-│   ├── mcmc.py            # MCMC sampling
-│   ├── mpi_array.py       # MPI parallelization
-│   └── machine_learning.py  # ML utilities
+│   └── mpi_array.py       # MPI parallelization
 │
 ├── data/                  # Data handling & I/O
 │   ├── __init__.py
 │   ├── core.py            # Data manipulation (from data.py)
-│   ├── io.py              # I/O utilities (from in_out.py)
 │   ├── collapser.py       # Data collapsing
-│   ├── containers.py      # Custom data structures
-│   ├── match.py           # Matching algorithms
-│   └── parsing.py         # Text/data parsing
+│   └── match.py           # Matching algorithms
 │
-├── finance/               # Financial & economic tools
+├── in_out/                # I/O and external format interfaces
 │   ├── __init__.py
+│   ├── core.py            # I/O utilities (from in_out.py; renamed from io.py)
+│   └── stata.py           # Stata interface
+│
+├── econ/               # Financial & economic tools
+│   ├── __init__.py
+│   ├── aim.py             # AIM solver
+│   ├── discrete.py        # Discrete choice models
 │   ├── financial.py       # Yield curves, coupon math
 │   └── econ.py            # Economic utilities
 │
-├── visualization/         # Plotting & output
+├── text/                  # Text and code-formatting utilities
 │   ├── __init__.py
-│   ├── plot.py            # Matplotlib wrappers
-│   ├── text.py            # Text formatting
+│   ├── core.py            # Text formatting (from text.py)
+│   ├── parsing.py         # Parsing helpers (from parsing.py)
 │   └── format_code.py     # Code formatting
+│
+├── plot/                  # Plotting and output visuals
+│   ├── __init__.py
+│   └── core.py            # Matplotlib wrappers (from plot.py)
+│
+├── utilities/             # Shared utility helpers and containers
+│   ├── __init__.py
+│   ├── core.py            # General-purpose utilities (from utilities.py)
+│   └── containers.py      # Custom data structures
 │
 ├── scraping/              # Web data acquisition
 │   ├── __init__.py
-│   ├── scrape.py          # General web scraping
-│   └── stata.py           # Stata interface
+│   └── scrape.py          # General web scraping
 │
 ├── config/                # Configuration
 │   ├── __init__.py
-│   └── registry.py        # Config registry (from config_registry.py)
+│   ├── registry.py        # Config registry (from config_registry.py)
+│   └── modspec.py         # Model specification
 │
 ├── datasets/              # Dataset loaders (keep as-is, see Phase 3)
 │   ├── __init__.py
 │   ├── loader.py
 │   └── ... (existing dataset modules)
-│
-├── utilities.py           # Keep at top level as a general-purpose utility module
 │
 └── tests/                 # Test suite (see Phase 5)
     └── ...
