@@ -3,8 +3,11 @@ import numpy as np
 import pandas as pd
 import py_tools.time_series as ts
 
-from py_tools.datasets import defaults
-default_dir = defaults.base_dir() + 'saez/'
+from py_tools.datasets import config
+default_dir = config.base_dir() + 'saez/'
+DATASET_NAME = "saez"
+DESCRIPTION = "Dataset loader for saez."
+
 
 def update_names(df, usecols):
 

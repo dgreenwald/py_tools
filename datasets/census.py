@@ -2,8 +2,21 @@ import glob, os
 import numpy as np
 import pandas as pd
 
-from . import defaults, misc
-default_dir = defaults.base_dir() + 'census/'
+from . import config, misc
+default_dir = config.base_dir() + 'census/'
+DATASET_NAME = "census"
+DESCRIPTION = "Dataset loader for census."
+
+
+def load(data_dir=None, **kwargs):
+    """Load census population data.
+
+    Backward-compatible wrapper around `load_pop`.
+    """
+    if data_dir is not None:
+        kwargs.setdefault('data_dir', data_dir)
+    return load_pop(**kwargs)
+
 
 def load_pop(level, year, data_dir=default_dir, infile=None):
 

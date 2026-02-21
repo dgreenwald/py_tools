@@ -3,9 +3,12 @@ import numpy as np
 import pandas as pd
 import py_tools.time_series as ts
 
-from . import defaults
-default_dir = defaults.base_dir() + 'jst/'
+from . import config
+default_dir = config.base_dir() + 'jst/'
 # data_dir = '/home/dan/Dropbox/data/jst/'
+DATASET_NAME = "jst"
+DESCRIPTION = "Dataset loader for jst."
+
 
 def load(data_dir=default_dir):
 

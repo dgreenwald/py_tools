@@ -4,8 +4,41 @@ import numpy as np
 import pandas as pd
 import re
 
-from . import defaults, crosswalk
-default_dir = defaults.base_dir() + 'irs/'
+from . import config, crosswalk
+default_dir = config.base_dir() + 'irs/'
+DATASET_NAME = "irs"
+DESCRIPTION = "Dataset loader for irs."
+
+
+def load(data_dir=None, **kwargs):
+    """Load IRS dataset variants through a single entrypoint.
+
+    Supported variants via `dataset`:
+    - `county` (default)
+    - `zip`
+    - `zip3_from_county`
+    - `zip3_from_zip`
+    - `county_year` (requires `year`)
+    - `zip_year` (requires `year`)
+    """
+    if data_dir is not None:
+        kwargs.setdefault('data_dir', data_dir)
+
+    dataset = kwargs.pop('dataset', 'county')
+    if dataset == 'county':
+        return load_county(**kwargs)
+    if dataset == 'zip':
+        return load_zip(**kwargs)
+    if dataset == 'zip3_from_county':
+        return load_zip3_from_county(**kwargs)
+    if dataset == 'zip3_from_zip':
+        return load_zip3_from_zip(**kwargs)
+    if dataset == 'county_year':
+        return load_county_year(**kwargs)
+    if dataset == 'zip_year':
+        return load_zip_year(**kwargs)
+    raise ValueError(f"Unsupported dataset variant: {dataset}")
+
 
 def double_list(these_items):
 

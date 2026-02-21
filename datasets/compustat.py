@@ -1,9 +1,27 @@
 import pandas as pd
 
-from . import defaults
-default_dir = defaults.base_dir() + 'compustat/'
+from . import config
+default_dir = config.base_dir() + 'compustat/'
 
 # def load(dataset='quarterly', data_dir=default_dir):
+DATASET_NAME = "compustat"
+DESCRIPTION = "Dataset loader for compustat."
+
+
+def load(data_dir=None, **kwargs):
+    """Load Compustat data by chunk.
+
+    Parameters are passed to either `read_by_chunk` (default) or
+    `read_single_chunk` if `single_chunk=True`.
+    """
+    if data_dir is not None:
+        kwargs.setdefault('data_dir', data_dir)
+
+    single_chunk = kwargs.pop('single_chunk', False)
+    if single_chunk:
+        return read_single_chunk(**kwargs)
+    return read_by_chunk(**kwargs)
+
 
 def read_single_chunk(name, data_dir=default_dir, keep_cols=None, chunksize=10000):
 

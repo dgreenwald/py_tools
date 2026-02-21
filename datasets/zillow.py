@@ -4,9 +4,12 @@ import re
 import numpy as np
 import pandas as pd
 
-from . import defaults, misc
-default_dir = defaults.base_dir() + 'zillow/'
+from . import config, misc
+default_dir = config.base_dir() + 'zillow/'
 # data_dir = '/home/dan/data/irs/'
+DATASET_NAME = "zillow"
+DESCRIPTION = "Dataset loader for zillow."
+
 
 def load(geo, data_dir=default_dir, dataset='Zhvi_AllHomes', reimport=False):
     

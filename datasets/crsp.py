@@ -2,9 +2,12 @@ import numpy as np
 import pandas as pd
 import py_tools.time_series as ts
 
-from . import defaults
-default_dir = defaults.base_dir() + 'crsp/'
+from . import config
+default_dir = config.base_dir() + 'crsp/'
 # data_dir = '/home/dan/Dropbox/data/crsp/'
+DATASET_NAME = "crsp"
+DESCRIPTION = "Dataset loader for crsp."
+
 
 def load(data_dir=default_dir, vintage='2017', **kwargs):
 

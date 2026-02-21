@@ -3,6 +3,9 @@ import os
 import pandas as pd
 
 default_base = os.environ.get('DROP_DIR', '/home/dan/Dropbox/') + 'greenwald_guren/Data/Rents/'
+DATASET_NAME = "rental"
+DESCRIPTION = "Dataset loader for rental."
+
 
 def load(dataset, base_dir=default_base):
 

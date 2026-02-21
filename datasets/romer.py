@@ -1,8 +1,11 @@
 import pandas as pd
 from py_tools.time_series import date_index
 
-from . import defaults
-default_dir = defaults.base_dir() + 'romer/'
+from . import config
+default_dir = config.base_dir() + 'romer/'
+DATASET_NAME = "romer"
+DESCRIPTION = "Dataset loader for romer."
+
 
 def load(data_dir=default_dir):
 

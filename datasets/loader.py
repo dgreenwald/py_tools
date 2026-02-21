@@ -12,13 +12,13 @@ import py_tools.utilities as ut
 
 from py_tools.datasets import fred, nipa, origins, fof
 
-from . import defaults
+from . import config
 
 def load(dataset_list, reimport=False, no_prefix=True, master_dirs={}, **kwargs):
 
     dirs = master_dirs.copy()
     if 'base' not in dirs:
-        dirs['base'] = defaults.base_dir()
+        dirs['base'] = config.base_dir()
     if 'pkl' not in dirs:
         dirs['pkl'] = dirs['base'] + 'pkl/'
 
@@ -52,7 +52,7 @@ def load_dataset(dataset, master_dirs={}, **kwargs):
 
     dirs = master_dirs.copy()
     if 'base' not in dirs:
-        dirs['base'] = defaults.base_dir()
+        dirs['base'] = config.base_dir()
     if 'pkl' not in dirs:
         dirs['pkl'] = dirs['base'] + 'pkl/'
 

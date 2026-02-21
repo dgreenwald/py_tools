@@ -1,9 +1,12 @@
 import pandas as pd
 from py_tools.data import date_index
 
-from . import defaults
-default_dir = defaults.base_dir() + 'datastream/'
+from . import config
+default_dir = config.base_dir() + 'datastream/'
 # data_dir = '/home/dan/Dropbox/data/frm/datastream/'
+DATASET_NAME = "mba"
+DESCRIPTION = "Dataset loader for mba."
+
 
 def load(data_dir=default_dir):
     

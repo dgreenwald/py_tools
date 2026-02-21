@@ -2,8 +2,8 @@ import numpy as np
 import pandas as pd
 import os
 
-from . import defaults, misc
-default_dir = defaults.base_dir() + 'intraday/'
+from . import config, misc
+default_dir = config.base_dir() + 'intraday/'
 
 data_dir = default_dir
 
@@ -14,6 +14,9 @@ data_dir = default_dir
 #    month_start[~ix_start] = date[~ix_start] - pd.tseries.offsets.MonthEnd(1)
 #    
 #    return month_start
+DATASET_NAME = "intraday"
+DESCRIPTION = "Dataset loader for intraday."
+
 
 def load(data_dir=default_dir, reimport=False, data_vintage=2019):
     

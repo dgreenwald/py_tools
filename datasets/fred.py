@@ -7,9 +7,12 @@ pd.core.common.is_list_like = pd.api.types.is_list_like
 from pandas_datareader import data as web
 import pickle
 
-from . import defaults
-default_dir = defaults.base_dir('DAN') + 'fred/'
+from . import config
+default_dir = config.base_dir('DAN') + 'fred/'
 # data_dir = '/home/dan/Dropbox/data/fred/'
+DATASET_NAME = "fred"
+DESCRIPTION = "Dataset loader for fred."
+
 
 def load(codes=None, code_names={}, 
          start=datetime.datetime(1900, 1, 1),

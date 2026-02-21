@@ -1,8 +1,11 @@
 import pandas as pd
 import os
 
-from . import defaults
-default_dir = defaults.base_dir() + 'ahs/'
+from . import config
+default_dir = config.base_dir() + 'ahs/'
+DATASET_NAME = "ahs"
+DESCRIPTION = "Dataset loader for ahs."
+
 
 def load(year, reimport=False, raw_dir='/data/ahs/', data_dir=default_dir,
          **kwargs):

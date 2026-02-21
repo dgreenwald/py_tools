@@ -7,6 +7,9 @@ import pickle
 import os
 default_dir = '/data/fannie/'
 # data_dir = '/data/fannie/'
+DATASET_NAME = "fannie"
+DESCRIPTION = "Dataset loader for fannie."
+
 
 def load(year, q, reimport=False, **kwargs):
 

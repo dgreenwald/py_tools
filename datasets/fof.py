@@ -2,9 +2,12 @@ import pandas as pd
 from . import fred
 from py_tools import time_series as ts
 
-from . import defaults
-default_dir = defaults.base_dir() + 'fof/'
+from . import config
+default_dir = config.base_dir() + 'fof/'
 # data_dir = '/home/dan/Dropbox/data/fof/'
+DATASET_NAME = "fof"
+DESCRIPTION = "Dataset loader for fof."
+
 
 def load(dataset, usecols=None, data_dir=default_dir, vintage='2003', 
          named_only=False, fof_vintage=None, update_names=False):

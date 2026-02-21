@@ -15,7 +15,8 @@ Optional extras:
 ```bash
 python -m pip install -e ".[dev]"       # pytest, flake8, coverage tools
 python -m pip install -e ".[ml]"        # scikit-learn, patsy
-python -m pip install -e ".[scraping]"  # requests, bs4, pandas-datareader
+python -m pip install -e ".[datasets]"  # pandas-datareader, python-dotenv
+python -m pip install -e ".[scraping]"  # requests, bs4
 ```
 
 If you use dataset loaders, set:

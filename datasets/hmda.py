@@ -2,8 +2,22 @@ import numpy as np
 import pandas as pd
 from py_tools import time_series as ts
 
-from . import defaults
-default_dir = defaults.base_dir() + 'hmda/'
+from . import config
+default_dir = config.base_dir() + 'hmda/'
+DATASET_NAME = "hmda"
+DESCRIPTION = "Dataset loader for hmda."
+
+
+def load(data_dir=None, **kwargs):
+    """Load HMDA data from the local HDF store.
+
+    Backward-compatible wrapper around `load_hmda`; expects `yr` in kwargs.
+    """
+    if data_dir is not None:
+        kwargs.setdefault('data_dir', data_dir)
+        kwargs.setdefault('save_dir', data_dir)
+    return load_hmda(**kwargs)
+
 
 def cat(num):
     return list(range(1, num+1))

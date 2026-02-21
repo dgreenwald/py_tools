@@ -2,8 +2,11 @@ import os
 import pandas as pd
 from py_tools import time_series as ts
 
-from . import defaults
-default_dir = defaults.base_dir() + 'fhfa/'
+from . import config
+default_dir = config.base_dir() + 'fhfa/'
+DATASET_NAME = "fhfa"
+DESCRIPTION = "Dataset loader for fhfa."
+
 
 def load(dataset, all_transactions=True, reimport=False, data_dir=default_dir):
     

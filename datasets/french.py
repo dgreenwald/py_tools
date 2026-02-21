@@ -2,9 +2,12 @@ import numpy as np
 import pandas as pd
 import py_tools.time_series as ts
 
-from . import defaults
-default_dir = defaults.base_dir() + 'french/'
+from . import config
+default_dir = config.base_dir() + 'french/'
 # data_dir = '/home/dan/Dropbox/data/french/'
+DATASET_NAME = "french"
+DESCRIPTION = "Dataset loader for french."
+
 
 def load_industry(data_dir=default_dir):
 

@@ -2,8 +2,8 @@ import numpy as np
 import pandas as pd
 import os
 
-from . import defaults, misc
-default_dir = defaults.base_dir() + 'crosswalk/'
+from . import config, misc
+default_dir = config.base_dir() + 'crosswalk/'
 
 data_dir = default_dir
 

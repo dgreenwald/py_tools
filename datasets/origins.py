@@ -12,12 +12,15 @@ import py_tools.time_series as ts
 # base_dir = drop_dir + 'data/'
 # pkl_dir = base_dir + 'pkl/'
 
-from . import defaults
-default_base = defaults.base_dir() + 'origins/'
+from . import config
+default_base = config.base_dir() + 'origins/'
 defaults = {
     var : default_base + var + '/'
     for var in ['gll', 'gll_pred', 'cay_source']
 }
+DATASET_NAME = "origins"
+DESCRIPTION = "Dataset loader for origins."
+
 
 def load(dataset, master_dirs={}, **kwargs):
 

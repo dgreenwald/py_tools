@@ -3,8 +3,11 @@ import pandas as pd
 from py_tools.time_series import date_index
 from py_tools.datasets import misc, ramey
 
-from . import defaults
-default_dir = defaults.base_dir()
+from . import config
+default_dir = config.base_dir()
+DATASET_NAME = "shocks"
+DESCRIPTION = "Dataset loader for shocks."
+
 
 def load(keep_list=None, master_dirs={}):
     """Load data from Ramey shocks file"""

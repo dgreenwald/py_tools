@@ -3,10 +3,13 @@ import os
 import pandas as pd
 import py_tools.time_series as ts
 
-from . import defaults
-default_dir = defaults.base_dir()
+from . import config
+default_dir = config.base_dir()
 
 idx = pd.IndexSlice
+DATASET_NAME = "nipa"
+DESCRIPTION = "Dataset loader for nipa."
+
 
 def get_var_index(nipa_table, vintage='1706', add_prefix=False, **kwargs):
 

@@ -2,10 +2,13 @@ import numpy as np
 import pandas as pd
 import os
 
-from . import defaults, fred, misc
-default_dir = defaults.base_dir() + 'state_income/'
+from . import config, fred, misc
+default_dir = config.base_dir() + 'state_income/'
 
 data_dir = default_dir
+DATASET_NAME = "state_income"
+DESCRIPTION = "Dataset loader for state_income."
+
 
 def load(data_dir=default_dir, reimport=False):
 

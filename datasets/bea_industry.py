@@ -2,8 +2,11 @@ import os
 import numpy as np
 import pandas as pd
 
-from . import defaults, misc
-default_dir = defaults.base_dir() + 'bea_industry/'
+from . import config, misc
+default_dir = config.base_dir() + 'bea_industry/'
+DATASET_NAME = "bea_industry"
+DESCRIPTION = "Dataset loader for bea_industry."
+
 
 def load(freq='q', data_dir=default_dir):
 

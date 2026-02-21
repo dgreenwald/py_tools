@@ -2,9 +2,12 @@ import numpy as np
 import pandas as pd
 import py_tools.time_series as ts
 
-from . import defaults
-default_dir = defaults.base_dir() + 'fama_bliss/'
+from . import config
+default_dir = config.base_dir() + 'fama_bliss/'
 # data_dir = '/home/dan/Dropbox/data/fama_bliss/'
+DATASET_NAME = "fama_bliss"
+DESCRIPTION = "Dataset loader for fama_bliss."
+
 
 def load(data_dir=default_dir):
 

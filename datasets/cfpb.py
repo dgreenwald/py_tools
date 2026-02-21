@@ -3,6 +3,9 @@ from py_tools import time_series as ts
 
 import os
 default_dir = os.environ['PY_TOOLS_DATA_DIR'] + 'cfpb/'
+DATASET_NAME = "cfpb"
+DESCRIPTION = "Dataset loader for cfpb."
+
 
 def process_data(raw_dir='/data/cfpb', data_dir=default_dir):
 
