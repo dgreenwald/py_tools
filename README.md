@@ -47,6 +47,9 @@ You can also import dataset loaders through:
 
 ```python
 from py_tools import datasets
+
+available = datasets.list_datasets()
+df = datasets.load_dataset("fred", codes=["UNRATE"])
 ```
 
 ## Module Overview
