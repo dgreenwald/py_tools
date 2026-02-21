@@ -78,8 +78,8 @@ class ChebFcn:
 
         self.scaled_grid = self.scale_from_grid(self.grid)
         
-    def grid(self):
-        
+    def make_grid(self):
+
         return self.grid.copy()
     
     def fit_vals(self, vals):

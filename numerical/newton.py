@@ -9,17 +9,18 @@ Created on Fri Jul  7 14:15:16 2023
 import numpy as np
 from . import core as nm
 
-def secant(fcn, args, x0, x1, tol=1e-6, max_it_inner=20, max_it_outer=50):
-    
+def secant(fcn, args, x0, x1, tol=1e-6, max_it_inner=20, max_it_outer=50, verbose=True):
+
     it_outer = 0
-    
+
     f0 = fcn(x0, *args)
     f1 = fcn(x1, *args)
-    
+
     while True:
-        
+
         dist = np.abs(f1)[0]
-        print(f"Iteration {it_outer:d}: |f| = {dist:g}")
+        if verbose:
+            print(f"Iteration {it_outer:d}: |f| = {dist:g}")
         
         slope = (f1 - f0) / (x1 - x0)
         step = -f1 / slope
