@@ -7,7 +7,7 @@ from scipy.io import loadmat
 import py_tools.time_series as ts
 
 from . import config
-default_dir = config.base_dir('DAN')
+default_dir = config.base_dir()
 DATASET_NAME = "misc"
 DESCRIPTION = "Dataset loader for misc."
 
@@ -15,7 +15,7 @@ DESCRIPTION = "Dataset loader for misc."
 def load(dataset, user='DAN', master_dirs={}, reimport=False, 
          save_pickle=True, **kwargs):
     
-    default_dir = config.base_dir(user)
+    default_dir = config.base_dir()
     dirs = master_dirs.copy()
     if 'base' not in dirs:
         dirs['base'] = default_dir

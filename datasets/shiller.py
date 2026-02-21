@@ -12,14 +12,14 @@ import pandas as pd
 from py_tools import time_series as ts
 
 from . import config
-default_dir = config.base_dir('DAN')
+default_dir = config.base_dir()
 DATASET_NAME = "shiller"
 DESCRIPTION = "Dataset loader for shiller."
 
 
 def load(vintage='2310', user='DAN', master_dirs={}, freq='Q'):
     
-    default_dir = config.base_dir(user)
+    default_dir = config.base_dir()
     dirs = master_dirs.copy()
     if 'base' not in dirs:
         dirs['base'] = default_dir

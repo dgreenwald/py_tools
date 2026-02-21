@@ -39,17 +39,17 @@ def _ensure_dotenv_loaded():
     _DOTENV_LOADED = True
 
 
-def base_dir(user="DAN"):
+def base_dir():
     """Return base dataset directory as a string ending with a path separator.
 
     Priority:
     1) Explicit environment variable PY_TOOLS_DATA_DIR
     2) Legacy user-specific HOME/Dropbox fallback
     """
-    return str(base_path(user=user)) + os.sep
+    return str(base_path()) + os.sep
 
 
-def base_path(user="DAN"):
+def base_path():
     """Return base dataset directory as a pathlib.Path."""
     _ensure_dotenv_loaded()
 
@@ -57,19 +57,14 @@ def base_path(user="DAN"):
     if env_dir:
         return Path(env_dir).expanduser()
 
-    if user == "DAN":
-        return Path.home() / "Dropbox" / "data"
-    if user == "MARY":
-        return Path.home() / "Dropbox (MIT)" / "data"
-
     return Path.home() / "Dropbox" / "data"
 
 
-def dataset_dir(stub, user="DAN"):
+def dataset_dir(stub):
     """Return a dataset-specific directory as a string ending with separator."""
-    return str(dataset_path(stub, user=user)) + os.sep
+    return str(dataset_path(stub)) + os.sep
 
 
-def dataset_path(stub, user="DAN"):
+def dataset_path(stub):
     """Return a dataset-specific directory path for a subfolder stub."""
-    return base_path(user=user) / stub
+    return base_path() / stub

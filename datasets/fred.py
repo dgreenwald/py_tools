@@ -8,7 +8,7 @@ from pandas_datareader import data as web
 import pickle
 
 from . import config
-default_dir = config.base_dir('DAN') + 'fred/'
+default_dir = config.base_dir() + 'fred/'
 # data_dir = '/home/dan/Dropbox/data/fred/'
 DATASET_NAME = "fred"
 DESCRIPTION = "Dataset loader for fred."
