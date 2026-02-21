@@ -91,11 +91,11 @@ def load_county_year(year, data_dir=default_dir, reimport=False):
         
         print("Loading year {}".format(year))
         if year <= 2009:
-            df_t = import_county_year_to_2009(year, data_dir=default_dir)
+            df_t = import_county_year_to_2009(year, data_dir=data_dir)
         elif year == 2010:
-            df_t = import_county_year_2010(year, data_dir=default_dir)
+            df_t = import_county_year_2010(year, data_dir=data_dir)
         else:
-            df_t = import_geo_year_from_2011(year, 'county', data_dir=default_dir)
+            df_t = import_geo_year_from_2011(year, 'county', data_dir=data_dir)
         
         # print(df_t.columns)
         for var in df_t.columns:

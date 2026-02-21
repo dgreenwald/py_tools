@@ -42,5 +42,9 @@ def read_by_chunk(name, data_dir=default_dir, keep_cols=None, chunksize=10000):
     filepath = data_dir + name + '.sas7bdat'
 
     reader = pd.read_sas(filepath, chunksize=chunksize)
-    return pd.concat([chunk[pd.Index.intersection(chunk.columns, keep_cols)] 
-                            for chunk in reader])
+    if keep_cols is None:
+        return pd.concat([chunk for chunk in reader])
+    return pd.concat([
+        chunk[pd.Index.intersection(chunk.columns, keep_cols)]
+        for chunk in reader
+    ])

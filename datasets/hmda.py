@@ -15,7 +15,8 @@ def load(data_dir=None, **kwargs):
     """
     if data_dir is not None:
         kwargs.setdefault('data_dir', data_dir)
-        kwargs.setdefault('save_dir', data_dir)
+    if 'save_dir' not in kwargs or kwargs.get('save_dir') is None:
+        kwargs['save_dir'] = kwargs.get('data_dir', default_dir)
     return load_hmda(**kwargs)
 
 
