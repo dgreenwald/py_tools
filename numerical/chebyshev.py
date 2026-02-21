@@ -51,9 +51,9 @@ def recurse_tensor(X, TX, n_vec, level):
     
     if level >= 0:
         this_basis = poly(X[:, level], n_vec[level])
-        TX_new = np.hstack((
+        TX_new = np.hstack([
                 this_basis[:, jj][:, np.newaxis] * TX for jj in range(n_vec[level])
-                ))
+                ])
         return recurse_tensor(X, TX_new, n_vec, level - 1)
     else:
         return TX
