@@ -3,9 +3,7 @@ import pandas as pd
 from . import config
 default_dir = config.base_dir() + 'dfa/'
 DATASET_NAME = "dfa"
-DESCRIPTION = "Dataset loader for dfa."
-
-
+DESCRIPTION = "Federal Reserve Distributional Financial Accounts (DFA) dataset loader."
 def load(dataset, levels=True, data_dir=default_dir, **kwargs):
     """Load pre-packaged set of variables"""
     

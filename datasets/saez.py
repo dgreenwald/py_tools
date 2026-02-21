@@ -6,9 +6,7 @@ import py_tools.time_series as ts
 from py_tools.datasets import config
 default_dir = config.base_dir() + 'saez/'
 DATASET_NAME = "saez"
-DESCRIPTION = "Dataset loader for saez."
-
-
+DESCRIPTION = "Saez income share dataset loader."
 def update_names(df, usecols):
 
     mapping = {

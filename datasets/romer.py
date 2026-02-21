@@ -4,9 +4,7 @@ from py_tools.time_series import date_index
 from . import config
 default_dir = config.base_dir() + 'romer/'
 DATASET_NAME = "romer"
-DESCRIPTION = "Dataset loader for romer."
-
-
+DESCRIPTION = "Romer-Romer monetary shock dataset loader."
 def load(data_dir=default_dir):
 
     # data_dir = '/home/dan/Dropbox/data/romer/'

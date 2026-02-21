@@ -12,9 +12,7 @@ from py_tools import in_out
 DEFAULT_FANNIE_DIR = os.environ['HOME'] + '/data/fannie/'
 DEFAULT_FREDDIE_DIR = os.environ['HOME'] + '/data/freddie/'
 DATASET_NAME = "gse"
-DESCRIPTION = "Dataset loader for gse."
-
-
+DESCRIPTION = "GSE mortgage datasets loader (Fannie/Freddie)."
 def cat(num):
     return list(range(1, num+1))
 

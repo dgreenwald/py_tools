@@ -5,9 +5,7 @@ from py_tools import time_series as ts
 from . import config
 default_dir = config.base_dir() + 'hmda/'
 DATASET_NAME = "hmda"
-DESCRIPTION = "Dataset loader for hmda."
-
-
+DESCRIPTION = "Home Mortgage Disclosure Act (HMDA) dataset loader."
 def load(data_dir=None, **kwargs):
     """Load HMDA data from the local HDF store.
 

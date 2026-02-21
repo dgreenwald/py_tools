@@ -25,6 +25,15 @@ If you use dataset loaders, set:
 export PY_TOOLS_DATA_DIR=/path/to/data
 ```
 
+Or create a `.env` file in the repository root (or a parent directory):
+
+```env
+PY_TOOLS_DATA_DIR=/path/to/data
+```
+
+`py_tools.datasets` will load `.env` automatically when `python-dotenv` is installed
+(included in the `datasets` extra).
+
 ## Quick Start
 
 ```python

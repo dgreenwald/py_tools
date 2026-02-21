@@ -8,9 +8,7 @@ default_dir = config.base_dir()
 
 idx = pd.IndexSlice
 DATASET_NAME = "nipa"
-DESCRIPTION = "Dataset loader for nipa."
-
-
+DESCRIPTION = "National Income and Product Accounts (NIPA) dataset loader."
 def get_var_index(nipa_table, vintage='1706', add_prefix=False, **kwargs):
 
     if nipa_table == '10105':

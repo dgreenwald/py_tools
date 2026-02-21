@@ -7,9 +7,7 @@ default_dir = config.base_dir() + 'frm/embs/by_coupon/'
 # data_dir = '/home/dan/Dropbox/data/frm/'
 # embs_dir = data_dir + 'embs/by_coupon/'
 DATASET_NAME = "embs"
-DESCRIPTION = "Dataset loader for embs."
-
-
+DESCRIPTION = "eMBS mortgage prepayment dataset loader."
 def load(embs_dir=default_dir):
 
     var_list = ['CPR', 'RPB', 'Issuance', 'Wac', 'Wam', 'Wala']

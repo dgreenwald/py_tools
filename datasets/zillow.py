@@ -8,9 +8,7 @@ from . import config, misc
 default_dir = config.base_dir() + 'zillow/'
 # data_dir = '/home/dan/data/irs/'
 DATASET_NAME = "zillow"
-DESCRIPTION = "Dataset loader for zillow."
-
-
+DESCRIPTION = "Zillow housing dataset loader."
 def load(geo, data_dir=default_dir, dataset='Zhvi_AllHomes', reimport=False):
     
     geo = geo.capitalize()

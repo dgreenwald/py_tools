@@ -14,9 +14,7 @@ from py_tools import time_series as ts
 from . import config
 default_dir = config.base_dir()
 DATASET_NAME = "shiller"
-DESCRIPTION = "Dataset loader for shiller."
-
-
+DESCRIPTION = "Shiller long-run asset price and valuation dataset loader."
 def load(vintage='2310', user='DAN', master_dirs={}, freq='Q'):
     
     default_dir = config.base_dir()

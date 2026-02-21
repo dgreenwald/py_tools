@@ -7,9 +7,7 @@ default_dir = config.base_dir() + 'state_income/'
 
 data_dir = default_dir
 DATASET_NAME = "state_income"
-DESCRIPTION = "Dataset loader for state_income."
-
-
+DESCRIPTION = "U.S. state income dataset loader."
 def load(data_dir=default_dir, reimport=False):
 
     pkl_file = data_dir + 'state_annual_income_long.pkl'

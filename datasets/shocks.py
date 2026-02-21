@@ -6,9 +6,7 @@ from py_tools.datasets import misc, ramey
 from . import config
 default_dir = config.base_dir()
 DATASET_NAME = "shocks"
-DESCRIPTION = "Dataset loader for shocks."
-
-
+DESCRIPTION = "Merged macro shock series loader (TFP, monetary, EBP, and related shocks)."
 def load(keep_list=None, master_dirs={}):
     """Load data from Ramey shocks file"""
 

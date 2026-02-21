@@ -6,9 +6,7 @@ from . import config
 default_dir = config.base_dir() + 'crsp/'
 # data_dir = '/home/dan/Dropbox/data/crsp/'
 DATASET_NAME = "crsp"
-DESCRIPTION = "Dataset loader for crsp."
-
-
+DESCRIPTION = "CRSP market and return dataset loader."
 def load(data_dir=default_dir, vintage='2017', **kwargs):
 
     infile = 'crsp_{}.csv'.format(vintage)

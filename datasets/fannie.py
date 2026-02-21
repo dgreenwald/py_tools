@@ -8,9 +8,7 @@ import os
 default_dir = '/data/fannie/'
 # data_dir = '/data/fannie/'
 DATASET_NAME = "fannie"
-DESCRIPTION = "Dataset loader for fannie."
-
-
+DESCRIPTION = "Fannie Mae mortgage acquisition/performance dataset loader."
 def load(year, q, reimport=False, **kwargs):
 
     pkl_file = data_dir + '/Acquisition_{0}Q{1}.pkl'.format(year, q)

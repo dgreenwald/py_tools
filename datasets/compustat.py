@@ -5,9 +5,7 @@ default_dir = config.base_dir() + 'compustat/'
 
 # def load(dataset='quarterly', data_dir=default_dir):
 DATASET_NAME = "compustat"
-DESCRIPTION = "Dataset loader for compustat."
-
-
+DESCRIPTION = "Compustat dataset loader (SAS chunk readers)."
 def load(data_dir=None, **kwargs):
     """Load Compustat data by chunk.
 

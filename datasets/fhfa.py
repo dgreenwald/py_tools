@@ -5,9 +5,7 @@ from py_tools import time_series as ts
 from . import config
 default_dir = config.base_dir() + 'fhfa/'
 DATASET_NAME = "fhfa"
-DESCRIPTION = "Dataset loader for fhfa."
-
-
+DESCRIPTION = "FHFA house price index dataset loader."
 def load(dataset, all_transactions=True, reimport=False, data_dir=default_dir):
     
     suffix = dataset

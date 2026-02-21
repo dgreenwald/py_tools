@@ -4,9 +4,7 @@ from py_tools import time_series as ts
 import os
 default_dir = os.environ['PY_TOOLS_DATA_DIR'] + 'cfpb/'
 DATASET_NAME = "cfpb"
-DESCRIPTION = "Dataset loader for cfpb."
-
-
+DESCRIPTION = "Consumer Financial Protection Bureau (CFPB) complaint dataset loader."
 def process_data(raw_dir='/data/cfpb', data_dir=default_dir):
 
     df = pd.read_csv(raw_dir + 'mortgage_complaints.csv')

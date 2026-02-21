@@ -5,9 +5,7 @@ from py_tools.time_series import date_index
 from . import config
 default_dir = config.base_dir()
 DATASET_NAME = "ramey"
-DESCRIPTION = "Dataset loader for ramey."
-
-
+DESCRIPTION = "Ramey macro shock datasets loader."
 def load(dataset, master_dirs={}):
     """Load data from Ramey shocks file"""
 

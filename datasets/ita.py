@@ -8,9 +8,7 @@ default_dir = config.base_dir()
 
 idx = pd.IndexSlice
 DATASET_NAME = "ita"
-DESCRIPTION = "Dataset loader for ita."
-
-
+DESCRIPTION = "BEA International Transactions Accounts (ITA) dataset loader."
 def load(table, data_dir=default_dir+'/ita/', quarterly=True, sa=True):
     
     df = pd.read_csv(data_dir + 'Ita_T' + table + '.csv', skiprows=4, 

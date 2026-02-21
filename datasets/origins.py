@@ -19,9 +19,7 @@ defaults = {
     for var in ['gll', 'gll_pred', 'cay_source']
 }
 DATASET_NAME = "origins"
-DESCRIPTION = "Dataset loader for origins."
-
-
+DESCRIPTION = "Legacy origins/source datasets loader (stock wealth and predictability inputs)."
 def load(dataset, master_dirs={}, **kwargs):
 
     dirs = master_dirs.copy()

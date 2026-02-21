@@ -6,9 +6,7 @@ from . import config
 default_dir = config.base_dir() + 'fama_bliss/'
 # data_dir = '/home/dan/Dropbox/data/fama_bliss/'
 DATASET_NAME = "fama_bliss"
-DESCRIPTION = "Dataset loader for fama_bliss."
-
-
+DESCRIPTION = "Fama-Bliss bond yield dataset loader."
 def load(data_dir=default_dir):
 
     infile = data_dir + 'fbdata.csv'

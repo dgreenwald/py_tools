@@ -7,9 +7,7 @@ import re
 from . import config, crosswalk
 default_dir = config.base_dir() + 'irs/'
 DATASET_NAME = "irs"
-DESCRIPTION = "Dataset loader for irs."
-
-
+DESCRIPTION = "IRS tax statistics dataset loader."
 def load(data_dir=None, **kwargs):
     """Load IRS dataset variants through a single entrypoint.
 

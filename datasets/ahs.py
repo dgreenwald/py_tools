@@ -4,9 +4,7 @@ import os
 from . import config
 default_dir = config.base_dir() + 'ahs/'
 DATASET_NAME = "ahs"
-DESCRIPTION = "Dataset loader for ahs."
-
-
+DESCRIPTION = "American Housing Survey (AHS) dataset loader."
 def load(year, reimport=False, raw_dir='/data/ahs/', data_dir=default_dir,
          **kwargs):
 

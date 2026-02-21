@@ -6,9 +6,7 @@ from . import config
 default_dir = config.base_dir() + 'qd/'
 # data_dir = '/home/dan/Dropbox/data/qd/'
 DATASET_NAME = "qd"
-DESCRIPTION = "Dataset loader for qd."
-
-
+DESCRIPTION = "FRED-QD dataset loader for Stock and Watson (2012)-style macro series."
 def load(vintage='2015-11', data_dir=default_dir):
 
     infile = data_dir + vintage + '.csv'

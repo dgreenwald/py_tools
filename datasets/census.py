@@ -5,9 +5,7 @@ import pandas as pd
 from . import config, misc
 default_dir = config.base_dir() + 'census/'
 DATASET_NAME = "census"
-DESCRIPTION = "Dataset loader for census."
-
-
+DESCRIPTION = "U.S. Census population dataset loader."
 def load(data_dir=None, **kwargs):
     """Load census population data.
 

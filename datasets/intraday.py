@@ -15,9 +15,7 @@ data_dir = default_dir
 #    
 #    return month_start
 DATASET_NAME = "intraday"
-DESCRIPTION = "Dataset loader for intraday."
-
-
+DESCRIPTION = "Intraday monetary policy shock dataset loader."
 def load(data_dir=default_dir, reimport=False, data_vintage=2019):
     
     pkl_file = data_dir + 'intraday_{:d}.pkl'.format(data_vintage)

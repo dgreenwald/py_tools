@@ -11,9 +11,7 @@ from . import config
 default_dir = config.base_dir() + 'fred/'
 # data_dir = '/home/dan/Dropbox/data/fred/'
 DATASET_NAME = "fred"
-DESCRIPTION = "Dataset loader for fred."
-
-
+DESCRIPTION = "FRED macroeconomic time series dataset loader."
 def load(codes=None, code_names={}, 
          start=datetime.datetime(1900, 1, 1),
          end = datetime.datetime.today(),

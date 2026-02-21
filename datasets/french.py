@@ -6,9 +6,7 @@ from . import config
 default_dir = config.base_dir() + 'french/'
 # data_dir = '/home/dan/Dropbox/data/french/'
 DATASET_NAME = "french"
-DESCRIPTION = "Dataset loader for french."
-
-
+DESCRIPTION = "Kenneth French data library dataset loader."
 def load_industry(data_dir=default_dir):
 
     infile = data_dir + '49_Industry_Portfolios.CSV'

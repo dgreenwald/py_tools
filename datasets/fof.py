@@ -6,9 +6,7 @@ from . import config
 default_dir = config.base_dir() + 'fof/'
 # data_dir = '/home/dan/Dropbox/data/fof/'
 DATASET_NAME = "fof"
-DESCRIPTION = "Dataset loader for fof."
-
-
+DESCRIPTION = "Federal Reserve Financial Accounts (FoF) dataset loader."
 def load(dataset, usecols=None, data_dir=default_dir, vintage='2003', 
          named_only=False, fof_vintage=None, update_names=False):
     """Load pre-packaged set of variables"""

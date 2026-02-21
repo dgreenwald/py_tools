@@ -9,9 +9,7 @@ import py_tools.time_series as ts
 from . import config
 default_dir = config.base_dir()
 DATASET_NAME = "misc"
-DESCRIPTION = "Dataset loader for misc."
-
-
+DESCRIPTION = "Miscellaneous one-off research datasets loader."
 def load(dataset, user='DAN', master_dirs={}, reimport=False, 
          save_pickle=True, **kwargs):
     

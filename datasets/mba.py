@@ -5,9 +5,7 @@ from . import config
 default_dir = config.base_dir() + 'datastream/'
 # data_dir = '/home/dan/Dropbox/data/frm/datastream/'
 DATASET_NAME = "mba"
-DESCRIPTION = "Dataset loader for mba."
-
-
+DESCRIPTION = "Mortgage Bankers Association (MBA) dataset loader."
 def load(data_dir=default_dir):
     
     col_names = {
