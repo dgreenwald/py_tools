@@ -18,7 +18,7 @@ def secant(fcn, args, x0, x1, tol=1e-6, max_it_inner=20, max_it_outer=50, verbos
 
     while True:
 
-        dist = np.abs(f1)[0]
+        dist = float(np.abs(f1))
         if verbose:
             print(f"Iteration {it_outer:d}: |f| = {dist:g}")
         
