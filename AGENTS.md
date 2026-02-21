@@ -5,7 +5,7 @@ This repository is a flat Python toolkit focused on numerical economics and data
 - Core modules live at the repo root (for example `state_space.py`, `mcmc.py`, `time_series.py`, `numerical.py`).
 - Dataset loaders and source-specific ingestion code live in `datasets/`.
 - Tests and executable validation scripts live in `test/`.
-- Legacy experiments are kept in `old/` and should not be used for new features.
+- Legacy experiments have been removed; use git history for historical reference and do not reintroduce them for new features.
 
 Imports assume the package name `py_tools`; set `PYTHONPATH` to the parent of this directory.
 
