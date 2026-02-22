@@ -1,5 +1,5 @@
 import re
-from collections import OrderedDict, UserDict
+from collections import OrderedDict
 from collections.abc import Mapping
 
 class MySet(set):
@@ -75,14 +75,27 @@ class PresetDict(dict):
         
         super().update(other)
         
-class UniqueList(UserDict):
-    
+class UniqueList:
+    """List that silently ignores duplicate entries on construction and addition."""
+
     def __init__(self, iterable=None):
         self.data = []
         if iterable is not None:
             for x in iterable:
                 if x not in self.data:
                     self.data.append(x)
+
+    def __repr__(self):
+        return "{}({!r})".format(type(self).__name__, self.data)
+
+    def __len__(self):
+        return len(self.data)
+
+    def __iter__(self):
+        return iter(self.data)
+
+    def __contains__(self, item):
+        return item in self.data
 
     def __add__(self, other):
         unique = UniqueList([x for x in other if x not in self.data])
@@ -91,20 +104,14 @@ class UniqueList(UserDict):
     def __radd__(self, other):
         unique = UniqueList([x for x in other if x not in self.data])
         return self.data + unique.data
-    
-    def __iadd__(self, other):
-        unique = UniqueList([x for x in other if x not in self.data])
-        return self.data.__iadd__(unique.data)
 
-#def override_preset_dict(preset, other):
-#    """Update preset dict, replacing even if value already set"""
-#
-#    temp = preset.copy()
-#    preset = PresetDict(other)
-#    preset.update(temp)
-#
-#    return preset 
-            
+    def __iadd__(self, other):
+        for x in other:
+            if x not in self.data:
+                self.data.append(x)
+        return self
+
+        
 def replace_keys(my_dict, orig, repl):
     """Replace keys in a dict according to a regex pattern"""
 
@@ -115,8 +122,9 @@ def replace_keys(my_dict, orig, repl):
     return None
 
 def replace_keys_items(my_dict, orig, repl):
-    """Replace keys and items in a dict according to a regex pattern"""
+    """Replace keys and string items in a dict according to a regex pattern"""
 
     for key in list(my_dict.keys()):
         new_key = re.sub(orig, repl, key)
-        my_dict[new_key] = re.sub(orig, repl, my_dict.pop(key)) 
+        value = my_dict.pop(key)
+        my_dict[new_key] = re.sub(orig, repl, value) if isinstance(value, str) else value
