@@ -1,5 +1,6 @@
 """Tests for py_tools.scraping.scrape"""
 
+import importlib.util
 import pytest
 from unittest.mock import patch, MagicMock
 
@@ -103,6 +104,10 @@ class TestStripHtml:
 # url_to_nltk
 # ---------------------------------------------------------------------------
 
+@pytest.mark.skipif(
+    importlib.util.find_spec("nltk") is None,
+    reason="nltk is an optional dependency",
+)
 class TestUrlToNltk:
     """Tests for url_to_nltk.  nltk.word_tokenize is mocked so that
     the punkt_tab corpus data resource does not need to be present."""

@@ -1,5 +1,4 @@
 from bs4 import BeautifulSoup
-import nltk
 import requests
 import time
 
@@ -42,6 +41,10 @@ stripHTML = strip_html
 
 def url_to_nltk(url, lower=False):
     """Load URL directly into NLTK"""
+    try:
+        import nltk
+    except ImportError as exc:
+        raise ImportError("url_to_nltk requires the optional dependency 'nltk'.") from exc
 
     raw = strip_html(url)
     if raw is None:
