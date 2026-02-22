@@ -12,7 +12,7 @@ from . import core as stats
 
 def compute_gini(df, var, wvar=None):
 
-    if var is None:
+    if wvar is None:
         df_by_var = df.groupby(var)[var].count()
     else:
         df_by_var = df.groupby(var)[wvar].sum()

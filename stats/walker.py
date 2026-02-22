@@ -69,32 +69,3 @@ class WalkerRandomSampling(object):
         j = randint(self.n, size=count)
         k = where(u <= self.prob[j], j, self.inx[j])
         return self.keys[k] if self.keys is not None else k
-
-
-#if __name__ == "__main__":
-#    # little examples, self-contained --
-#    N = 5
-#    Nrand = 1000
-#    randomseed = 1
-#
-#    if randomseed:
-#        seed(randomseed)
-#
-#    print Nrand, "Walker random sampling with weights .1 .2 .3 .4:"
-#    wrand = WalkerRandomSampling(arange(1, N))
-#    nrand = bincount(wrand.random(Nrand)).tolist()
-#    s = str(nrand)
-#    print s
-#    if N==5 and Nrand==1000 and randomseed==1:
-#        assert s == "[97, 207, 316, 380]"
-#
-#    print Nrand, "Walker random sampling, strings with weights .1 .2 .3 .4:"
-#    abcd = dict(A=1, D=4, C=3, B=2)
-#    wrand = WalkerRandomSampling(abcd.values(), abcd.keys())
-#    nrand = defaultdict(int)
-#    for sample in wrand.random(Nrand):
-#        nrand[sample] += 1
-#    s = str(sorted(nrand.iteritems()))
-#    print s
-#    if N==5 and Nrand==1000 and randomseed==1:
-#        assert s == "[('A', 85), ('B', 199), ('C', 343), ('D', 373)]"

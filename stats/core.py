@@ -3,8 +3,6 @@ from scipy.stats import norm, lognorm
 
 def weighted_quantile(values_in, weights_in, quantiles, sort=True, C=0.5):
     
-    # assert (np.all(np.isfinite(values_in)) and np.all(np.isfinite(weights_in)))
-    
     ix_keep = np.isfinite(values_in) & np.isfinite(weights_in) & (weights_in > 0.0)
     if np.sum(ix_keep) == 1:
         return np.full(len(quantiles), values_in[ix_keep][0])
@@ -13,8 +11,11 @@ def weighted_quantile(values_in, weights_in, quantiles, sort=True, C=0.5):
 
     if sort:
         sorter = np.argsort(values_in[ix_keep])
-        values = values_in[ix_keep][sorter].astype(np.float64)
-        weights = weights_in[ix_keep][sorter].astype(np.float64)
+    else:
+        sorter = np.arange(np.sum(ix_keep))
+
+    values = values_in[ix_keep][sorter].astype(np.float64)
+    weights = weights_in[ix_keep][sorter].astype(np.float64)
     
     S = np.cumsum(weights)
     q_grid = (S - C * weights) / (S[-1] + (1.0 - 2.0 * C) * weights)
@@ -49,12 +50,6 @@ def weighted_var(values_in, weights_in):
 
 def weighted_std(values_in, weights_in):
 
-#    residuals = values_in - weighted_mean(values_in, weights_in)
-#    num = np.dot(residuals**2, weights_in)
-#    denom = np.sum(weights_in)
-#
-#    return np.sqrt(num / denom)
-    
     return np.sqrt(weighted_var(values_in, weights_in))
 
 def std_norm_z_star(p_val, two_sided=True):
