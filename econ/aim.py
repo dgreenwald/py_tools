@@ -97,7 +97,23 @@ class KleinObj:
             self.A, self.B, sort='ouc', output='complex'
         )  
 
-        # TODO: checks here
+        # Basic existence/uniqueness diagnostics (Blanchard-Kahn style).
+        eig_tol = 1e-10
+        eig_abs = np.full(alp.shape, np.inf, dtype=float)
+        finite_bet = np.abs(bet) > eig_tol
+        eig_abs[finite_bet] = np.abs(alp[finite_bet] / bet[finite_bet])
+        n_stable = int(np.sum(eig_abs < (1.0 - eig_tol)))
+        n_unit = int(np.sum(np.abs(eig_abs - 1.0) <= eig_tol))
+
+        if n_unit > 0:
+            raise ValueError(
+                "Klein solver encountered generalized eigenvalues on the unit circle."
+            )
+        if n_stable != self.n_pre:
+            raise ValueError(
+                "Blanchard-Kahn condition failed: expected {} stable roots, found {}."
+                .format(self.n_pre, n_stable)
+            )
 
         Q_star = np.asmatrix(Q).H 
         Q1 = np.asmatrix(Q_star[:self.n_pre, :])
@@ -115,6 +131,11 @@ class KleinObj:
         T11 = np.asmatrix(T[:self.n_pre, :self.n_pre])
         T12 = np.asmatrix(T[:self.n_pre, self.n_pre:])
         T22 = np.asmatrix(T[self.n_pre:, self.n_pre:])
+
+        if Z12.shape[0] != Z12.shape[1]:
+            raise ValueError(
+                "Klein solver requires square Z12 block; got shape {}.".format(Z12.shape)
+            )
 
         G_xc = Z11 * np.linalg.inv(Z12)
         H_xc = Z11 * (np.linalg.solve(S11, T11)) * np.linalg.inv(Z11)
@@ -397,4 +418,3 @@ class AimObj:
         self.B = self.Z[:self.neq, :self.neq * self.nlag]
 
         return None
-

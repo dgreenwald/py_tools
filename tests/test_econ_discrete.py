@@ -10,6 +10,7 @@ from py_tools.econ.discrete import (
     combine_markov_chains,
     drop_low_probs,
     DiscreteModel,
+    LifeCycleModel,
 )
 
 
@@ -187,3 +188,21 @@ class TestDiscreteModel:
         model = self._make_model()
         model.solve()
         assert np.all(np.isfinite(model.V))
+
+
+class TestLifeCycleModelInitialization:
+    def test_nested_lists_are_not_aliased(self):
+        Nx = 2
+        Nz = 2
+        Nt = 3
+        x_grid = np.array([[0.0], [1.0]])
+        z_grid = np.array([[0.0], [1.0]])
+        Pz = np.array([[0.5, 0.5], [0.5, 0.5]])
+        flow_lists = [[np.zeros((Nx, Nx)) for _ in range(Nz)] for _ in range(Nt)]
+        terminal_list = [np.zeros((1, Nx)) for _ in range(Nz)]
+
+        model = LifeCycleModel(0.95, flow_lists, terminal_list, x_grid, z_grid, Pz)
+
+        model.v_lists[0][0][0, 0] = 123.0
+        assert model.v_lists[1][0][0, 0] == 0.0
+        assert model.v_lists[0][1][0, 0] == 0.0

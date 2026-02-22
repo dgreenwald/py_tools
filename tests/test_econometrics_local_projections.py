@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 import pytest
 from py_tools.econometrics.local_projections import (
-    lag_var, add_lags, add_leads, formula_lags, get_formula, LocalProjection,
+    lag_var, add_lags, add_leads, formula_lags, get_formula, estimate, LocalProjection,
 )
 
 
@@ -131,3 +131,17 @@ class TestLocalProjection:
     def test_df_stored(self, simple_df):
         lp = LocalProjection(df=simple_df)
         assert lp.df is simple_df
+
+
+class TestEstimate:
+    def test_se_matches_attached_covariance_estimator(self, simple_df):
+        fr_list, x, se = estimate(
+            simple_df,
+            y_var="y",
+            shock_var="x",
+            periods=3,
+            shock_lags=0,
+            y_lags=0,
+        )
+        assert len(fr_list) == 3
+        assert np.isclose(se[1], fr_list[1].results.bse[1])

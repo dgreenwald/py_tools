@@ -68,9 +68,9 @@ def reghdfe_formula(df, formula, fes=None, weight_var=None, se_type='robust',
     tol : float, optional
         Convergence tolerance passed to the within-transformation absorber.
         Default is ``1e-12``.
-    cluster : ignored
-        Reserved for future cluster-robust standard errors; not yet
-        implemented.
+    cluster : object, optional
+        Cluster specification for cluster-robust standard errors. Currently not
+        implemented; passing a non-``None`` value raises ``NotImplementedError``.
 
     Returns
     -------
@@ -86,7 +86,12 @@ def reghdfe_formula(df, formula, fes=None, weight_var=None, se_type='robust',
     for both the number of regressors and the number of absorbed fixed-effect
     groups.
     """
-    if fes is None: fes = []
+    if fes is None:
+        fes = []
+    if cluster is not None:
+        raise NotImplementedError(
+            "cluster-robust standard errors are not implemented in reghdfe_formula yet."
+        )
     
     unweighted = (weight_var is None)
     

@@ -1,5 +1,3 @@
-import numpy as np
-
 def get_coupon(rm, freq=1, years=30):
     """Compute the coupon rate for a par bond.
 

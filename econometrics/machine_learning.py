@@ -99,8 +99,10 @@ class RandomForestWrapper:
             If ``True``, skip label extraction (``self.labels`` will be
             ``None``).  Default is ``False``.
         """
-        if continuous_vars is None: continuous_vars = []
-        if category_vars is None: category_vars = []
+        if continuous_vars is None:
+            continuous_vars = []
+        if category_vars is None:
+            category_vars = []
         
         self.label_var = label_var
         self.continuous_vars = continuous_vars
@@ -285,8 +287,10 @@ def complete_estimation(df, label_var, continuous_vars=None, category_vars=None,
     rfw : RandomForestWrapper
         Fitted wrapper instance.
     """
-    if continuous_vars is None: continuous_vars = []
-    if category_vars is None: category_vars = []
+    if continuous_vars is None:
+        continuous_vars = []
+    if category_vars is None:
+        category_vars = []
     
     rfw = RandomForestWrapper(data=df, **kwargs)
     rfw.set_labels_features(label_var, continuous_vars, category_vars)
@@ -446,8 +450,10 @@ def get_labels_features(df, label_var, continuous_vars=None,
     names : list of str
         Feature column names (continuous names followed by dummy names).
     """
-    if continuous_vars is None: continuous_vars = []
-    if category_vars is None: category_vars = []
+    if continuous_vars is None:
+        continuous_vars = []
+    if category_vars is None:
+        category_vars = []
 
     feature_list = [df[continuous_vars]]
     for var in category_vars:

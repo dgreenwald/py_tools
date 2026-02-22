@@ -211,12 +211,17 @@ def estimate(df_in, y_var, shock_var, control_vars=None, fe_vars=None,
     x : ndarray of shape (periods,)
         Point estimates of the impulse-response coefficients at each horizon.
     se : ndarray of shape (periods,)
-        HC0 standard errors for each horizon's impulse-response coefficient.
+        Standard errors for each horizon's impulse-response coefficient from
+        the covariance estimator attached to each fitted regression result
+        (HAC/Newey-West when ``nw_lags > 0``).
     """
 
-    if control_vars is None: control_vars = []
-    if fe_vars is None: fe_vars = []
-    if control_lags is None: control_lags = {}
+    if control_vars is None:
+        control_vars = []
+    if fe_vars is None:
+        fe_vars = []
+    if control_lags is None:
+        control_lags = {}
 
     # Copy relevant dataframe columns
     unique_controls = [var for var in control_vars if var not in [y_var, shock_var]]
@@ -248,7 +253,9 @@ def estimate(df_in, y_var, shock_var, control_vars=None, fe_vars=None,
     for jj in range(periods):
 
         x[jj] = fr_list[jj].results.params[1]
-        se[jj] = fr_list[jj].results.HC0_se[1]
+        # Use the covariance estimator currently attached to `results`
+        # (HAC/Newey-West for jj > 0, robust default otherwise).
+        se[jj] = fr_list[jj].results.bse[1]
         
     return fr_list, x, se
 

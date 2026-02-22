@@ -493,8 +493,14 @@ class LifeCycleModel:
         self.bP1 = np.kron(self.bP, np.ones((self.Nx, 1)))
 
         # Initializations
-        self.v_lists = self.Nt * [self.Nz * [np.zeros((self.Nx, 1))]]
-        self.index_lists = self.Nt * [self.Nz * [np.zeros((self.Nx, 1)).astype(int)]]
+        self.v_lists = [
+            [np.zeros((self.Nx, 1)) for _ in range(self.Nz)]
+            for _ in range(self.Nt)
+        ]
+        self.index_lists = [
+            [np.zeros((self.Nx, 1), dtype=int) for _ in range(self.Nz)]
+            for _ in range(self.Nt)
+        ]
 
     def solve(self):
         """Solve the life-cycle model by backward induction.
