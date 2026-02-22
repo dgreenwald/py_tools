@@ -10,7 +10,7 @@ from . import config
 default_dir = config.base_dir()
 DATASET_NAME = "misc"
 DESCRIPTION = "Miscellaneous one-off research datasets loader."
-def load(dataset, user='DAN', master_dirs={}, reimport=False,
+def load(dataset, master_dirs={}, reimport=False,
          save_pickle=True, **kwargs):
     """Load a one-off miscellaneous dataset from pickle cache.
 
@@ -22,8 +22,6 @@ def load(dataset, user='DAN', master_dirs={}, reimport=False,
     ----------
     dataset : str
         Name of the one-off dataset to load.
-    user : str, optional
-        User identifier (currently unused, reserved for multi-user setups).
     master_dirs : dict, optional
         Override directory paths.  Recognised key is ``'base'``.
     reimport : bool, optional

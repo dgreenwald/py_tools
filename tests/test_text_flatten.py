@@ -26,6 +26,7 @@ from py_tools.text.flatten import (
     replace_commands_dynamic,
     get_figure_labels,
     flatten_text,
+    flatten,
 )
 
 
@@ -86,6 +87,11 @@ class TestReplaceContent:
         result, after = replace_content("{a}{b} rest", cmd)
         assert result == r"\frac{a}{b}"
         assert after == " rest"
+
+    def test_raises_for_ten_or_more_args(self):
+        cmd = Command("too_many", 10, "")
+        with pytest.raises(ValueError, match="fewer than 10"):
+            replace_content("", cmd)
 
 
 # --- replace_command ---
@@ -506,3 +512,18 @@ class TestFlattenText:
         result = flatten_text(text, commands_to_replace=[cmd],
                               do_remove_comments_from_text=False)
         assert "Hello" in result
+
+
+class TestFlatten:
+    def test_flatten_does_not_change_cwd(self, tmp_path):
+        root = tmp_path / "proj"
+        root.mkdir()
+        (root / "part.tex").write_text("included")
+        (root / "main.tex").write_text("\\begin{document}\\input{part}\\end{document}")
+
+        cwd_before = os.getcwd()
+        result = flatten(infile=str(root / "main.tex"), outfile=None)
+        cwd_after = os.getcwd()
+
+        assert "included" in result
+        assert cwd_after == cwd_before

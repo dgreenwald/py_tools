@@ -1,5 +1,3 @@
-from tabulate import tabulate
-
 import py_tools.utilities as ut
 
 TSTRUT = '\\rule{0pt}{2.6ex}'
@@ -590,7 +588,8 @@ def join_vertical(table_list, header_list):
     for (table, header) in zip(table_list, header_list):
 
         # Add header
-        if offset > 0: full_hlines.append(offset - 1)
+        if offset > 0:
+            full_hlines.append(offset - 1)
         full_contents.append(table.multicolumn_row(header))
         full_hlines.append(offset)
         offset += 1
@@ -672,7 +671,7 @@ def close_latex(fid):
 def regression_table(results, var_names=None, vertical=False, tstat=False,
                      cov_type='HC0_se', floatfmt='4.3f', 
                      print_vars=None,
-                     stats=['rsquared_adj'], **kwargs):
+                     stats=None, **kwargs):
     """Build a :class:`Table` from a regression results object.
 
     Parameters
@@ -711,6 +710,9 @@ def regression_table(results, var_names=None, vertical=False, tstat=False,
     Table
         Formatted regression table.
     """
+    if stats is None:
+        stats = ['rsquared_adj']
+
     tex_stats = {
         'rsquared' : 'R^2',
         'rsquared_adj' : '\\bar{R}^2'

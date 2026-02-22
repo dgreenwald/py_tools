@@ -14,7 +14,7 @@ from . import config
 default_dir = config.base_dir()
 DATASET_NAME = "shiller"
 DESCRIPTION = "Shiller long-run asset price and valuation dataset loader."
-def load(vintage='2310', user='DAN', master_dirs={}, freq='Q'):
+def load(vintage='2310', master_dirs={}, freq='Q'):
     """Load Shiller long-run equity price/yield data from Excel.
 
     Reads the Shiller IE data Excel file for the specified vintage, selects
@@ -26,9 +26,6 @@ def load(vintage='2310', user='DAN', master_dirs={}, freq='Q'):
     vintage : str, optional
         Date code identifying the data vintage (e.g. ``'2310'`` for October
         2023).
-    user : str, optional
-        User identifier used for directory resolution (currently unused
-        internally but reserved for future multi-user path logic).
     master_dirs : dict, optional
         Override directory paths. If ``'base'`` key is absent, the default
         base directory from config is used.

@@ -6,7 +6,8 @@ Created on Tue Apr  8 14:34:39 2025
 @author: dan
 """
 
-import os, shutil
+import os
+import shutil
 from py_tools.text import parsing as par
 import re
 from collections import namedtuple
@@ -94,17 +95,21 @@ def replace_content(text, command):
 
     Raises
     ------
-    AssertionError
+    ValueError
         If ``command.nargs >= 10`` (double-digit argument numbers are not
         supported) or if the number of extracted arguments does not match
         ``command.nargs``.
     """
     # If we go to double digits there will be issues with the regex, where #10 catches #1, etc.
-    assert command.nargs < 10
+    if command.nargs >= 10:
+        raise ValueError(
+            "replace_content only supports commands with fewer than 10 arguments."
+        )
     
     new_content = command.content
     arguments, text = get_arguments(text, command.nargs)
-    assert len(arguments) == command.nargs
+    if len(arguments) != command.nargs:
+        raise ValueError("Unexpected argument count while replacing LaTeX command content.")
     for ii, argument in enumerate(arguments):
         arg_no = ii + 1
         new_content = re.sub(rf'#{arg_no}', re.escape(argument), new_content)
@@ -461,6 +466,28 @@ def read_if_exists(filepath):
             return fid.read()
     else:
         return None
+
+def _read_input_file_and_path(filepath, base_dir=None):
+    """Read a LaTeX ``\\input`` target and return its text plus resolved path."""
+    filepath = remove_brackets(filepath)
+
+    candidates = [filepath, filepath + '.tex']
+    if base_dir is not None:
+        candidates.extend([
+            os.path.join(base_dir, filepath),
+            os.path.join(base_dir, filepath + '.tex'),
+        ])
+
+    seen = set()
+    for candidate in candidates:
+        if candidate in seen:
+            continue
+        seen.add(candidate)
+        text = read_if_exists(candidate)
+        if text is not None:
+            return text, candidate
+
+    return None, None
     
 def remove_brackets(text):
     """Recursively strip all outermost ``{...}`` braces from a text string.
@@ -485,7 +512,7 @@ def remove_brackets(text):
     else:
         return text
     
-def read_input_file(filepath):
+def read_input_file(filepath, base_dir=None):
     """Read a LaTeX ``\\input`` target file, trying with and without ``.tex``.
 
     Parameters
@@ -501,19 +528,7 @@ def read_input_file(filepath):
         File contents if the file (or the file with ``.tex`` appended) is
         found, otherwise ``None``.
     """
-    # filepath = filepath_in.strip()
-    
-    filepath = remove_brackets(filepath)
-    
-    # Try to load in file
-    text = read_if_exists(filepath)
-    if text is not None:
-        return text
-    
-    # If we failed, try adding the .tex extension
-    backup_path = filepath + '.tex'
-    text = read_if_exists(backup_path)
-    
+    text, _ = _read_input_file_and_path(filepath, base_dir=base_dir)
     return text
 
 def remove_unused_commands(text, command_list=None, defn_list=None):
@@ -538,8 +553,10 @@ def remove_unused_commands(text, command_list=None, defn_list=None):
     str
         Text with all unused command/definition declarations removed.
     """
-    if command_list is None: command_list = []
-    if defn_list is None: defn_list = []
+    if command_list is None:
+        command_list = []
+    if defn_list is None:
+        defn_list = []
     
     done = False
     while not done:
@@ -694,7 +711,7 @@ def get_figure_labels(text):
             
     return figures
 
-def replace_figures(text, aux_file, figure_dir_in_text=None, figure_dir_actual_location=None):
+def replace_figures(text, aux_file, figure_dir_in_text=None, figure_dir_actual_location=None, base_dir=None):
     """Rename and copy figure files, updating their paths in the LaTeX source.
 
     For each figure whose label appears in the ``.aux`` file, the image is
@@ -736,13 +753,17 @@ def replace_figures(text, aux_file, figure_dir_in_text=None, figure_dir_actual_l
             ext = '.pdf'
             image_path = stem + ext
         
-        if os.path.exists(image_path) and (label in aux_labels_dict):
+        image_path_fs = image_path
+        if (base_dir is not None) and (not os.path.isabs(image_path_fs)):
+            image_path_fs = os.path.join(base_dir, image_path_fs)
+
+        if os.path.exists(image_path_fs) and (label in aux_labels_dict):
             
             # _, ext = os.path.splitext(image_path)
             doc_number = aux_labels_dict[label]
             new_path = os.path.join(figure_dir_actual_location, f'fig{doc_number}{ext}')
             new_path_in_text = os.path.join(figure_dir_in_text, f'fig{doc_number}{ext}')
-            shutil.copy2(image_path, new_path)
+            shutil.copy2(image_path_fs, new_path)
             
             text = re.sub(
                 rf'(\\includegraphics(?:\[.*?\])?){{{re.escape(stem)}(?:{re.escape(ext)})?}}',
@@ -756,7 +777,7 @@ def replace_figures(text, aux_file, figure_dir_in_text=None, figure_dir_actual_l
     
 def flatten_text(text, flattened_text='', commands_to_replace=None, 
                  do_remove_comments_from_text=True, 
-                 names_to_replace=None):
+                 names_to_replace=None, base_dir=None):
     """Recursively expand ``\\input{...}`` directives in a LaTeX text string.
 
     Processes ``text`` by replacing each ``\\input{filepath}`` with the
@@ -809,7 +830,7 @@ def flatten_text(text, flattened_text='', commands_to_replace=None,
     
     # Try to read from file
     filepath = argument.strip()
-    input_text = read_input_file(filepath)
+    input_text, input_path = _read_input_file_and_path(filepath, base_dir=base_dir)
     
     if input_text is not None:
         # print(f'loaded {filepath}')
@@ -817,6 +838,7 @@ def flatten_text(text, flattened_text='', commands_to_replace=None,
         flattened_text += flatten_text(
             input_text, commands_to_replace=commands_to_replace,
             names_to_replace=names_to_replace,
+            base_dir=os.path.dirname(os.path.abspath(input_path)),
             )
     else:
         # It didn't work, leave it as-is
@@ -825,7 +847,8 @@ def flatten_text(text, flattened_text='', commands_to_replace=None,
 
     # Continue through rest of the file
     flattened_text += flatten_text(after_input, commands_to_replace=commands_to_replace,
-                                   names_to_replace=names_to_replace)
+                                   names_to_replace=names_to_replace,
+                                   base_dir=base_dir)
             
     return flattened_text
 
@@ -881,14 +904,21 @@ def flatten(infile=None, outfile=None, names_to_replace=None,
     """
     if names_to_replace is None:
         names_to_replace = []
-        
-    head_in, tail_in = os.path.split(infile)
-    if head_in != '':
-        os.chdir(head_in)
-        
-    head_out, tail_out = os.path.split(outfile)
 
-    with open(infile, 'rt') as fid:
+    infile_abs = os.path.abspath(infile)
+    infile_dir = os.path.dirname(infile_abs)
+
+    if outfile is None:
+        outfile_path = None
+        head_out = ''
+    elif os.path.isabs(outfile):
+        outfile_path = outfile
+        head_out, _ = os.path.split(outfile_path)
+    else:
+        outfile_path = os.path.join(infile_dir, outfile)
+        head_out, _ = os.path.split(outfile_path)
+
+    with open(infile_abs, 'rt') as fid:
         text = fid.read()
 
     bma_preamble = par.bma_search(r'\\begin\s*{\s*document\s*}', text)
@@ -909,6 +939,7 @@ def flatten(infile=None, outfile=None, names_to_replace=None,
         bma_preamble.after, commands_to_replace=commands_and_defns_to_replace,
         do_remove_comments_from_text=do_remove_comments_from_text,
         names_to_replace=names_to_replace,
+        base_dir=infile_dir,
         )
 
     # Remove preamble comments?
@@ -921,7 +952,8 @@ def flatten(infile=None, outfile=None, names_to_replace=None,
     
     # Replace references from auxiliary document
     if aux_reference_file is not None:
-        
+        if not os.path.isabs(aux_reference_file):
+            aux_reference_file = os.path.join(infile_dir, aux_reference_file)
         refs_to_replace = get_aux_labels(aux_reference_file)
         text = replace_refs(text, refs_to_replace)
         
@@ -931,14 +963,15 @@ def flatten(infile=None, outfile=None, names_to_replace=None,
         
     # Replace figures
     if do_replace_figures:
-        this_aux_file = infile.replace('.tex', '.aux')
+        this_aux_file = infile_abs.replace('.tex', '.aux')
         if figure_dir_actual_location is None:
             figure_dir_actual_location = head_out + '/'
         text = replace_figures(text, this_aux_file, figure_dir_in_text=figure_dir_in_text,
-                               figure_dir_actual_location=figure_dir_actual_location)
+                               figure_dir_actual_location=figure_dir_actual_location,
+                               base_dir=infile_dir)
     
-    if outfile is not None:
-        with open(outfile, 'wt') as fid:
+    if outfile_path is not None:
+        with open(outfile_path, 'wt') as fid:
             fid.write(text)
         return None
             

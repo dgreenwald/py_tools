@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
-from numpy import arange, array, bincount, ndarray, ones, where
-from numpy.random import seed, random, randint
+from numpy import array, ndarray, ones, where
+from numpy.random import random, randint
 
 __author__ = "Tamas Nepusz, Denis Bzowy"
 __version__ = "27jul2011"
