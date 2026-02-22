@@ -14,8 +14,6 @@ def read_coefficients(file_stem=None, file_b=None, file_V=None, to_numpy=False):
     V = pd.read_csv(file_V, sep='\s+')
     
     se_data = np.sqrt(np.diag(V.values))
-    # se_names = [name + '_se' for name in V.columns]
-    
     se = pd.DataFrame(data=se_data[np.newaxis, :], columns=V.columns)
     
     if to_numpy:
