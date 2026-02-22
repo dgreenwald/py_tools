@@ -69,7 +69,7 @@ def test_bvar_class_fit_sample_and_irf_smoke():
         y[t, 0] = 0.5 * y[t - 1, 0] + 0.1 * y[t - 1, 1] + eps[t, 0]
         y[t, 1] = 0.2 * y[t - 1, 0] + 0.6 * y[t - 1, 1] + eps[t, 1]
 
-    idx = pd.date_range("2000-01-01", periods=n, freq="QE")
+    idx = pd.date_range("2000-01-01", periods=n, freq=pd.offsets.QuarterEnd())
     df = pd.DataFrame({"y1": y[:, 0], "y2": y[:, 1]}, index=idx)
 
     model = bvm.BVAR(df, y_vars=["y1", "y2"], p=1, glp_prior=True)

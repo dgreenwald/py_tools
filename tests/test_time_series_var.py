@@ -38,7 +38,7 @@ def test_var_class_fit_irf_and_bootstrap_smoke():
         y[t, 0] = 0.7 * y[t - 1, 0] + 0.1 * y[t - 1, 1] + e[t, 0]
         y[t, 1] = 0.2 * y[t - 1, 0] + 0.6 * y[t - 1, 1] + e[t, 1]
 
-    idx = pd.date_range("2000-01-01", periods=n, freq="QE")
+    idx = pd.date_range("2000-01-01", periods=n, freq=pd.offsets.QuarterEnd())
     df = pd.DataFrame({"y1": y[:, 0], "y2": y[:, 1]}, index=idx)
 
     model = tsv.VAR(df, ["y1", "y2"], n_var_lags=1, use_const=True)

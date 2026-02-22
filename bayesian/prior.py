@@ -30,7 +30,10 @@ def get_prior(prior_type, mean=None, sd=None):
             "prior_type must be None, int, or str; got {}".format(type(prior_type).__name__)
         )
 
-    assert (mean is not None and sd is not None)
+    if mean is None or sd is None:
+        raise ValueError(
+            "mean and sd must both be provided for prior_type={}".format(prior_type)
+        )
 
     if prior_num == BETA:
         alp = (1.0 - mean) * ((mean / sd) ** 2) - mean

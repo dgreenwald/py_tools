@@ -17,7 +17,7 @@ import py_tools.plot.core as pc
 
 def _make_df(n=50, seed=42):
     rng = np.random.default_rng(seed)
-    idx = pd.date_range('2000-01-01', periods=n, freq='ME')
+    idx = pd.date_range('2000-01-01', periods=n, freq=pd.offsets.MonthEnd())
     return pd.DataFrame(
         {
             'a': rng.standard_normal(n),

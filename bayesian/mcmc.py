@@ -467,13 +467,13 @@ class MonteCarlo:
         for var in np_list:
             try:
                 self.load_item(var, **kwargs)
-            except:
+            except Exception:
                 print("Warning: could not load " + var)
             
         for var in pkl_list:
             try:
                 self.load_item(var, pickle=True, **kwargs)
-            except:
+            except Exception:
                 print("Warning: could not load " + var)
 
         return None

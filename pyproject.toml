@@ -7,7 +7,7 @@ name = "py_tools"
 version = "0.1.0"
 description = "Numerical economics and research utilities."
 readme = "README.md"
-requires-python = ">=3.8"
+requires-python = ">=3.11"
 dependencies = [
     "numpy>=1.21",
     "pandas>=1.3",

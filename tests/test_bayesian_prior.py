@@ -17,7 +17,7 @@ def test_get_prior_invalid_type_raises():
 
 
 def test_get_prior_requires_mean_and_sd():
-    with pytest.raises(AssertionError):
+    with pytest.raises(ValueError, match="mean and sd"):
         get_prior("norm", mean=0.0, sd=None)
 
 
