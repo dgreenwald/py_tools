@@ -9,6 +9,7 @@ import numpy as np
 import scipy.sparse as sp
 from py_tools.stats import walker
 
+
 def get_unit_vecs(P, tol=1e-8, normalize=False, **kwargs):
     """Compute eigenvectors of a matrix corresponding to eigenvalues near 1.
 
@@ -33,17 +34,20 @@ def get_unit_vecs(P, tol=1e-8, normalize=False, **kwargs):
         within *tol* of 1.0. Columns correspond to distinct unit
         eigenvectors.
     """
-    
+
     vals, vecs = np.linalg.eig(P)
     unit = np.abs(vals - 1.0) < tol
     unit_vecs = np.real(vecs[:, unit])
-    
+
     if normalize:
         unit_vecs /= np.sum(unit_vecs, axis=0)
-        
+
     return unit_vecs
 
-def stationary_doubling(P, tol=1e-12, pi_seed=None, maxit=500, normalize=True, **kwargs):
+
+def stationary_doubling(
+    P, tol=1e-12, pi_seed=None, maxit=500, normalize=True, **kwargs
+):
     """Find the invariant distribution of a Markov chain by forward iteration.
 
     Uses a doubling algorithm: at each step the candidate distribution is
@@ -78,12 +82,12 @@ def stationary_doubling(P, tol=1e-12, pi_seed=None, maxit=500, normalize=True, *
     ValueError
         If convergence is not achieved within *maxit* iterations.
     """
-    
+
     if pi_seed is None:
         pi = np.ones(P.shape[0]) / P.shape[0]
     else:
         pi = pi_seed
-        
+
     Pj = P.copy()
 
     for it in range(maxit):
@@ -94,13 +98,14 @@ def stationary_doubling(P, tol=1e-12, pi_seed=None, maxit=500, normalize=True, *
             break
         pi = pi_new
     else:
-        raise ValueError(f'No convergence after {maxit} forward iterations!')
+        raise ValueError(f"No convergence after {maxit} forward iterations!")
     pi = pi_new
-    
+
     if normalize:
         pi = pi / np.sum(pi)
 
     return pi
+
 
 def ergodic_dist(P, doubling=False, **kwargs):
     """Compute the ergodic (stationary) distribution of a Markov chain.
@@ -121,11 +126,12 @@ def ergodic_dist(P, doubling=False, **kwargs):
     pi : ndarray of shape (n,)
         Ergodic distribution of the Markov chain, normalised to sum to 1.
     """
-    
+
     if doubling:
         return stationary_doubling(P, **kwargs)
     else:
-        return get_unit_vecs(P.T, normalize=True, **kwargs) 
+        return get_unit_vecs(P.T, normalize=True, **kwargs)
+
 
 def check_ergodic(invariant, tol=1e-8):
     """Check whether a distribution matrix is ergodic.
@@ -146,10 +152,11 @@ def check_ergodic(invariant, tol=1e-8):
         True if all rows of *invariant* agree with the first row to within
         *tol* (sup-norm); False otherwise.
     """
-    
+
     invariant_test = invariant - invariant[0, :]
     is_ergodic = np.amax(np.abs(invariant_test)) < tol
     return is_ergodic
+
 
 def markov_std(P, vals):
     """Compute the conditional standard deviation under a Markov transition.
@@ -173,12 +180,13 @@ def markov_std(P, vals):
     """
 
     Ev = np.dot(P, vals)
-    Ev2 = np.dot(P, vals ** 2)
-    V = Ev2 - (Ev ** 2)
+    Ev2 = np.dot(P, vals**2)
+    V = Ev2 - (Ev**2)
     sig = np.sqrt(V)
 
     return sig
-    
+
+
 def update_value(V):
     """Extract the optimal policy indices and values from a value function matrix.
 
@@ -195,11 +203,12 @@ def update_value(V):
     v : ndarray of shape (n_states,)
         Maximum value in each state, i.e. ``V[i, indices[i]]`` for each *i*.
     """
-    
+
     indices = np.argmax(V, axis=1)
     v = V[np.arange(V.shape[0]), indices]
     return indices, v
-    
+
+
 def get_transition(indices, sparse=False):
     """Build a deterministic transition matrix from an array of policy indices.
 
@@ -220,18 +229,19 @@ def get_transition(indices, sparse=False):
     transition : ndarray or csr_matrix of shape (n, n)
         Row-stochastic transition matrix with exactly one 1 per row.
     """
-    
+
     n = len(indices)
-    
+
     if sparse:
         transition = sp.lil_matrix((n, n))
         transition = transition.tocsr()
     else:
         transition = np.zeros((n, n))
-        
+
     transition[np.arange(n), indices] = 1
     return transition
-    
+
+
 def sim_discrete(P, N, i0=0):
     """Simulate a discrete Markov chain for N periods.
 
@@ -251,16 +261,17 @@ def sim_discrete(P, N, i0=0):
     ix : ndarray of int, shape (N,)
         Sequence of state indices, with ``ix[0] == i0``.
     """
-    
+
     samplers = [walker.WalkerRandomSampling(P[ii, :]) for ii in range(P.shape[0])]
-    
+
     ix = np.zeros(N).astype(int)
     ix[0] = i0
-    
+
     for ii in range(1, N):
-        ix[ii] = samplers[ix[ii-1]].random()
-    
+        ix[ii] = samplers[ix[ii - 1]].random()
+
     return ix
+
 
 def sim_iid(p, N):
     """Simulate N i.i.d. draws from a discrete distribution.
@@ -280,6 +291,7 @@ def sim_iid(p, N):
 
     sampler = walker.WalkerRandomSampling(p)
     return sampler.random(N)
+
 
 def sim_discrete_from_ergodic(P, N, pi_star=None):
     """Simulate a Markov chain starting from its ergodic distribution.
@@ -305,10 +317,11 @@ def sim_discrete_from_ergodic(P, N, pi_star=None):
 
     if pi_star is None:
         pi_star = ergodic_dist(P)
-        
+
     i0 = np.random.choice(len(pi_star), p=pi_star.ravel())
 
     return sim_discrete(P, N, i0)
+
 
 def multi_choice(p):
     """Draw one sample from each of many probability vectors in parallel.
@@ -335,7 +348,8 @@ def multi_choice(p):
     choices = (u < c).argmax(axis=1)
 
     return choices
-    
+
+
 def sim_policy(index_list, z_ix_sim, i0=0):
     """Simulate the endogenous state by following a policy function.
 
@@ -358,20 +372,21 @@ def sim_policy(index_list, z_ix_sim, i0=0):
     ix : ndarray of int, shape (Nsim,)
         Simulated endogenous state indices.
     """
-    
+
     Nsim = len(z_ix_sim)
     ix = np.zeros(Nsim).astype(int)
     ix[0] = i0
-    
+
     for ii in range(0, Nsim):
         if ii > 0:
-            ix_old = ix[ii-1]
+            ix_old = ix[ii - 1]
         else:
             ix_old = i0
 
         ix[ii] = index_list[z_ix_sim[ii]][ix_old]
-        
+
     return ix
+
 
 def sim_life_cycle(index_lists, z_ix_sim, i0=0):
     """Simulate the endogenous state for a life-cycle model.
@@ -401,13 +416,14 @@ def sim_life_cycle(index_lists, z_ix_sim, i0=0):
 
     for tt in range(0, Nt):
         if tt > 0:
-            ix_old = ix[tt-1]
+            ix_old = ix[tt - 1]
         else:
             ix_old = i0
 
         ix[tt] = index_lists[tt][z_ix_sim[tt]][ix_old]
 
     return ix
+
 
 def sim_ar1(rho, sig, mu=0.0, Nsim=100, e=None, x0=None):
     """Simulate an AR(1) process.
@@ -445,16 +461,17 @@ def sim_ar1(rho, sig, mu=0.0, Nsim=100, e=None, x0=None):
         e = np.random.randn(Nsim)
 
     if x0 is None:
-        sig0 = sig / np.sqrt(1.0 - rho ** 2)
-        x[0] = sig0 * e[0] 
+        sig0 = sig / np.sqrt(1.0 - rho**2)
+        x[0] = sig0 * e[0]
     else:
         x[0] = x0
 
     for jj in range(1, Nsim):
-        x[jj] = rho * x[jj-1] + sig * e[jj]
+        x[jj] = rho * x[jj - 1] + sig * e[jj]
 
     x += mu
     return x
+
 
 def sim_ar1_multi(rho, sig, Nper, Nsim=1, mu=0.0, e=None, x0=None):
     """Simulate multiple independent AR(1) processes simultaneously.
@@ -484,24 +501,25 @@ def sim_ar1_multi(rho, sig, Nper, Nsim=1, mu=0.0, e=None, x0=None):
     x : ndarray of shape (Nsim, Nper)
         Simulated AR(1) paths including the mean *mu*.
     """
-    
+
     x = np.zeros((Nsim, Nper))
     if e is None:
         e = np.random.randn(Nsim, Nper)
     else:
         assert e.shape == (Nsim, Nper)
-        
+
     if x0 is None:
-        sig0 = sig / np.sqrt(1.0 - rho ** 2)
+        sig0 = sig / np.sqrt(1.0 - rho**2)
         x[:, 0] = sig0 * e[:, 0]
     else:
         assert len(x0) == Nsim
-        
+
     for jj in range(1, Nper):
-        x[:, jj] = rho * x[:, jj-1] + sig * e[:, jj]
-        
+        x[:, jj] = rho * x[:, jj - 1] + sig * e[:, jj]
+
     x += mu
     return x
+
 
 def sim_cir(rho, sig, mu=0.0, Nsim=100, e=None, x0=None, bound=False):
     """Simulate a Cox-Ingersoll-Ross (CIR) process.
@@ -555,11 +573,16 @@ def sim_cir(rho, sig, mu=0.0, Nsim=100, e=None, x0=None, bound=False):
         x[0] = np.abs(x[0])
 
     for jj in range(1, Nsim):
-        x[jj] = (1.0 - rho) * mu + rho * x[jj-1] + np.sqrt(np.abs(x[jj-1])) * sig * e[jj]
+        x[jj] = (
+            (1.0 - rho) * mu
+            + rho * x[jj - 1]
+            + np.sqrt(np.abs(x[jj - 1])) * sig * e[jj]
+        )
         if bound:
             x[jj] = np.abs(x[jj])
 
     return x
+
 
 # Rouwenhorst approximation
 def discrete_approx(rho, sig_e, N, cons=0.0):
@@ -595,7 +618,7 @@ def discrete_approx(rho, sig_e, N, cons=0.0):
     """
 
     q = 0.5 * (1.0 + rho)
-    sig_z = np.sqrt((sig_e ** 2)/(1 - rho ** 2))
+    sig_z = np.sqrt((sig_e**2) / (1 - rho**2))
     psi = np.sqrt(N - 1.0) * sig_z
 
     y = np.linspace(-psi, psi, N) + cons
@@ -604,7 +627,7 @@ def discrete_approx(rho, sig_e, N, cons=0.0):
 
     for ii in range(2, N):
         P_old = P
-        P = np.zeros((ii+1, ii+1))
+        P = np.zeros((ii + 1, ii + 1))
 
         P[:-1, :-1] += q * P_old
         P[:-1, 1:] += (1.0 - q) * P_old

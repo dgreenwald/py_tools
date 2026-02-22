@@ -2,12 +2,15 @@ import numpy as np
 import pandas as pd
 
 from . import config
-default_dir = config.base_dir() + 'frm/embs/by_coupon/'
+
+default_dir = config.base_dir() + "frm/embs/by_coupon/"
 
 # data_dir = '/home/dan/Dropbox/data/frm/'
 # embs_dir = data_dir + 'embs/by_coupon/'
 DATASET_NAME = "embs"
 DESCRIPTION = "eMBS mortgage prepayment dataset loader."
+
+
 def load(embs_dir=default_dir):
     """Load eMBS mortgage prepayment data by merging per-variable pickle files.
 
@@ -26,18 +29,19 @@ def load(embs_dir=default_dir):
         coupon, origination date, and observation date.
     """
 
-    var_list = ['CPR', 'RPB', 'Issuance', 'Wac', 'Wam', 'Wala']
+    var_list = ["CPR", "RPB", "Issuance", "Wac", "Wam", "Wala"]
 
     for i_var, var in enumerate(var_list):
-        df_new = pd.read_pickle(embs_dir + 'embs_{0}_clean.pkl'.format(var.lower()))
+        df_new = pd.read_pickle(embs_dir + "embs_{0}_clean.pkl".format(var.lower()))
         if i_var == 0:
             df = df_new
         else:
-            df = pd.merge(df, df_new, on = ['coupon', 'orig_date', 'date'])
+            df = pd.merge(df, df_new, on=["coupon", "orig_date", "date"])
 
     return df
 
-def aggregate(df_in, weight='rpb'):
+
+def aggregate(df_in, weight="rpb"):
     """Compute weighted aggregate CPR, WAC, WAM, and WALA across coupons and vintages.
 
     For each date, each variable is aggregated as a weighted average using the
@@ -58,25 +62,26 @@ def aggregate(df_in, weight='rpb'):
         ``cpr``, ``wac``, ``wam``, and ``wala``.
     """
 
-    var_list = ['cpr', 'wac', 'wam', 'wala']
+    var_list = ["cpr", "wac", "wam", "wala"]
 
     df = df_in.loc[pd.notnull(df_in[weight]), :].copy()
-    
+
     for var in var_list:
-        df['wtd_' + var] = df[weight] * df[var]
+        df["wtd_" + var] = df[weight] * df[var]
 
-    wtd_list = ['wtd_' + var for var in var_list]
-    keep_list = ['date', weight] + wtd_list
+    wtd_list = ["wtd_" + var for var in var_list]
+    keep_list = ["date", weight] + wtd_list
 
-    columns = {var : var + '_total' for var in [weight] + wtd_list}
+    columns = {var: var + "_total" for var in [weight] + wtd_list}
 
-    df_agg = df[keep_list].groupby(['date']).sum().rename(columns=columns) 
+    df_agg = df[keep_list].groupby(["date"]).sum().rename(columns=columns)
     for var in var_list:
-        df_agg[var] = df_agg['wtd_' + var + '_total'] / df_agg[weight + '_total']
+        df_agg[var] = df_agg["wtd_" + var + "_total"] / df_agg[weight + "_total"]
 
-    return df_agg[var_list] 
+    return df_agg[var_list]
 
-def resample_cpr(cpr, freq='QS'):
+
+def resample_cpr(cpr, freq="QS"):
     """Convert a monthly CPR series to the specified resampling frequency.
 
     Converts monthly conditional prepayment rates to a lower frequency by

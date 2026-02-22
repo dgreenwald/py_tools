@@ -1,10 +1,13 @@
 import pandas as pd
 
 from . import config
-default_dir = config.base_dir() + 'bea_industry/'
+
+default_dir = config.base_dir() + "bea_industry/"
 DATASET_NAME = "bea_industry"
 DESCRIPTION = "BEA industry accounts dataset loader."
-def load(freq='q', data_dir=default_dir):
+
+
+def load(freq="q", data_dir=default_dir):
     """Load BEA industry accounts data from a pre-processed feather file.
 
     Reads the profits feather file for the requested frequency from
@@ -25,5 +28,5 @@ def load(freq='q', data_dir=default_dir):
     pandas.DataFrame
         BEA industry accounts profits data for the requested frequency.
     """
-    df = pd.read_feather(data_dir + freq + 'profits.feather')
+    df = pd.read_feather(data_dir + freq + "profits.feather")
     return df

@@ -22,13 +22,13 @@ class TestWalkerRandomSampling:
         assert samples.shape == (50,)
 
     def test_with_keys_single(self):
-        sampler = WalkerRandomSampling([1, 2, 3], keys=['a', 'b', 'c'])
-        assert sampler.random() in ['a', 'b', 'c']
+        sampler = WalkerRandomSampling([1, 2, 3], keys=["a", "b", "c"])
+        assert sampler.random() in ["a", "b", "c"]
 
     def test_with_keys_batch(self):
-        sampler = WalkerRandomSampling([1, 2, 3], keys=['a', 'b', 'c'])
+        sampler = WalkerRandomSampling([1, 2, 3], keys=["a", "b", "c"])
         samples = sampler.random(count=20)
-        assert all(s in ['a', 'b', 'c'] for s in samples)
+        assert all(s in ["a", "b", "c"] for s in samples)
 
     def test_frequency_proportional_to_weights(self):
         np.random.seed(42)

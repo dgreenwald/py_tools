@@ -1,6 +1,7 @@
 import numpy as np
 from scipy.stats import norm, lognorm
 
+
 def weighted_quantile(values_in, weights_in, quantiles, sort=True, C=0.5):
     """Compute weighted quantiles of a 1-D array.
 
@@ -41,11 +42,12 @@ def weighted_quantile(values_in, weights_in, quantiles, sort=True, C=0.5):
 
     values = values_in[ix_keep][sorter].astype(np.float64)
     weights = weights_in[ix_keep][sorter].astype(np.float64)
-    
+
     S = np.cumsum(weights)
     q_grid = (S - C * weights) / (S[-1] + (1.0 - 2.0 * C) * weights)
 
     return np.interp(quantiles, q_grid, values)
+
 
 def wq_by_col(values, weights, quantiles, **kwargs):
     """Compute weighted quantiles for each column of a 2-D array.
@@ -78,6 +80,7 @@ def wq_by_col(values, weights, quantiles, **kwargs):
 
     return output
 
+
 def weighted_mean(values_in, weights_in):
     """Compute the weighted mean of an array.
 
@@ -96,7 +99,8 @@ def weighted_mean(values_in, weights_in):
     num = np.dot(values_in, weights_in)
     denom = np.sum(weights_in)
 
-    return (num / denom)
+    return num / denom
+
 
 def weighted_var(values_in, weights_in):
     """Compute the weighted variance of an array.
@@ -117,8 +121,9 @@ def weighted_var(values_in, weights_in):
     residuals = values_in - weighted_mean(values_in, weights_in)
     num = np.dot(residuals**2, weights_in)
     denom = np.sum(weights_in)
-    
+
     return num / denom
+
 
 def weighted_std(values_in, weights_in):
     """Compute the weighted standard deviation of an array.
@@ -136,6 +141,7 @@ def weighted_std(values_in, weights_in):
         Square root of the weighted variance; see :func:`weighted_var`.
     """
     return np.sqrt(weighted_var(values_in, weights_in))
+
 
 def std_norm_z_star(p_val, two_sided=True):
     """Return the standard-normal critical value for a given confidence level.
@@ -160,7 +166,8 @@ def std_norm_z_star(p_val, two_sided=True):
     else:
         p = p_val
 
-    return (norm.ppf(p))
+    return norm.ppf(p)
+
 
 def std_norm_bands(p_val):
     """Return the lower and upper standard-normal critical values for a confidence band.
@@ -186,6 +193,7 @@ def std_norm_bands(p_val):
 
     return (z_lb, z_ub)
 
+
 def draw_norm(Sig):
     """Draw a single multivariate normal sample with covariance ``Sig``.
 
@@ -201,6 +209,7 @@ def draw_norm(Sig):
     """
     C = np.linalg.cholesky(Sig)
     return np.dot(C, np.random.randn(Sig.shape[0]))
+
 
 def draw_norm_multi(Sig, n):
     """Draw multiple multivariate normal samples with covariance ``Sig``.
@@ -220,6 +229,7 @@ def draw_norm_multi(Sig, n):
     """
     C = np.linalg.cholesky(Sig)
     return np.dot(np.random.randn(n, Sig.shape[0]), C.T)
+
 
 def my_lognorm(mu, sig):
     """Create a log-normal distribution object parameterised by its log-scale mean and std.

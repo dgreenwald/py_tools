@@ -1,6 +1,7 @@
 import numpy as np
 from mpi4py import MPI
 
+
 def rank():
     """Return the MPI rank of the calling process.
 
@@ -9,8 +10,9 @@ def rank():
     int
         Rank of this process in ``MPI.COMM_WORLD`` (0-based).
     """
-    
+
     return MPI.COMM_WORLD.Get_rank()
+
 
 def disp(mesg, flush=True, **kwargs):
     """Print a message from MPI rank 0 only.
@@ -24,9 +26,10 @@ def disp(mesg, flush=True, **kwargs):
     **kwargs
         Additional keyword arguments forwarded to :func:`print`.
     """
-    
+
     if rank() == 0:
         print(mesg, flush=flush, **kwargs)
+
 
 def time():
     """Return the current wall-clock time as reported by MPI.
@@ -39,13 +42,15 @@ def time():
 
     return MPI.Wtime()
 
+
 def barrier():
     """Block until all MPI processes have reached this point.
 
     Wraps ``MPI.Comm.Barrier(MPI.COMM_WORLD)``.
     """
-    
+
     MPI.Comm.Barrier(MPI.COMM_WORLD)
+
 
 def initialize(x, fake=False):
     """Create an :class:`MPIArray` (or :class:`FakeMPIArray`) and scatter *x*.
@@ -75,6 +80,7 @@ def initialize(x, fake=False):
 
     return x_mpi, x_loc
 
+
 def finalize(x_mpi, x_loc):
     """Write local results back and retrieve the full array on rank 0.
 
@@ -95,7 +101,8 @@ def finalize(x_mpi, x_loc):
     x_mpi.set_local_data(x_loc)
     return x_mpi.get_root_data()
 
-#class MPIPrinter:
+
+# class MPIPrinter:
 #    """Object that holds rank and prints only for rank 0"""
 #
 #    def __init__(self, flush=True):
@@ -110,6 +117,7 @@ def finalize(x_mpi, x_loc):
 #                flush = self.flush
 #
 #            print(mesg, flush=flush)
+
 
 class MPIArray:
     """Array that automatically does MPI sharing.
@@ -160,8 +168,7 @@ class MPIArray:
         real (not padding) in the local buffer.
     """
 
-    def __init__(self, root_data=None, root_shape=None, dtype='float64',
-                 scatter=True):
+    def __init__(self, root_data=None, root_shape=None, dtype="float64", scatter=True):
 
         # Get info from array passed in
         if root_data is not None:
@@ -179,7 +186,7 @@ class MPIArray:
         self.root_shape = list(root_shape)
         self.nrow_root = self.root_shape[0]
         self.npad_local = ((self.nrow_root - 1) // self.size) + 1
-        self.npad_root = self.npad_local * self.size # padded version
+        self.npad_root = self.npad_local * self.size  # padded version
 
         if len(self.root_shape) == 1:
             # One-index vector
@@ -197,12 +204,12 @@ class MPIArray:
         else:
             self.root_data = None
 
-        self.local_data = np.empty((self.npad_local, self.ncol), dtype=self.dtype) 
+        self.local_data = np.empty((self.npad_local, self.ncol), dtype=self.dtype)
 
         # Allocate index for padding
         if self.rank == 0:
             self.ix_root = np.ones(self.npad_root, dtype=bool)
-            self.ix_root[self.nrow_root:] = False
+            self.ix_root[self.nrow_root :] = False
         else:
             self.ix_root = None
 
@@ -213,7 +220,7 @@ class MPIArray:
             self.set_root_data(root_data, scatter=scatter)
         elif scatter:
             self.scatter()
-            
+
         # Scatter data
         # if scatter: self.scatter()
 
@@ -270,7 +277,6 @@ class MPIArray:
             self.gather()
 
         if self.rank == 0:
-
             out_data = self.root_data[self.ix_root, :]
 
             if self.vec_flag:
@@ -279,7 +285,6 @@ class MPIArray:
                 return out_data.reshape(self.root_shape)
 
         else:
-
             return None
 
     def get_local_data(self, scatter=False):
@@ -317,7 +322,7 @@ class MPIArray:
         ``local_shape`` for multi-dimensional arrays).
         """
 
-        self.comm.Scatter(self.root_data, self.local_data, root=0) 
+        self.comm.Scatter(self.root_data, self.local_data, root=0)
         self.comm.Scatter(self.ix_root, self.ix_local, root=0)
 
         # Update number of local rows
@@ -335,6 +340,7 @@ class MPIArray:
 
         self.comm.Gather(self.local_data, self.root_data, root=0)
         self.comm.Gather(self.ix_local, self.ix_root, root=0)
+
 
 class FakeMPIArray:
     """Regular numpy array with the same interface as :class:`MPIArray`.
@@ -363,8 +369,9 @@ class FakeMPIArray:
         The underlying array.
     """
 
-    def __init__(self, root_data=None, root_shape=None, dtype='float64',
-                 copy=True, **kwargs):
+    def __init__(
+        self, root_data=None, root_shape=None, dtype="float64", copy=True, **kwargs
+    ):
 
         if root_data is not None:
             if copy:
@@ -372,7 +379,7 @@ class FakeMPIArray:
             else:
                 self.data = root_data
         else:
-            assert (root_shape is not None)
+            assert root_shape is not None
             self.data = np.empty(root_shape, dtype=dtype)
 
     def set_root_data(self, data, copy=True, **kwargs):

@@ -12,10 +12,12 @@ Nx = 50
 x_grid = np.linspace(0.0, 5.0, Nx)
 z_grid, Pz = ec.discrete_approx(rho_z, sig_z, Nz)
 
-xz_stack = np.transpose([
-    np.repeat(x_grid, len(z_grid)),
-    np.tile(z_grid, len(x_grid)), 
-])
+xz_stack = np.transpose(
+    [
+        np.repeat(x_grid, len(z_grid)),
+        np.tile(z_grid, len(x_grid)),
+    ]
+)
 
 flow_list = []
 for iz in range(Nz):

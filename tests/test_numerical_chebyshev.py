@@ -1,7 +1,6 @@
 """Tests for py_tools.numerical.chebyshev"""
 
 import numpy as np
-import pytest
 
 from py_tools.numerical.chebyshev import (
     grid,
@@ -14,6 +13,7 @@ from py_tools.numerical.chebyshev import (
 
 
 # --- grid ---
+
 
 class TestGrid:
     def test_size(self):
@@ -35,6 +35,7 @@ class TestGrid:
 
 # --- poly ---
 
+
 class TestPoly:
     def test_shape(self):
         x = np.linspace(-1, 1, 5)
@@ -50,11 +51,11 @@ class TestPoly:
 
     def test_T2(self):
         x = np.array([-0.5, 0.0, 0.5])
-        assert np.allclose(poly(x, 3)[:, 2], 2 * x ** 2 - 1)
+        assert np.allclose(poly(x, 3)[:, 2], 2 * x**2 - 1)
 
     def test_T3(self):
         x = np.array([-0.5, 0.0, 0.5])
-        assert np.allclose(poly(x, 4)[:, 3], 4 * x ** 3 - 3 * x)
+        assert np.allclose(poly(x, 4)[:, 3], 4 * x**3 - 3 * x)
 
     def test_n1_is_all_ones(self):
         x = np.array([0.3, -0.7])
@@ -62,6 +63,7 @@ class TestPoly:
 
 
 # --- basis_and_gradient ---
+
 
 class TestBasisAndGradient:
     def test_basis_matches_poly(self):
@@ -95,6 +97,7 @@ class TestBasisAndGradient:
 
 # --- gradient ---
 
+
 class TestGradient:
     def test_matches_basis_and_gradient(self):
         x = np.linspace(-0.8, 0.8, 6)
@@ -103,6 +106,7 @@ class TestGradient:
 
 
 # --- ChebFcn ---
+
 
 class TestChebFcn:
     def test_grid_in_range(self):
@@ -122,21 +126,27 @@ class TestChebFcn:
     def test_fit_and_evaluate_polynomial_exact(self):
         # n=5 basis can represent degree-4 polynomials exactly
         cf = ChebFcn(5)
-        f = lambda x: x ** 4 - 2 * x ** 2 + 1
+
+        def f(x):
+            return x**4 - 2 * x**2 + 1
+
         cf.fit_fcn(f)
         x_test = np.linspace(-1, 1, 20)
         assert np.allclose(cf.evaluate(x_test), f(x_test), atol=1e-10)
 
     def test_fit_and_evaluate_custom_domain(self):
         cf = ChebFcn(6, lb=1.0, ub=4.0)
-        f = lambda x: (x - 2.5) ** 2
+
+        def f(x):
+            return (x - 2.5) ** 2
+
         cf.fit_fcn(f)
         x_test = np.linspace(1.0, 4.0, 15)
         assert np.allclose(cf.evaluate(x_test), f(x_test), atol=1e-10)
 
     def test_gradient_matches_finite_difference(self):
         cf = ChebFcn(6)
-        cf.fit_fcn(lambda x: x ** 3 - x)
+        cf.fit_fcn(lambda x: x**3 - x)
         x_test = np.linspace(-0.9, 0.9, 10)
         h = 1e-6
         df_fd = (cf.evaluate(x_test + h) - cf.evaluate(x_test - h)) / (2 * h)
@@ -163,6 +173,7 @@ class TestChebFcn:
 
 
 # --- TensorChebFcn ---
+
 
 class TestTensorChebFcn:
     def test_fit_and_evaluate_linear(self):

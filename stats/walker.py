@@ -6,6 +6,7 @@ from numpy.random import random, randint
 __author__ = "Tamas Nepusz, Denis Bzowy"
 __version__ = "27jul2011"
 
+
 class WalkerRandomSampling(object):
     """Walker's alias method for random objects with different probabilities.
 
@@ -32,7 +33,7 @@ class WalkerRandomSampling(object):
     inx : numpy.ndarray
         Walker alias index table.
     """
-    
+
     def __init__(self, weights, keys=None):
         """Build the Walker tables ``prob`` and ``inx`` for calls to :meth:`random`.
 
@@ -77,9 +78,9 @@ class WalkerRandomSampling(object):
             k = long[-1]
 
             inx[j] = k
-            weights[k] -= (1 - weights[j])
+            weights[k] -= 1 - weights[j]
             if weights[k] < 1:
-                short.append( k )
+                short.append(k)
                 long.pop()
 
         self.prob = weights

@@ -6,6 +6,7 @@ from py_tools.text.parsing import match_to_bma, bma_search, expand_to_target, Bm
 
 # --- match_to_bma ---
 
+
 class TestMatchToBma:
     def test_none_match_returns_unmatched(self):
         bma = match_to_bma(None, "hello world")
@@ -17,6 +18,7 @@ class TestMatchToBma:
 
     def test_valid_match_splits_correctly(self):
         import re
+
         text = "foo BAR baz"
         match = re.search(r"BAR", text)
         bma = match_to_bma(match, text)
@@ -28,6 +30,7 @@ class TestMatchToBma:
 
     def test_match_at_start(self):
         import re
+
         text = "XYZ rest"
         match = re.search(r"XYZ", text)
         bma = match_to_bma(match, text)
@@ -37,6 +40,7 @@ class TestMatchToBma:
 
     def test_match_at_end(self):
         import re
+
         text = "start END"
         match = re.search(r"END", text)
         bma = match_to_bma(match, text)
@@ -46,6 +50,7 @@ class TestMatchToBma:
 
 
 # --- bma_search ---
+
 
 class TestBmaSearch:
     def test_found_pattern(self):
@@ -68,11 +73,13 @@ class TestBmaSearch:
 
     def test_extra_flags_passed_through(self):
         import re
+
         bma = bma_search(r"^hello", "HELLO world", re.IGNORECASE | re.MULTILINE)
         assert bma.matched
 
 
 # --- expand_to_target ---
+
 
 class TestExpandToTarget:
     def test_simple_parentheses(self):
@@ -95,13 +102,17 @@ class TestExpandToTarget:
 
     def test_nested_parens(self):
         # Outer content includes the nested paren
-        content, bracket, after = expand_to_target("(inner) outer) end", left_bracket="(")
+        content, bracket, after = expand_to_target(
+            "(inner) outer) end", left_bracket="("
+        )
         assert content == "(inner) outer"
         assert bracket == ")"
         assert after == " end"
 
     def test_nested_curly_braces(self):
-        content, bracket, after = expand_to_target("{nested} outer} end", left_bracket="{")
+        content, bracket, after = expand_to_target(
+            "{nested} outer} end", left_bracket="{"
+        )
         assert content == "{nested} outer"
         assert bracket == "}"
         assert after == " end"
@@ -121,7 +132,9 @@ class TestExpandToTarget:
             expand_to_target("no closing bracket at all", left_bracket="(")
 
     def test_content_with_special_chars(self):
-        content, bracket, after = expand_to_target(r"\alpha + \beta} rest", left_bracket="{")
+        content, bracket, after = expand_to_target(
+            r"\alpha + \beta} rest", left_bracket="{"
+        )
         assert content == r"\alpha + \beta"
         assert bracket == "}"
         assert after == " rest"

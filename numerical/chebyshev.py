@@ -1,6 +1,7 @@
 import numpy as np
 from py_tools.utilities import cartesian
 
+
 def grid(n_pts):
     """Return Chebyshev-Gauss-Lobatto nodes on the interval ``[-1, 1]``.
 
@@ -19,6 +20,7 @@ def grid(n_pts):
         1-D array of ``n_pts`` nodes in ``[-1, 1]``.
     """
     return np.sin(np.linspace(-0.5 * np.pi, 0.5 * np.pi, n_pts))
+
 
 def poly(x, n):
     """Evaluate the first *n* Chebyshev polynomials at each point in *x*.
@@ -45,9 +47,10 @@ def poly(x, n):
         T[1, :] = x
 
     for jj in range(2, n):
-        T[jj, :] = 2.0 * x * T[jj-1, :] - T[jj-2, :]
+        T[jj, :] = 2.0 * x * T[jj - 1, :] - T[jj - 2, :]
 
     return T.T
+
 
 def basis_and_gradient(x, n):
     """Compute Chebyshev basis values and their derivatives at *x*.
@@ -69,14 +72,15 @@ def basis_and_gradient(x, n):
     """
     T = poly(x, n).T
     dT = np.zeros((n, len(x)))
-    
+
     if n > 1:
         dT[1, :] = 1.0
-        
+
     for jj in range(2, n):
-        dT[jj, :] = 2.0 * T[jj-1, :] + 2.0 * x * dT[jj-1, :] - dT[jj-2, :]
-        
+        dT[jj, :] = 2.0 * T[jj - 1, :] + 2.0 * x * dT[jj - 1, :] - dT[jj - 2, :]
+
     return T.T, dT.T
+
 
 def gradient(x, n):
     """Compute the derivatives of the first *n* Chebyshev polynomials at *x*.
@@ -95,6 +99,7 @@ def gradient(x, n):
     """
     _, dT = basis_and_gradient(x, n)
     return dT
+
 
 def tensor(X, n_vec):
     """Build a tensor-product Chebyshev basis matrix.
@@ -119,14 +124,15 @@ def tensor(X, n_vec):
         Tensor-product basis matrix of shape
         ``(N, prod(n_vec))``.
     """
-    
+
     if len(X.shape) == 1:
         X = X[np.newaxis, :]
 
     k = X.shape[1]
     TX = poly(X[:, -1], n_vec[-1])
     return recurse_tensor(X, TX, n_vec, k - 2)
-    
+
+
 def recurse_tensor(X, TX, n_vec, level):
     """Recursively construct a tensor-product Chebyshev basis.
 
@@ -151,15 +157,16 @@ def recurse_tensor(X, TX, n_vec, level):
     numpy.ndarray
         Completed (or partially completed) tensor-product basis matrix.
     """
-    
+
     if level >= 0:
         this_basis = poly(X[:, level], n_vec[level])
-        TX_new = np.hstack([
-                this_basis[:, jj][:, np.newaxis] * TX for jj in range(n_vec[level])
-                ])
+        TX_new = np.hstack(
+            [this_basis[:, jj][:, np.newaxis] * TX for jj in range(n_vec[level])]
+        )
         return recurse_tensor(X, TX_new, n_vec, level - 1)
     else:
         return TX
+
 
 class ChebFcn:
     """Chebyshev polynomial approximation for a univariate function.
@@ -195,13 +202,13 @@ class ChebFcn:
         Chebyshev coefficients, set after calling :meth:`fit_vals` or
         :meth:`fit_fcn`.
     """
-    
+
     def __init__(self, n, lb=-1.0, ub=1.0):
 
         self.n = n
         self.grid = grid(n)
         self.basis = poly(self.grid, self.n)
-        
+
         self.lb = lb
         self.ub = ub
 
@@ -212,7 +219,7 @@ class ChebFcn:
         self.b_from_grid = (self.ub - self.lb) / 2.0
 
         self.scaled_grid = self.scale_from_grid(self.grid)
-        
+
     def make_grid(self):
         """Return a copy of the Chebyshev grid nodes on ``[-1, 1]``.
 
@@ -222,7 +229,7 @@ class ChebFcn:
             1-D array of ``n`` Chebyshev nodes.
         """
         return self.grid.copy()
-    
+
     def fit_vals(self, vals):
         """Fit the Chebyshev approximation to function values at the grid.
 
@@ -236,7 +243,7 @@ class ChebFcn:
             equal ``n``.
         """
         self.coeffs = np.linalg.solve(self.basis, vals)
-        
+
     def fit_fcn(self, fcn):
         """Fit the Chebyshev approximation by evaluating a function on the grid.
 
@@ -248,7 +255,7 @@ class ChebFcn:
         """
         vals = fcn(self.scaled_grid)
         self.fit_vals(vals)
-        
+
     def get_basis(self, x_in):
         """Return the Chebyshev basis matrix evaluated at *x_in*.
 
@@ -266,7 +273,7 @@ class ChebFcn:
         """
         x_scaled = self.scale_x(x_in)
         return poly(x_scaled, self.n)
-        
+
     def get_basis_and_gradient(self, x_in):
         """Return the Chebyshev basis and its derivative at *x_in*.
 
@@ -286,7 +293,7 @@ class ChebFcn:
         """
         x_scaled = self.scale_x(x_in)
         return basis_and_gradient(x_scaled, self.n)
-        
+
     def get_basis_gradient_only(self, x_in):
         """Return only the derivative of the Chebyshev basis at *x_in*.
 
@@ -304,7 +311,7 @@ class ChebFcn:
         """
         x_scaled = self.scale_x(x_in)
         return gradient(x_scaled, self.n)
-        
+
     def evaluate(self, x_in):
         """Evaluate the fitted Chebyshev approximation at *x_in*.
 
@@ -320,7 +327,7 @@ class ChebFcn:
         """
         Tx = self.get_basis(x_in)
         return Tx @ self.coeffs
-    
+
     def gradient(self, x_in):
         """Evaluate the derivative of the fitted approximation at *x_in*.
 
@@ -336,7 +343,7 @@ class ChebFcn:
         """
         _, dTx = self.get_basis_and_gradient(x_in)
         return np.dot(dTx, self.coeffs)
-    
+
     def evaluate_with_gradient(self, x_in):
         """Evaluate the approximation and its derivative simultaneously.
 
@@ -356,7 +363,7 @@ class ChebFcn:
         fx = Tx @ self.coeffs
         dfx = dTx @ self.coeffs
         return fx, dfx
-        
+
     def scale_x(self, x_in):
         """Clip *x_in* to ``[lb, ub]`` and scale to the grid interval ``[-1, 1]``.
 
@@ -374,7 +381,7 @@ class ChebFcn:
         x = np.minimum(x, self.ub)
         x = np.maximum(x, self.lb)
         return self.scale_to_grid(x)
-    
+
     def scale_to_grid(self, vals):
         """Scale values from ``[lb, ub]`` to the grid interval ``[-1, 1]``.
 
@@ -404,7 +411,8 @@ class ChebFcn:
             Scaled values in ``[lb, ub]``.
         """
         return self.a_from_grid + (self.b_from_grid * vals)
-    
+
+
 class TensorChebFcn:
     """Tensor-product Chebyshev approximation for a multivariate function.
 
@@ -443,9 +451,9 @@ class TensorChebFcn:
         Fitted coefficients, set after calling :meth:`fit_vals` or
         :meth:`fit_fcn`.
     """
-    
+
     def __init__(self, n_vec, lb=-1.0, ub=1.0):
-        
+
         self.k = len(n_vec)
         self.n_vec = n_vec
         self.grid = cartesian((grid(n_vec[ii]) for ii in range(self.k)))
@@ -472,7 +480,7 @@ class TensorChebFcn:
             must equal ``prod(n_vec)``.
         """
         self.coeffs = np.linalg.solve(self.basis, vals)
-        
+
     def fit_fcn(self, fcn):
         """Fit the tensor Chebyshev approximation by evaluating a function.
 
@@ -485,7 +493,7 @@ class TensorChebFcn:
         """
         vals = fcn(self.scaled_grid)
         self.fit_vals(vals)
-        
+
     def evaluate(self, x, chunksize=100000):
         """Evaluate the fitted tensor approximation at *x*.
 
@@ -516,13 +524,12 @@ class TensorChebFcn:
             count = 0
             while count < Nx:
                 vals[count : count + chunksize] = eval_tensor(
-                    x_grid[count : count + chunksize, :],
-                    self.n_vec, self.coeffs
+                    x_grid[count : count + chunksize, :], self.n_vec, self.coeffs
                 )
                 count += chunksize
         else:
             # Tx = tensor(x_grid, self.n_vec)
-            # vals= np.dot(Tx, self.coeffs) 
+            # vals= np.dot(Tx, self.coeffs)
             vals = eval_tensor(x_grid, self.n_vec, self.coeffs)
 
         return vals
@@ -556,6 +563,7 @@ class TensorChebFcn:
             Scaled values in ``[lb, ub]``.
         """
         return self.a_from_grid + (self.b_from_grid * vals)
+
 
 def eval_tensor(x, n_vec, coeffs):
     """Evaluate a fitted tensor-product Chebyshev approximation at *x*.

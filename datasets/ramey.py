@@ -3,9 +3,12 @@ import warnings
 from py_tools.time_series import date_index
 
 from . import config
+
 default_dir = config.base_dir()
 DATASET_NAME = "ramey"
 DESCRIPTION = "Ramey macro shock datasets loader."
+
+
 def load(dataset, master_dirs=None):
     """Load data from Ramey shocks file.
 
@@ -35,31 +38,29 @@ def load(dataset, master_dirs=None):
     else:
         master_dirs = {}
     dirs = master_dirs.copy()
-    if 'base' not in dirs:
-        dirs['base'] = default_dir
+    if "base" not in dirs:
+        dirs["base"] = default_dir
         # home_dir = os.environ['HOME']
         # dirs['base'] = home_dir + '/Dropbox/data/'
 
-    data_dir = dirs['base'] + 'ramey/'
+    data_dir = dirs["base"] + "ramey/"
 
-    if dataset == 'technology':
-
-        infile = data_dir + 'technology/Technology_data.xlsx'
+    if dataset == "technology":
+        infile = data_dir + "technology/Technology_data.xlsx"
         df = pd.read_excel(
             infile,
-            sheet_name='techdat',
+            sheet_name="techdat",
         )
 
-        df = date_index(df, '1947-01-01', freq='QS')
+        df = date_index(df, "1947-01-01", freq="QS")
 
-    elif dataset == 'monetary':
-
-        infile = data_dir + 'monetary/Monetarydat.xlsx'
+    elif dataset == "monetary":
+        infile = data_dir + "monetary/Monetarydat.xlsx"
         df = pd.read_excel(
             infile,
-            sheet_name='Monthly',
+            sheet_name="Monthly",
         )
 
-        df = date_index(df, '1959-01-01', freq='MS')
+        df = date_index(df, "1959-01-01", freq="MS")
 
     return df

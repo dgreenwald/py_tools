@@ -1,7 +1,8 @@
 import py_tools.utilities as ut
 
-TSTRUT = '\\rule{0pt}{2.6ex}'
-BSTRUT = '\\rule[-0.9ex]{0pt}{0pt}'
+TSTRUT = "\\rule{0pt}{2.6ex}"
+BSTRUT = "\\rule[-0.9ex]{0pt}{0pt}"
+
 
 class Table:
     """LaTeX table builder.
@@ -53,10 +54,18 @@ class Table:
     tabu : bool
     """
 
-    def __init__(self, contents=None, n_cols=None, has_header=False, 
-                 alignment=None, clines=None, hlines=None,
-                 super_header=None,
-                 floatfmt='4.3f', tabu=False):
+    def __init__(
+        self,
+        contents=None,
+        n_cols=None,
+        has_header=False,
+        alignment=None,
+        clines=None,
+        hlines=None,
+        super_header=None,
+        floatfmt="4.3f",
+        tabu=False,
+    ):
         """Initialise the Table.
 
         Parameters
@@ -85,7 +94,7 @@ class Table:
         self.contents = contents if contents is not None else []
         self.n_cols = n_cols
         self.has_header = has_header
-        self.alignment = alignment 
+        self.alignment = alignment
         self.clines = clines if clines is not None else {}
         self.hlines = hlines
         self.super_header = super_header
@@ -107,9 +116,9 @@ class Table:
         # Set alignment
         if self.alignment is None:
             if self.tabu:
-                self.alignment = self.n_cols * 'X[c]'
+                self.alignment = self.n_cols * "X[c]"
             else:
-                self.alignment = self.n_cols * 'c'
+                self.alignment = self.n_cols * "c"
 
         if len(self.alignment) == 1 and self.n_cols > 1:
             self.alignment *= self.n_cols
@@ -125,8 +134,16 @@ class Table:
         return len(self.contents)
 
     # Important kwargs = booktabs
-    def table(self, caption=None, notes=None, position='h!', fontsize='small', 
-              caption_above=True, swp=False, **kwargs):
+    def table(
+        self,
+        caption=None,
+        notes=None,
+        position="h!",
+        fontsize="small",
+        caption_above=True,
+        swp=False,
+        **kwargs,
+    ):
         """Format the table contents as a complete LaTeX ``table`` float.
 
         Parameters
@@ -159,50 +176,54 @@ class Table:
         table_text = ""
 
         if swp:
-            table_text += r"""
-%TCIMACRO{\TeXButton{B}{\begin{table}[""" + position + r"""] \centering}}%
+            table_text += (
+                r"""
+%TCIMACRO{\TeXButton{B}{\begin{table}["""
+                + position
+                + r"""] \centering}}%
 %BeginExpansion
 """
+            )
 
-        table_text += r'\begin{table}'
+        table_text += r"\begin{table}"
 
-        table_text += '[{}]'.format(position)
+        table_text += "[{}]".format(position)
 
         if swp:
-            table_text += r' \centering' + '\n' + r'%EndExpansion' + '\n'
+            table_text += r" \centering" + "\n" + r"%EndExpansion" + "\n"
         else:
-            table_text += '\n' + r'\begin{center}' + '\n'
+            table_text += "\n" + r"\begin{center}" + "\n"
 
         if not swp:
-            table_text += '\\' + fontsize + '\n'
+            table_text += "\\" + fontsize + "\n"
 
         if caption is not None and caption_above:
-            table_text += r'\caption{' + caption + '}\n'
+            table_text += r"\caption{" + caption + "}\n"
 
         table_text += self.tabular(**kwargs)
 
         if not swp:
-            table_text += r'\end{center}' + '\n'
+            table_text += r"\end{center}" + "\n"
 
         if caption is not None and not caption_above:
-            table_text += r'\caption{' + caption + '}\n'
+            table_text += r"\caption{" + caption + "}\n"
 
         if notes is not None:
-            table_text += r'\footnotesize{' + notes + '}\n'
+            table_text += r"\footnotesize{" + notes + "}\n"
 
         if swp:
             table_text += r"""%TCIMACRO{\TeXButton{E}{\end{table}}}%
 %BeginExpansion
 """
-        table_text += r'\end{table}' + '\n'
-        
+        table_text += r"\end{table}" + "\n"
+
         if swp:
             table_text += r"""%EndExpansion
 """
 
         return table_text
 
-    def tabular(self, booktabs=True, width=r'\textwidth', include_tstrut=True):
+    def tabular(self, booktabs=True, width=r"\textwidth", include_tstrut=True):
         """Format the table contents as a LaTeX ``tabular`` (or ``tabu``) environment.
 
         Parameters
@@ -223,33 +244,32 @@ class Table:
             LaTeX source for the ``tabular``/``tabu`` environment.
         """
 
-        table_text = ''
+        table_text = ""
         if self.tabu:
-            table_text += (r'\begin{tabu} to ' + width + r' {' 
-                           + self.alignment + '}\n')
+            table_text += r"\begin{tabu} to " + width + r" {" + self.alignment + "}\n"
         else:
-            table_text += r'\begin{tabular}{' + self.alignment + '}\n'
+            table_text += r"\begin{tabular}{" + self.alignment + "}\n"
 
         if self.super_header is not None:
-            table_text += '\t&'.join(self.super_header) + '\\\\\n'
+            table_text += "\t&".join(self.super_header) + "\\\\\n"
 
         # Top rule
         if booktabs:
-            table_text += r'\toprule' + '\n'
+            table_text += r"\toprule" + "\n"
         else:
-            table_text += r'\hline \hline' + '\n'
+            table_text += r"\hline \hline" + "\n"
 
         table_text += self.body(booktabs=booktabs, include_tstrut=include_tstrut)
 
         if booktabs:
-            table_text += r'\bottomrule' + '\n'
+            table_text += r"\bottomrule" + "\n"
         else:
-            table_text += r'\hline \hline' + '\n'
+            table_text += r"\hline \hline" + "\n"
 
         if self.tabu:
-            table_text += r'\end{tabu}' + '\n'
+            table_text += r"\end{tabu}" + "\n"
         else:
-            table_text += r'\end{tabular}' + '\n'
+            table_text += r"\end{tabular}" + "\n"
 
         return table_text
 
@@ -270,41 +290,44 @@ class Table:
         str
             LaTeX source for all body rows including inter-row rules.
         """
-        table_text = ''
+        table_text = ""
 
         # Body of table
         for i_row, row in enumerate(self.contents):
-
             for ii, entry in enumerate(row):
                 if ii > 0:
-                    table_text += '\t& '
+                    table_text += "\t& "
 
                 if isinstance(entry, float):
-                    table_text += '{0:{1}}'.format(entry, self.floatfmt)
+                    table_text += "{0:{1}}".format(entry, self.floatfmt)
                 else:
-                    table_text += '{}'.format(entry)
-            
+                    table_text += "{}".format(entry)
+
             # Top strut (added to first row and each row after a rule)
             if include_tstrut:
                 table_text += TSTRUT
                 include_tstrut = False
 
-            if i_row in self.clines or i_row in self.hlines or i_row + 1 == self.n_rows():
+            if (
+                i_row in self.clines
+                or i_row in self.hlines
+                or i_row + 1 == self.n_rows()
+            ):
                 table_text += BSTRUT
 
-            table_text += '\t' + r'\\' 
-            table_text += ' \n'
+            table_text += "\t" + r"\\"
+            table_text += " \n"
 
             if i_row in self.clines:
-                for (start, end) in self.clines[i_row]:
-                    table_text += '\\cline{{{0}-{1}}}'.format(start, end)
-                table_text += '\n'
+                for start, end in self.clines[i_row]:
+                    table_text += "\\cline{{{0}-{1}}}".format(start, end)
+                table_text += "\n"
                 include_tstrut = True
             elif i_row in self.hlines:
                 if booktabs:
-                    table_text += r'\midrule' + '\n'
+                    table_text += r"\midrule" + "\n"
                 else:
-                    table_text += r'\hline' + '\n'
+                    table_text += r"\hline" + "\n"
                 include_tstrut = True
 
         return table_text
@@ -323,7 +346,7 @@ class Table:
             Cell values for row ``i_row``, or an empty list when ``i_row``
             is out of range.
         """
-        
+
         if i_row < self.n_rows():
             return self.contents[i_row]
         else:
@@ -347,7 +370,7 @@ class Table:
         -------
         None
         """
-        
+
         if row in self.clines:
             self.clines[row] += [(start, end)]
         else:
@@ -385,6 +408,7 @@ class Table:
         """
         self.super_header = self.multicolumn_row(text)
 
+
 def multicolumn(n_cols, text):
     """Generate a LaTeX ``\\multicolumn`` command string.
 
@@ -400,7 +424,8 @@ def multicolumn(n_cols, text):
     str
         LaTeX ``\\multicolumn{n_cols}{c}{text}`` string.
     """
-    return '\\multicolumn{{{0}}}{{c}}{{{1}}}'.format(n_cols, text)
+    return "\\multicolumn{{{0}}}{{c}}{{{1}}}".format(n_cols, text)
+
 
 def hstack(table_list):
     """Stack a list of tables horizontally into a single table.
@@ -420,23 +445,28 @@ def hstack(table_list):
     """
     n_rows = max([table.n_rows() for table in table_list])
 
-    contents = [ut.join_lists([table.row(ii) for table in table_list]) for ii in range(n_rows)]
+    contents = [
+        ut.join_lists([table.row(ii) for table in table_list]) for ii in range(n_rows)
+    ]
     n_cols = sum([table.n_cols for table in table_list])
-    alignment = ''.join([table.alignment for table in table_list])
+    alignment = "".join([table.alignment for table in table_list])
     hlines = list(set(ut.join_lists([table.hlines for table in table_list])))
 
     tabu = any([table.tabu for table in table_list])
 
-    new_table = Table(contents, n_cols=n_cols, alignment=alignment, tabu=tabu, hlines=hlines)
+    new_table = Table(
+        contents, n_cols=n_cols, alignment=alignment, tabu=tabu, hlines=hlines
+    )
 
     offset = 0
     for table in table_list:
         for row, start_end_list in table.clines.items():
-            for (start, end) in start_end_list:
+            for start, end in start_end_list:
                 new_table.add_cline(start + offset, end + offset, row)
         offset += table.n_cols
 
     return new_table
+
 
 def empty_table(n_rows, n_cols, alignment=None, **kwargs):
     """Create a blank table filled with single-space strings.
@@ -460,10 +490,11 @@ def empty_table(n_rows, n_cols, alignment=None, **kwargs):
         Empty table with ``n_rows`` rows and ``n_cols`` columns.
     """
     if alignment is None:
-        alignment = n_cols * 'c'
+        alignment = n_cols * "c"
 
-    contents = [n_cols * [' '] for row in range(n_rows)]
+    contents = [n_cols * [" "] for row in range(n_rows)]
     return Table(contents, n_cols=n_cols, alignment=alignment, **kwargs)
+
 
 def shift_down(table, new_row, is_header=True):
     """Prepend a new row to a table, shifting all existing rows down by one.
@@ -487,13 +518,12 @@ def shift_down(table, new_row, is_header=True):
     new_table = table
     new_table.contents = [new_row] + new_table.contents
 
-    new_table.clines = {
-        key + 1 : val for key, val in table.clines.items()
-    }
+    new_table.clines = {key + 1: val for key, val in table.clines.items()}
 
     new_table.hlines = [row + 1 for row in table.hlines]
 
     return new_table
+
 
 # Join horizontally
 def join_horizontal(table_list, header_list):
@@ -515,7 +545,6 @@ def join_horizontal(table_list, header_list):
     """
     tables_with_headers = []
     for table, header in zip(table_list, header_list):
-        
         new_table = table
 
         add_header = header is not None
@@ -523,7 +552,7 @@ def join_horizontal(table_list, header_list):
         if add_header:
             new_header = new_table.multicolumn_row(header)
         else:
-            new_header = [' ']
+            new_header = [" "]
 
         new_table = shift_down(new_table, new_header)
 
@@ -533,7 +562,7 @@ def join_horizontal(table_list, header_list):
         tables_with_headers.append(new_table)
 
     n_rows = max([table.n_rows() for table in tables_with_headers])
-    
+
     full_table_list = []
     for i_table, (table, header) in enumerate(zip(tables_with_headers, header_list)):
         full_table_list.append(table)
@@ -546,6 +575,7 @@ def join_horizontal(table_list, header_list):
     super_table = hstack(full_table_list)
 
     return super_table
+
 
 # Append vertically
 def join_vertical(table_list, header_list):
@@ -585,8 +615,7 @@ def join_vertical(table_list, header_list):
     full_hlines = []
 
     offset = 0
-    for (table, header) in zip(table_list, header_list):
-
+    for table, header in zip(table_list, header_list):
         # Add header
         if offset > 0:
             full_hlines.append(offset - 1)
@@ -597,16 +626,25 @@ def join_vertical(table_list, header_list):
         # Add content
         full_contents += table.contents
 
-        full_clines.update({
-            key + offset : [(start, end) for start, end in vals]
-            for key, vals in table.clines.items()
-        })
+        full_clines.update(
+            {
+                key + offset: [(start, end) for start, end in vals]
+                for key, vals in table.clines.items()
+            }
+        )
 
         full_hlines += [val + offset for val in table.hlines]
         offset += table.n_rows()
 
-    return Table(full_contents, n_cols, alignment=alignment, tabu=tabu,
-                 clines=full_clines, hlines=full_hlines)
+    return Table(
+        full_contents,
+        n_cols,
+        alignment=alignment,
+        tabu=tabu,
+        clines=full_clines,
+        hlines=full_hlines,
+    )
+
 
 def open_latex(fid):
     """Write a standard LaTeX document preamble to a file object.
@@ -653,6 +691,7 @@ def open_latex(fid):
 
     return None
 
+
 def close_latex(fid):
     """Write the ``\\end{document}`` closing tag to a file object.
 
@@ -665,13 +704,21 @@ def close_latex(fid):
     -------
     None
     """
-    fid.write('\n' + r'\end{document}')
+    fid.write("\n" + r"\end{document}")
     return None
 
-def regression_table(results, var_names=None, vertical=False, tstat=False,
-                     cov_type='HC0_se', floatfmt='4.3f', 
-                     print_vars=None,
-                     stats=None, **kwargs):
+
+def regression_table(
+    results,
+    var_names=None,
+    vertical=False,
+    tstat=False,
+    cov_type="HC0_se",
+    floatfmt="4.3f",
+    print_vars=None,
+    stats=None,
+    **kwargs,
+):
     """Build a :class:`Table` from a regression results object.
 
     Parameters
@@ -711,12 +758,9 @@ def regression_table(results, var_names=None, vertical=False, tstat=False,
         Formatted regression table.
     """
     if stats is None:
-        stats = ['rsquared_adj']
+        stats = ["rsquared_adj"]
 
-    tex_stats = {
-        'rsquared' : 'R^2',
-        'rsquared_adj' : '\\bar{R}^2'
-    }
+    tex_stats = {"rsquared": "R^2", "rsquared_adj": "\\bar{R}^2"}
 
     contents = []
 
@@ -739,10 +783,10 @@ def regression_table(results, var_names=None, vertical=False, tstat=False,
     if vertical:
         for ii in range(n_vars):
             contents.append([coeffs[ii]])
-            contents.append(['({0:{1}})'.format(se_like[ii], floatfmt)])
+            contents.append(["({0:{1}})".format(se_like[ii], floatfmt)])
         for stat in stats:
             this_stat = getattr(results, stat)
-            contents.append(['{0:{1}}'.format(this_stat, floatfmt)])
+            contents.append(["{0:{1}}".format(this_stat, floatfmt)])
     else:
         if var_names is not None:
             header_list = print_vars + [tex_stats[stat] for stat in stats]
@@ -750,11 +794,13 @@ def regression_table(results, var_names=None, vertical=False, tstat=False,
             has_header = True
 
         contents.append(
-            [coeffs[ii] for ii in print_ix]
-            + [getattr(results, stat) for stat in stats])
+            [coeffs[ii] for ii in print_ix] + [getattr(results, stat) for stat in stats]
+        )
 
-        contents.append(['({0:{1}})'.format(se_like[ii], floatfmt) for ii in print_ix]
-                        + [' ' for stat in stats])
+        contents.append(
+            ["({0:{1}})".format(se_like[ii], floatfmt) for ii in print_ix]
+            + [" " for stat in stats]
+        )
 
     return Table(contents, has_header=has_header, floatfmt=floatfmt, **kwargs)
 
@@ -777,12 +823,18 @@ def to_camel_case(s: str) -> str:
     >>> to_camel_case('my_variable_name')
     'myVariableName'
     """
-    parts = s.split('_')
-    return parts[0] + ''.join(word.capitalize() for word in parts[1:])
+    parts = s.split("_")
+    return parts[0] + "".join(word.capitalize() for word in parts[1:])
 
 
-def write_values_tex(data: dict, path="values.tex", prop_name="g_myvals_prop", 
-                     prefix=None, command_str=None, add_prefix_to_command=True):
+def write_values_tex(
+    data: dict,
+    path="values.tex",
+    prop_name="g_myvals_prop",
+    prefix=None,
+    command_str=None,
+    add_prefix_to_command=True,
+):
     """Write a LaTeX file defining key-value pairs accessible as ``\\val{key}``.
 
     Uses the LaTeX3 ``expl3`` property-list interface.  The generated file
@@ -835,10 +887,10 @@ def write_values_tex(data: dict, path="values.tex", prop_name="g_myvals_prop",
     """
     if command_str is None:
         if add_prefix_to_command and (prefix is not None):
-            command_str = to_camel_case('val_' + prefix)
+            command_str = to_camel_case("val_" + prefix)
         else:
-            command_str = 'val'
-    
+            command_str = "val"
+
     with open(path, "w", encoding="utf-8") as f:
         f.write("\\ExplSyntaxOn\n")
         f.write(f"\\prop_new:N \\{prop_name}\n")
@@ -847,12 +899,14 @@ def write_values_tex(data: dict, path="values.tex", prop_name="g_myvals_prop",
             if prefix is None:
                 key_new = key
             else:
-                key_new = f'{prefix}_{key}'
+                key_new = f"{prefix}_{key}"
             # Convert Python values to TeX-safe strings
             val_str = str(value)
             # Escape braces if they appear in value strings
             val_str = val_str.replace("{", "\\{").replace("}", "\\}")
             f.write(f"\\prop_gput:Nnn \\{prop_name} {{{key_new}}} {{{val_str}}}\n")
 
-        f.write(f"\\cs_new:Npn \\{command_str} #1 {{ \\prop_item:Nn \\{prop_name} {{#1}} }}\n")
+        f.write(
+            f"\\cs_new:Npn \\{command_str} #1 {{ \\prop_item:Nn \\{prop_name} {{#1}} }}\n"
+        )
         f.write("\\ExplSyntaxOff\n")

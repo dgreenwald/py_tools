@@ -7,4 +7,4 @@ warnings.warn(
     stacklevel=2,
 )
 
-from py_tools.text.format_code import *  # noqa: F401,F403
+from py_tools.text.format_code import *  # noqa: F401,F403,E402

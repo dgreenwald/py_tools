@@ -6,7 +6,8 @@ import struct
 import zipfile
 import json
 
-def load_eigen(filename, dtype='float64'):
+
+def load_eigen(filename, dtype="float64"):
     """Load a 2-D array written in the Eigen binary format.
 
     The file is expected to begin with two 4-byte little-endian integers
@@ -25,12 +26,13 @@ def load_eigen(filename, dtype='float64'):
     numpy.ndarray
         2-D array of shape ``(n_rows, n_cols)`` with the loaded data.
     """
-    with open(filename, 'rb') as fid:
-        n_rows = struct.unpack('i', fid.read(4))[0]
-        n_cols = struct.unpack('i', fid.read(4))[0]
+    with open(filename, "rb") as fid:
+        n_rows = struct.unpack("i", fid.read(4))[0]
+        n_cols = struct.unpack("i", fid.read(4))[0]
         return np.fromfile(fid, dtype=dtype).reshape(n_cols, n_rows).transpose()
 
-def reshape_eigen(filename, shape, dtype='float64'):
+
+def reshape_eigen(filename, shape, dtype="float64"):
     """Load an Eigen binary file and reshape the data to a custom shape.
 
     Reads the row/column counts from the file header, verifies that the
@@ -58,10 +60,9 @@ def reshape_eigen(filename, shape, dtype='float64'):
         If the total number of elements implied by ``shape`` does not
         match the element count in the file.
     """
-    with open(filename, 'rb') as fid:
-
-        n_rows = struct.unpack('i', fid.read(4))[0]
-        n_cols = struct.unpack('i', fid.read(4))[0]
+    with open(filename, "rb") as fid:
+        n_rows = struct.unpack("i", fid.read(4))[0]
+        n_cols = struct.unpack("i", fid.read(4))[0]
 
         if (n_rows * n_cols) != np.prod(shape):
             raise ValueError(
@@ -70,7 +71,8 @@ def reshape_eigen(filename, shape, dtype='float64'):
 
         return np.fromfile(fid, dtype=dtype).reshape(shape)
 
-def save_eigen(vals, filename, dtype='float64'):
+
+def save_eigen(vals, filename, dtype="float64"):
     """Save a 2-D array to a binary file in Eigen format.
 
     Writes a 4-byte integer header containing the number of rows and
@@ -93,12 +95,13 @@ def save_eigen(vals, filename, dtype='float64'):
     """
     n_rows, n_cols = vals.shape
 
-    with open(filename, 'wb') as fid:
-        fid.write(struct.pack('i', n_rows))
-        fid.write(struct.pack('i', n_cols))
+    with open(filename, "wb") as fid:
+        fid.write(struct.pack("i", n_rows))
+        fid.write(struct.pack("i", n_cols))
         vals.transpose().astype(dtype).tofile(fid)
 
     return None
+
 
 def save_pickle(obj, filename):
     """Serialize an object to a file using pickle.
@@ -114,9 +117,10 @@ def save_pickle(obj, filename):
     -------
     None
     """
-    with open(filename, 'wb') as fid:
+    with open(filename, "wb") as fid:
         pickle.dump(obj, fid)
     return None
+
 
 def load_pickle(filename):
     """Deserialize an object from a pickle file.
@@ -131,9 +135,10 @@ def load_pickle(filename):
     object
         The Python object stored in the file.
     """
-    with open(filename, 'rb') as fid:
+    with open(filename, "rb") as fid:
         obj = pickle.load(fid)
-    return obj 
+    return obj
+
 
 def make_dir(path):
     """Create a directory, including any missing parent directories.
@@ -153,7 +158,8 @@ def make_dir(path):
         os.makedirs(path)
     return None
 
-def write_numeric(val, filename, precision='4.3f'):
+
+def write_numeric(val, filename, precision="4.3f"):
     """Write a single numeric value to a plain-text file.
 
     Parameters
@@ -170,10 +176,11 @@ def write_numeric(val, filename, precision='4.3f'):
     -------
     None
     """
-    with open(filename, 'w') as fid:
-        fid.write('{0:{1}}'.format(val, precision))
-        
+    with open(filename, "w") as fid:
+        fid.write("{0:{1}}".format(val, precision))
+
     return None
+
 
 def write_text(string, filename):
     """Write a string to a plain-text file.
@@ -189,10 +196,11 @@ def write_text(string, filename):
     -------
     None
     """
-    with open(filename, 'w') as fid:
+    with open(filename, "w") as fid:
         fid.write(string)
-        
+
     return None
+
 
 def write_json(obj, filename, **kwargs):
     """Serialize an object to a JSON file.
@@ -210,10 +218,11 @@ def write_json(obj, filename, **kwargs):
     -------
     None
     """
-    with open(filename, 'w') as fid:
+    with open(filename, "w") as fid:
         json.dump(obj, fid, **kwargs)
 
     return None
+
 
 def read_numeric(filename):
     """Read a single numeric value from a plain-text file.
@@ -228,10 +237,11 @@ def read_numeric(filename):
     float
         The numeric value read from the file.
     """
-    with open(filename, 'r') as fid:
+    with open(filename, "r") as fid:
         val = float(fid.read())
-        
+
     return val
+
 
 def read_zipped(zip_path, file_name, **kwargs):
     """Read a CSV file from inside a ZIP archive into a DataFrame.
@@ -254,8 +264,9 @@ def read_zipped(zip_path, file_name, **kwargs):
     with zipfile.ZipFile(zip_path) as zf:
         with zf.open(file_name) as fid:
             df = pd.read_csv(fid, **kwargs)
-            
+
     return df
+
 
 def read_json(filename, **kwargs):
     """Deserialize a JSON file into a Python object.
@@ -272,5 +283,5 @@ def read_json(filename, **kwargs):
     object
         The Python object decoded from the JSON file.
     """
-    with open(filename, 'r') as fid:
+    with open(filename, "r") as fid:
         return json.load(fid)

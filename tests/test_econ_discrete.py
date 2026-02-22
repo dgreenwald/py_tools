@@ -1,7 +1,6 @@
 """Tests for py_tools.econ.discrete"""
 
 import numpy as np
-import pytest
 
 from py_tools.econ.discrete import (
     to_2d,
@@ -15,6 +14,7 @@ from py_tools.econ.discrete import (
 
 
 # --- to_2d ---
+
 
 class TestTo2d:
     def test_1d_becomes_2d(self):
@@ -35,6 +35,7 @@ class TestTo2d:
 
 
 # --- combine_grids ---
+
 
 class TestCombineGrids:
     def test_output_shape(self):
@@ -63,6 +64,7 @@ class TestCombineGrids:
 
 # --- combine_grids_from_list ---
 
+
 class TestCombineGridsFromList:
     def test_two_grids(self):
         g1 = np.array([1.0, 2.0])
@@ -80,6 +82,7 @@ class TestCombineGridsFromList:
 
 
 # --- combine_markov_chains ---
+
 
 class TestCombineMarkovChains:
     def test_kron_transition(self):
@@ -103,23 +106,21 @@ class TestCombineMarkovChains:
 
 # --- drop_low_probs ---
 
+
 class TestDropLowProbs:
     def test_zeros_small_probs(self):
-        P = np.array([[0.9, 1e-7, 0.1 - 1e-7],
-                      [0.5, 0.5, 0.0]])
+        P = np.array([[0.9, 1e-7, 0.1 - 1e-7], [0.5, 0.5, 0.0]])
         P_clean = drop_low_probs(P, tol=1e-6)
         # The 1e-7 entry should become 0
         assert P_clean[0, 1] == 0.0
 
     def test_rows_still_sum_to_one(self):
-        P = np.array([[0.5, 1e-8, 0.5],
-                      [0.3, 0.7, 0.0]])
+        P = np.array([[0.5, 1e-8, 0.5], [0.3, 0.7, 0.0]])
         P_clean = drop_low_probs(P, tol=1e-6)
         assert np.allclose(P_clean.sum(axis=1), 1.0)
 
     def test_no_change_above_tol(self):
-        P = np.array([[0.6, 0.4],
-                      [0.3, 0.7]])
+        P = np.array([[0.6, 0.4], [0.3, 0.7]])
         P_clean = drop_low_probs(P, tol=1e-6)
         assert np.allclose(P_clean.sum(axis=1), 1.0)
         # All entries are above tol, rows should still be normalized
@@ -127,6 +128,7 @@ class TestDropLowProbs:
 
 
 # --- DiscreteModel ---
+
 
 class TestDiscreteModel:
     """Simple 2-state, 1-shock discrete dynamic programming test.
@@ -141,8 +143,7 @@ class TestDiscreteModel:
 
     def _make_model(self):
         # Flow: u[x, x'] = x' for both z states => (2,2) array
-        flow = np.array([[0.0, 1.0],
-                         [0.0, 1.0]])
+        flow = np.array([[0.0, 1.0], [0.0, 1.0]])
         flow_list = [flow, flow]
         x_grid = np.array([[0.0], [1.0]])
         z_grid = np.array([[0.0], [1.0]])
@@ -158,8 +159,8 @@ class TestDiscreteModel:
     def test_solve_converges(self, capsys):
         model = self._make_model()
         model.solve()
-        assert hasattr(model, 'V')
-        assert hasattr(model, 'I')
+        assert hasattr(model, "V")
+        assert hasattr(model, "I")
 
     def test_optimal_policy_is_one(self):
         model = self._make_model()
@@ -181,6 +182,7 @@ class TestDiscreteModel:
         model = self._make_model()
         P_trans = model.get_P_trans(discount=False, sparse=True)
         import scipy.sparse as sp
+
         assert sp.issparse(P_trans)
         assert P_trans.shape == (model.Nz * model.Nx, model.Nz * model.Nx)
 

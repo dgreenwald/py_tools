@@ -2,6 +2,7 @@ import re
 from collections import OrderedDict
 from collections.abc import Mapping
 
+
 class MySet(set):
     """A :class:`set` subclass that supports the ``+`` operator for union.
 
@@ -52,6 +53,7 @@ class MySet(set):
             Union of ``other`` and ``self``.
         """
         return MySet(self.copy() | MySet(other))
+
 
 class MyDict(dict):
     """A :class:`dict` subclass that supports the ``+`` operator for merging.
@@ -106,6 +108,7 @@ class MyDict(dict):
         temp.update(self)
         return MyDict(temp)
 
+
 class MyOrderedDict(OrderedDict):
     """An :class:`OrderedDict` subclass that supports the ``+`` operator for merging.
 
@@ -159,6 +162,7 @@ class MyOrderedDict(OrderedDict):
         temp.update(self)
         return MyOrderedDict(temp)
 
+
 class PresetDict(dict):
     """A :class:`dict` subclass that silently ignores updates to existing keys.
 
@@ -197,7 +201,7 @@ class PresetDict(dict):
             Additional initial key-value pairs.
         """
         super().__init__()
-        self.verbose=verbose
+        self.verbose = verbose
         self.update(other, **kwargs)
 
     def __setitem__(self, key, value):
@@ -244,7 +248,7 @@ class PresetDict(dict):
         """
 
         super().__setitem__(key, value)
-        
+
     def overwrite_update(self, other):
         """Merge *other* into this dict, overwriting any existing keys.
 
@@ -253,9 +257,10 @@ class PresetDict(dict):
         other : mapping
             Key-value pairs to merge unconditionally.
         """
-        
+
         super().update(other)
-        
+
+
 class UniqueList:
     """An ordered list that silently discards duplicate entries.
 
@@ -387,7 +392,7 @@ class UniqueList:
                 self.data.append(x)
         return self
 
-        
+
 def replace_keys(my_dict, orig, repl):
     """Replace dictionary keys in-place using a regex substitution.
 
@@ -412,6 +417,7 @@ def replace_keys(my_dict, orig, repl):
 
     return None
 
+
 def replace_keys_items(my_dict, orig, repl):
     """Replace dictionary keys and string values in-place using a regex substitution.
 
@@ -433,4 +439,6 @@ def replace_keys_items(my_dict, orig, repl):
     for key in list(my_dict.keys()):
         new_key = re.sub(orig, repl, key)
         value = my_dict.pop(key)
-        my_dict[new_key] = re.sub(orig, repl, value) if isinstance(value, str) else value
+        my_dict[new_key] = (
+            re.sub(orig, repl, value) if isinstance(value, str) else value
+        )

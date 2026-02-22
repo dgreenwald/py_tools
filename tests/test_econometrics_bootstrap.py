@@ -16,7 +16,6 @@ def ar1_setup():
 
 
 class TestAr1BootstrapInner:
-
     def test_returns_scalar(self, ar1_setup):
         rho, mu, eps_boot, x_init, Nboot, Nt_eps = ar1_setup
         result = ar1_bootstrap_inner(rho, mu, eps_boot, x_init)
@@ -60,7 +59,6 @@ class TestAr1BootstrapInner:
 
 
 class TestObjfcnAr1Bootstrap:
-
     def test_zero_at_solution(self, ar1_setup):
         rho, mu, eps_boot, x_init, Nboot, Nt_eps = ar1_setup
         rho_sim = ar1_bootstrap_inner(rho, mu, eps_boot, x_init)

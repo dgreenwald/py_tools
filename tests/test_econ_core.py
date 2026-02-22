@@ -29,13 +29,13 @@ from py_tools.econ.core import (
 # Stationary distribution: [0.4, 0.6]
 @pytest.fixture
 def two_state_chain():
-    P = np.array([[0.7, 0.3],
-                  [0.2, 0.8]])
+    P = np.array([[0.7, 0.3], [0.2, 0.8]])
     pi_star = np.array([0.4, 0.6])
     return P, pi_star
 
 
 # --- get_unit_vecs ---
+
 
 class TestGetUnitVecs:
     def test_symmetric_chain(self, two_state_chain):
@@ -61,6 +61,7 @@ class TestGetUnitVecs:
 
 
 # --- stationary_doubling ---
+
 
 class TestStationaryDoubling:
     def test_known_stationary(self, two_state_chain):
@@ -92,6 +93,7 @@ class TestStationaryDoubling:
 
 # --- ergodic_dist ---
 
+
 class TestErgodic:
     def test_eigenvalue_method(self, two_state_chain):
         P, pi_star = two_state_chain
@@ -107,6 +109,7 @@ class TestErgodic:
 
 # --- check_ergodic ---
 
+
 class TestCheckErgodic:
     def test_ergodic_matrix(self):
         # All rows identical => ergodic
@@ -120,6 +123,7 @@ class TestCheckErgodic:
 
 
 # --- markov_std ---
+
 
 class TestMarkovStd:
     def test_deterministic_chain(self):
@@ -140,10 +144,10 @@ class TestMarkovStd:
 
 # --- update_value ---
 
+
 class TestUpdateValue:
     def test_selects_max(self):
-        V = np.array([[1.0, 3.0, 2.0],
-                      [4.0, 0.0, 1.0]])
+        V = np.array([[1.0, 3.0, 2.0], [4.0, 0.0, 1.0]])
         indices, v = update_value(V)
         assert np.array_equal(indices, [1, 0])
         assert np.allclose(v, [3.0, 4.0])
@@ -156,6 +160,7 @@ class TestUpdateValue:
 
 
 # --- get_transition ---
+
 
 class TestGetTransition:
     def test_dense_output(self):
@@ -175,10 +180,12 @@ class TestGetTransition:
         indices = np.array([1, 0])
         T = get_transition(indices, sparse=True)
         import scipy.sparse as sp
+
         assert sp.issparse(T)
 
 
 # --- sim_discrete ---
+
 
 class TestSimDiscrete:
     def test_output_length(self, two_state_chain):
@@ -200,6 +207,7 @@ class TestSimDiscrete:
 
 
 # --- sim_iid ---
+
 
 class TestSimIid:
     def test_output_length(self):
@@ -225,6 +233,7 @@ class TestSimIid:
 
 # --- sim_discrete_from_ergodic ---
 
+
 class TestSimDiscreteFromErgodic:
     def test_output_length(self, two_state_chain):
         P, pi_star = two_state_chain
@@ -241,6 +250,7 @@ class TestSimDiscreteFromErgodic:
 
 # --- multi_choice ---
 
+
 class TestMultiChoice:
     def test_output_shape(self):
         np.random.seed(0)
@@ -256,19 +266,21 @@ class TestMultiChoice:
 
     def test_deterministic_choice(self):
         # All probability on index 1
-        p = np.array([[0.0, 1.0, 0.0],
-                      [0.0, 1.0, 0.0]])
+        p = np.array([[0.0, 1.0, 0.0], [0.0, 1.0, 0.0]])
         choices = multi_choice(p)
         assert np.all(choices == 1)
 
 
 # --- sim_policy ---
 
+
 class TestSimPolicy:
     def test_identity_policy(self):
         # Policy: always stay at current x
-        index_list = [np.array([0, 1, 2]),  # z=0: x->x
-                      np.array([0, 1, 2])]  # z=1: x->x
+        index_list = [
+            np.array([0, 1, 2]),  # z=0: x->x
+            np.array([0, 1, 2]),
+        ]  # z=1: x->x
         z_ix_sim = np.array([0, 1, 0, 1])
         ix = sim_policy(index_list, z_ix_sim, i0=2)
         # With identity policy, x stays at i0=2
@@ -282,6 +294,7 @@ class TestSimPolicy:
 
 
 # --- sim_life_cycle ---
+
 
 class TestSimLifeCycle:
     def test_output_length(self):
@@ -306,6 +319,7 @@ class TestSimLifeCycle:
 
 
 # --- sim_ar1 ---
+
 
 class TestSimAr1:
     def test_output_length(self):
@@ -334,6 +348,7 @@ class TestSimAr1:
 
 # --- sim_ar1_multi ---
 
+
 class TestSimAr1Multi:
     def test_output_shape(self):
         x = sim_ar1_multi(0.9, 0.1, Nper=20, Nsim=5)
@@ -346,6 +361,7 @@ class TestSimAr1Multi:
 
 
 # --- sim_cir ---
+
 
 class TestSimCir:
     def test_requires_x0(self):
@@ -367,6 +383,7 @@ class TestSimCir:
 
 
 # --- discrete_approx (Rouwenhorst) ---
+
 
 class TestDiscreteApprox:
     def test_output_sizes(self):

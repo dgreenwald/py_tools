@@ -4,6 +4,7 @@ from scipy.sparse import csr_matrix
 
 from py_tools import econ
 
+
 def make_2d(x):
     """Ensure an array is at least 2-dimensional.
 
@@ -22,6 +23,7 @@ def make_2d(x):
         x = x[np.newaxis, :]
 
     return x
+
 
 class HiddenMarkov:
     """Hidden Markov model with forward filtering and backward smoothing.
@@ -79,7 +81,7 @@ class HiddenMarkov:
         """
 
         self.P = P
-        
+
         self.sparse = sparse
         if self.sparse:
             self.Ps = P.copy()
@@ -88,16 +90,16 @@ class HiddenMarkov:
             self.Ps = csr_matrix(self.Ps)
         else:
             self.Ps = self.P
-            
+
         self.log_err_density = log_err_density  # Measurement error density function
-        self.y_vals = make_2d(y_vals.copy())    # Data values
+        self.y_vals = make_2d(y_vals.copy())  # Data values
 
         self.Nx = self.P.shape[0]
-        self.Nt, self.Ny = self.y_vals.shape 
+        self.Nt, self.Ny = self.y_vals.shape
 
         self.px_filt = np.zeros((self.Nt, self.Nx))
         self.log_p_err = np.zeros((self.Nt, self.Nx))
-            
+
     def set_px_init(self, px_init):
         """Set the initial state probability distribution.
 
@@ -131,7 +133,7 @@ class HiddenMarkov:
             log_p_err_t = self.log_err_density(self.y_vals[tt, :], tt)
             log_py_all = log_p_err_t + np.log(px_pred_t)
             log_py_marg = logsumexp(log_py_all)
-            
+
             px_filt_t = np.exp(log_py_all - log_py_marg)
             px_pred_t = self.Ps.T.dot(px_filt_t)
 
@@ -152,13 +154,14 @@ class HiddenMarkov:
         self.px_smooth = np.zeros((self.Nt, self.Nx))
 
         for tt in range(self.Nt - 1, -1, -1):
-
             if tt < self.Nt - 1:
-                px_smooth_t = self.px_filt[tt, :] * (self.Ps.dot(self.px_smooth[tt+1, :] / self.px_pred[tt, :]))
+                px_smooth_t = self.px_filt[tt, :] * (
+                    self.Ps.dot(self.px_smooth[tt + 1, :] / self.px_pred[tt, :])
+                )
             else:
                 px_smooth_t = self.px_filt[-1, :]
 
-            self.px_smooth[tt, :] = px_smooth_t 
+            self.px_smooth[tt, :] = px_smooth_t
 
         return None
 
@@ -178,7 +181,7 @@ class HiddenMarkov:
 
         grid_2d = make_2d(grid.copy())
         return np.dot(self.px_smooth, grid_2d.T)
-    
+
     def filtered_vals(self, grid):
         """Compute expected values of grid points under filtered state probabilities.
 
@@ -206,18 +209,18 @@ class HiddenMarkov:
         """
 
         self.Nsim = Nsim
-        self.ix_sample = np.zeros((self.Nt, self.Nsim), dtype=int) 
+        self.ix_sample = np.zeros((self.Nt, self.Nsim), dtype=int)
 
         # Last period: draw from marginal
-        self.ix_sample[-1, :] = np.random.choice(self.Nx, size=self.Nsim,
-                                                p=self.px_smooth[-1, :])
-        
+        self.ix_sample[-1, :] = np.random.choice(
+            self.Nx, size=self.Nsim, p=self.px_smooth[-1, :]
+        )
+
         # Now iterate backwards
         for tt in range(self.Nt - 2, -1, -1):
-            
-            ix_next = self.ix_sample[tt+1, :]
+            ix_next = self.ix_sample[tt + 1, :]
             Pk = self.P[:, ix_next] / self.px_pred[tt, ix_next][np.newaxis, :]
-            new_probs = self.px_filt[tt, :][:, np.newaxis] * Pk 
+            new_probs = self.px_filt[tt, :][:, np.newaxis] * Pk
 
             self.ix_sample[tt, :] = econ.multi_choice(new_probs.T)
 
@@ -272,4 +275,4 @@ class HiddenMarkov:
             for tt in range(self.Nt):
                 vals[:, ii, tt] = np.interp(q, Fx_smooth[tt, :], grid_2d[ii, :])
 
-        return vals 
+        return vals

@@ -6,6 +6,7 @@ Created on Tue Oct 10 10:01:55 2023
 @author: dan
 """
 
+
 class ModSpec:
     """Model specification defined by a set of named feature flags.
 
@@ -63,15 +64,17 @@ class ModSpec:
             add_list = []
         if remove_list is None:
             remove_list = []
-        
+
         self.features = add_list.copy()
         if mod is not None:
-            self.features += [feature for feature in mod.features if feature not in remove_list]
-            
+            self.features += [
+                feature for feature in mod.features if feature not in remove_list
+            ]
+
         self.features = sorted(list(set(self.features)))
-        
+
         if label is None:
-            self.label = '_'.join(self.features)
+            self.label = "_".join(self.features)
 
     def __contains__(self, key):
         """Return ``True`` if *key* is an active feature in this spec.
@@ -86,8 +89,8 @@ class ModSpec:
         bool
             ``True`` if *key* is present in :attr:`features`.
         """
-        return (key in self.features)
-    
+        return key in self.features
+
     def __str__(self):
         """Return the string label of this specification.
 

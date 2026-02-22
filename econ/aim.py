@@ -1,6 +1,7 @@
 import numpy as np
 from scipy.linalg import ordqz
 
+
 class KleinObj:
     """Solver for the Klein (2000) linear rational expectations system.
 
@@ -93,9 +94,7 @@ class KleinObj:
         H_f : ndarray, shape (n_pre, n_exog)
             Law of motion mapping exogenous states to predetermined states.
         """
-        S, T, alp, bet, Q, Z = ordqz(
-            self.A, self.B, sort='ouc', output='complex'
-        )  
+        S, T, alp, bet, Q, Z = ordqz(self.A, self.B, sort="ouc", output="complex")
 
         # Basic existence/uniqueness diagnostics (Blanchard-Kahn style).
         eig_tol = 1e-10
@@ -111,30 +110,33 @@ class KleinObj:
             )
         if n_stable != self.n_pre:
             raise ValueError(
-                "Blanchard-Kahn condition failed: expected {} stable roots, found {}."
-                .format(self.n_pre, n_stable)
+                "Blanchard-Kahn condition failed: expected {} stable roots, found {}.".format(
+                    self.n_pre, n_stable
+                )
             )
 
-        Q_star = np.asmatrix(Q).H 
-        Q1 = np.asmatrix(Q_star[:self.n_pre, :])
-        Q2 = np.asmatrix(Q_star[self.n_pre:, :])
+        Q_star = np.asmatrix(Q).H
+        Q1 = np.asmatrix(Q_star[: self.n_pre, :])
+        Q2 = np.asmatrix(Q_star[self.n_pre :, :])
 
-        Z11 = np.asmatrix(Z[:self.n_pre, :self.n_pre])
-        Z12 = np.asmatrix(Z[:self.n_pre, self.n_pre:])
-        Z21 = np.asmatrix(Z[self.n_pre:, :self.n_pre])
-        Z22 = np.asmatrix(Z[self.n_pre:, self.n_pre:])
+        Z11 = np.asmatrix(Z[: self.n_pre, : self.n_pre])
+        Z12 = np.asmatrix(Z[: self.n_pre, self.n_pre :])
+        Z21 = np.asmatrix(Z[self.n_pre :, : self.n_pre])
+        Z22 = np.asmatrix(Z[self.n_pre :, self.n_pre :])
 
-        S11 = np.asmatrix(S[:self.n_pre, :self.n_pre])
-        S12 = np.asmatrix(S[:self.n_pre, self.n_pre:])
-        S22 = np.asmatrix(S[self.n_pre:, self.n_pre:])
+        S11 = np.asmatrix(S[: self.n_pre, : self.n_pre])
+        S12 = np.asmatrix(S[: self.n_pre, self.n_pre :])
+        S22 = np.asmatrix(S[self.n_pre :, self.n_pre :])
 
-        T11 = np.asmatrix(T[:self.n_pre, :self.n_pre])
-        T12 = np.asmatrix(T[:self.n_pre, self.n_pre:])
-        T22 = np.asmatrix(T[self.n_pre:, self.n_pre:])
+        T11 = np.asmatrix(T[: self.n_pre, : self.n_pre])
+        T12 = np.asmatrix(T[: self.n_pre, self.n_pre :])
+        T22 = np.asmatrix(T[self.n_pre :, self.n_pre :])
 
         if Z12.shape[0] != Z12.shape[1]:
             raise ValueError(
-                "Klein solver requires square Z12 block; got shape {}.".format(Z12.shape)
+                "Klein solver requires square Z12 block; got shape {}.".format(
+                    Z12.shape
+                )
             )
 
         G_xc = Z11 * np.linalg.inv(Z12)
@@ -144,18 +146,21 @@ class KleinObj:
         self.H_x = np.real(H_xc)
 
         PhiST = np.kron(self.Phi.T, S22) - np.kron(np.eye(self.n_exog), T22)
-        q2C = (Q2 * self.C).flatten(order='F')
-        M = np.linalg.solve(PhiST, q2C).reshape((self.n_uns, self.n_exog), order='F')
+        q2C = (Q2 * self.C).flatten(order="F")
+        M = np.linalg.solve(PhiST, q2C).reshape((self.n_uns, self.n_exog), order="F")
 
         N = (Z22 - Z21 * np.linalg.solve(Z11, Z12)) * M
-        L = (-Z11 * np.linalg.solve(S11, T11) * np.linalg.solve(Z11, Z12) * M 
-             + Z11 * np.linalg.solve(S11, T12 * M - S12 * M * self.Phi + Q1 - self.C)
-             + Z12 * M * self.Phi)
+        L = (
+            -Z11 * np.linalg.solve(S11, T11) * np.linalg.solve(Z11, Z12) * M
+            + Z11 * np.linalg.solve(S11, T12 * M - S12 * M * self.Phi + Q1 - self.C)
+            + Z12 * M * self.Phi
+        )
 
         self.G_f = np.real(N)
         self.H_f = np.real(L)
 
         return None
+
 
 class AimObj:
     """Solver for the Anderson-Moore (AIM) linear rational expectations system.
@@ -267,7 +272,7 @@ class AimObj:
             Column-shifted copy of ``x``.
         """
         x_shift = np.zeros(x.shape)
-        x_shift[:, self.neq:] = x[:, :-self.neq]
+        x_shift[:, self.neq :] = x[:, : -self.neq]
 
         return x_shift
 
@@ -290,7 +295,7 @@ class AimObj:
             incremented by ``len(ix)``.
         """
         nz = len(ix)
-        self.Z[self.iz:self.iz + nz, :] = self.H[ix, self.left]
+        self.Z[self.iz : self.iz + nz, :] = self.H[ix, self.left]
         self.H[ix, :] = self.shift_right(self.H[ix, :])
         self.iz += nz
 
@@ -309,7 +314,7 @@ class AimObj:
             ``self.H`` and ``self.Z`` are updated in place.
         """
         zerorows = np.sum(np.abs(self.H[:, self.right]), axis=1) < self.tol
-        while (np.any(zerorows) and self.iz < self.zrows):
+        while np.any(zerorows) and self.iz < self.zrows:
             ix = np.arange(self.neq)[zerorows]
             self.shuffle(ix)
             # nz = np.sum(zerorows)
@@ -335,7 +340,7 @@ class AimObj:
         """
         q, r = np.linalg.qr(self.H[:, self.right])
         zerorows = np.abs(np.diag(r)) < self.tol
-        while (np.any(zerorows) and self.iz < self.zrows):
+        while np.any(zerorows) and self.iz < self.zrows:
             ix = np.arange(self.neq)[zerorows]
             self.H = np.dot(q.T, self.H)
             self.shuffle(ix)
@@ -360,10 +365,10 @@ class AimObj:
         """
         self.A = np.zeros((self.zcols, self.zcols))
         if self.zcols > self.neq:
-            self.A[:-self.neq, self.neq:] = np.eye(self.zcols - self.neq)
+            self.A[: -self.neq, self.neq :] = np.eye(self.zcols - self.neq)
 
         Gam = -np.linalg.solve(self.H[:, self.right], self.H[:, self.left])
-        self.A[-self.neq:, :] = Gam
+        self.A[-self.neq :, :] = Gam
 
         # Delete inessential lags
         self.js = np.arange(self.zcols)
@@ -397,7 +402,7 @@ class AimObj:
 
         # self.lgroots = np.sum(np.abs(sorted_vals) > self.eig_bnd)
 
-        self.Z[self.iz:, self.js] =  sorted_vecs[:, :(self.zrows - self.iz)].T
+        self.Z[self.iz :, self.js] = sorted_vecs[:, : (self.zrows - self.iz)].T
 
         return None
 
@@ -414,7 +419,9 @@ class AimObj:
             Sets ``self.B`` (shape ``(neq, neq * nlag)``) and overwrites
             ``self.Z`` with the full solution coefficients.
         """
-        self.Z = -np.linalg.solve(self.Z[:, self.zcols - self.zrows:], self.Z[:, :self.zcols - self.zrows])
-        self.B = self.Z[:self.neq, :self.neq * self.nlag]
+        self.Z = -np.linalg.solve(
+            self.Z[:, self.zcols - self.zrows :], self.Z[:, : self.zcols - self.zrows]
+        )
+        self.B = self.Z[: self.neq, : self.neq * self.nlag]
 
         return None

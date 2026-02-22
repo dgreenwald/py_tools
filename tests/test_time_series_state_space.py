@@ -33,7 +33,9 @@ def test_decompose_by_shock_reconstructs_state_path():
     ssm = _ssm_1d()
     x1 = np.array([0.5])
     shocks = np.array([[0.2], [-0.4], [0.1], [0.0]])
-    _, states = ssm.simulate(x_1=x1, shocks=shocks, meas_err=np.zeros((5, 1)), use_b=False)
+    _, states = ssm.simulate(
+        x_1=x1, shocks=shocks, meas_err=np.zeros((5, 1)), use_b=False
+    )
 
     shock_components, det_component = ssm.decompose_by_shock_init(shocks, x1)
     recon = det_component + np.sum(shock_components, axis=0)

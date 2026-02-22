@@ -32,6 +32,7 @@ from py_tools.text.flatten import (
 
 # --- get_next_argument ---
 
+
 class TestGetNextArgument:
     def test_simple_argument(self):
         arg, after = get_next_argument("{hello} rest")
@@ -55,6 +56,7 @@ class TestGetNextArgument:
 
 # --- get_arguments ---
 
+
 class TestGetArguments:
     def test_two_arguments(self):
         args, after = get_arguments("{first}{second} rest", 2)
@@ -68,6 +70,7 @@ class TestGetArguments:
 
 
 # --- replace_content ---
+
 
 class TestReplaceContent:
     def test_no_args_command(self):
@@ -95,6 +98,7 @@ class TestReplaceContent:
 
 
 # --- replace_command ---
+
 
 class TestReplaceCommand:
     def test_replaces_zero_arg_command(self):
@@ -135,6 +139,7 @@ class TestReplaceCommand:
 
 # --- replace_commands_static ---
 
+
 class TestReplaceCommandsStatic:
     def test_multiple_commands(self):
         cmds = [
@@ -163,6 +168,7 @@ class TestReplaceCommandsStatic:
 
 
 # --- remove_comments ---
+
 
 class TestRemoveComments:
     def test_removes_comment(self):
@@ -199,6 +205,7 @@ class TestRemoveComments:
 
 # --- get_definitions ---
 
+
 class TestGetDefinitions:
     def test_finds_def(self):
         text = r"\def\myvar{42}"
@@ -223,6 +230,7 @@ class TestGetDefinitions:
 
 # --- remove_command ---
 
+
 class TestRemoveCommand:
     def test_removes_newcommand_zero_args(self):
         cmd = Command("myfunc", 0, "content")
@@ -239,6 +247,7 @@ class TestRemoveCommand:
 
 
 # --- remove_commands ---
+
 
 class TestRemoveCommands:
     def test_removes_multiple(self):
@@ -259,6 +268,7 @@ class TestRemoveCommands:
 
 # --- remove_defn ---
 
+
 class TestRemoveDefn:
     def test_removes_def(self):
         cmd = Command("mydef", 0, "value")
@@ -269,6 +279,7 @@ class TestRemoveDefn:
 
 
 # --- remove_defns ---
+
 
 class TestRemoveDefns:
     def test_removes_multiple_defns(self):
@@ -288,6 +299,7 @@ class TestRemoveDefns:
 
 
 # --- replace_ref ---
+
 
 class TestReplaceRef:
     def test_replaces_ref(self):
@@ -310,6 +322,7 @@ class TestReplaceRef:
 
 # --- replace_refs ---
 
+
 class TestReplaceRefs:
     def test_replaces_multiple(self):
         text = r"\ref{a} and \ref{b}"
@@ -319,6 +332,7 @@ class TestReplaceRefs:
 
 
 # --- get_commands ---
+
 
 class TestGetCommands:
     def test_finds_newcommand(self):
@@ -343,6 +357,7 @@ class TestGetCommands:
 
 # --- read_if_exists ---
 
+
 class TestReadIfExists:
     def test_reads_existing_file(self, tmp_path):
         p = tmp_path / "test.txt"
@@ -356,6 +371,7 @@ class TestReadIfExists:
 
 
 # --- remove_brackets ---
+
 
 class TestRemoveBrackets:
     def test_removes_outer_braces(self):
@@ -372,6 +388,7 @@ class TestRemoveBrackets:
 
 
 # --- read_input_file ---
+
 
 class TestReadInputFile:
     def test_reads_file_directly(self, tmp_path):
@@ -394,6 +411,7 @@ class TestReadInputFile:
 
 # --- remove_unused_commands ---
 
+
 class TestRemoveUnusedCommands:
     def test_removes_unused(self):
         cmd = Command("unused", 0, "stuff")
@@ -411,6 +429,7 @@ class TestRemoveUnusedCommands:
 
 
 # --- replace_commands_dynamic ---
+
 
 class TestReplaceCommandsDynamic:
     def test_no_defs_returns_static_replaced(self):
@@ -439,6 +458,7 @@ class TestReplaceCommandsDynamic:
 
 
 # --- get_figure_labels ---
+
 
 class TestGetFigureLabels:
     def test_finds_figure_label(self):
@@ -478,6 +498,7 @@ class TestGetFigureLabels:
 
 # --- flatten_text ---
 
+
 class TestFlattenText:
     def test_plain_text_unchanged(self):
         text = "plain text no inputs"
@@ -509,8 +530,9 @@ class TestFlattenText:
     def test_command_replacement_applied(self):
         cmd = Command("greet", 0, "Hello")
         text = r"\greet world"
-        result = flatten_text(text, commands_to_replace=[cmd],
-                              do_remove_comments_from_text=False)
+        result = flatten_text(
+            text, commands_to_replace=[cmd], do_remove_comments_from_text=False
+        )
         assert "Hello" in result
 
 

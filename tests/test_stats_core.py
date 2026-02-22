@@ -1,7 +1,6 @@
 """Tests for py_tools.stats.core"""
 
 import numpy as np
-import pytest
 from scipy.stats import norm
 
 from py_tools.stats.core import (
@@ -19,6 +18,7 @@ from py_tools.stats.core import (
 
 
 # --- weighted_quantile ---
+
 
 class TestWeightedQuantile:
     def test_uniform_weights_matches_numpy(self):
@@ -64,6 +64,7 @@ class TestWeightedQuantile:
 
 # --- wq_by_col ---
 
+
 class TestWqByCol:
     def test_shape(self):
         values = np.random.default_rng(1).standard_normal((20, 3))
@@ -84,6 +85,7 @@ class TestWqByCol:
 
 # --- weighted_mean ---
 
+
 class TestWeightedMean:
     def test_equal_weights_matches_mean(self):
         x = np.array([1.0, 2.0, 3.0, 4.0])
@@ -98,6 +100,7 @@ class TestWeightedMean:
 
 # --- weighted_var ---
 
+
 class TestWeightedVar:
     def test_equal_weights_matches_variance(self):
         x = np.array([1.0, 2.0, 3.0, 4.0, 5.0])
@@ -110,6 +113,7 @@ class TestWeightedVar:
 
 # --- weighted_std ---
 
+
 class TestWeightedStd:
     def test_matches_sqrt_of_var(self):
         x = np.array([1.0, 3.0, 5.0, 7.0])
@@ -118,6 +122,7 @@ class TestWeightedStd:
 
 
 # --- std_norm_z_star ---
+
 
 class TestStdNormZStar:
     def test_two_sided(self):
@@ -131,6 +136,7 @@ class TestStdNormZStar:
 
 
 # --- std_norm_bands ---
+
 
 class TestStdNormBands:
     def test_symmetric(self):
@@ -148,6 +154,7 @@ class TestStdNormBands:
 
 # --- draw_norm ---
 
+
 class TestDrawNorm:
     def test_shape(self):
         assert draw_norm(np.eye(3)).shape == (3,)
@@ -162,6 +169,7 @@ class TestDrawNorm:
 
 # --- draw_norm_multi ---
 
+
 class TestDrawNormMulti:
     def test_shape(self):
         assert draw_norm_multi(np.eye(4), 10).shape == (10, 4)
@@ -169,8 +177,9 @@ class TestDrawNormMulti:
 
 # --- my_lognorm ---
 
+
 class TestMyLognorm:
     def test_mean(self):
         mu, sig = 1.0, 0.5
         dist = my_lognorm(mu, sig)
-        assert np.isclose(dist.mean(), np.exp(mu + 0.5 * sig ** 2), rtol=1e-6)
+        assert np.isclose(dist.mean(), np.exp(mu + 0.5 * sig**2), rtol=1e-6)

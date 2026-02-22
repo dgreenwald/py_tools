@@ -1,9 +1,12 @@
 import pandas as pd
 
 from . import config
-default_dir = config.base_dir() + 'dfa/'
+
+default_dir = config.base_dir() + "dfa/"
 DATASET_NAME = "dfa"
 DESCRIPTION = "Federal Reserve Distributional Financial Accounts (DFA) dataset loader."
+
+
 def load(dataset, levels=True, data_dir=default_dir, **kwargs):
     """Load pre-packaged set of DFA variables from CSV.
 
@@ -23,14 +26,14 @@ def load(dataset, levels=True, data_dir=default_dir, **kwargs):
     pandas.DataFrame
         DataFrame containing the requested DFA variables.
     """
-    
-    filename = 'dfa-' + dataset + '-'
-    
+
+    filename = "dfa-" + dataset + "-"
+
     if levels:
-        filename += 'levels'
+        filename += "levels"
     else:
-        filename += 'shares'
-        
-    filename += '.csv'
-    
+        filename += "shares"
+
+    filename += ".csv"
+
     return pd.read_csv(data_dir + filename, **kwargs)

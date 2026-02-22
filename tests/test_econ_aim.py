@@ -1,7 +1,6 @@
 """Tests for py_tools.econ.aim"""
 
 import numpy as np
-import pytest
 
 from py_tools.econ.aim import AimObj
 
@@ -57,5 +56,5 @@ class TestAimObjAttributes:
         H = np.array([[-0.7, 1.0, 0.0]])
         aim = AimObj(H.copy(), nlead=1)
         aim.solve()
-        assert hasattr(aim, 'B')
+        assert hasattr(aim, "B")
         assert aim.B is not None

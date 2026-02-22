@@ -3,7 +3,6 @@
 import io
 import os
 import pytest
-import tempfile
 
 from py_tools.text.core import (
     Table,
@@ -23,6 +22,7 @@ from py_tools.text.core import (
 
 
 # --- Table construction ---
+
 
 class TestTableConstruction:
     def test_basic_construction(self):
@@ -70,6 +70,7 @@ class TestTableConstruction:
 
 # --- Table.n_rows ---
 
+
 class TestTableNRows:
     def test_n_rows(self):
         t = Table([["a"], ["b"], ["c"]])
@@ -83,6 +84,7 @@ class TestTableNRows:
 
 # --- Table.row ---
 
+
 class TestTableRow:
     def test_valid_row(self):
         t = Table([["x", "y"], ["p", "q"]])
@@ -95,6 +97,7 @@ class TestTableRow:
 
 
 # --- Table.add_cline ---
+
 
 class TestTableAddCline:
     def test_add_first_cline(self):
@@ -111,6 +114,7 @@ class TestTableAddCline:
 
 
 # --- Table.body ---
+
 
 class TestTableBody:
     def test_body_contains_entries(self):
@@ -152,6 +156,7 @@ class TestTableBody:
 
 # --- Table.tabular ---
 
+
 class TestTableTabular:
     def test_tabular_contains_tabular_env(self):
         t = Table([["a", "b"]])
@@ -189,6 +194,7 @@ class TestTableTabular:
 
 # --- Table.table ---
 
+
 class TestTableTable:
     def test_table_wraps_in_table_env(self):
         t = Table([["a", "b"]])
@@ -222,6 +228,7 @@ class TestTableTable:
 
 # --- multicolumn ---
 
+
 class TestMulticolumn:
     def test_basic(self):
         result = multicolumn(3, "Header")
@@ -233,6 +240,7 @@ class TestMulticolumn:
 
 
 # --- empty_table ---
+
 
 class TestEmptyTable:
     def test_creates_correct_shape(self):
@@ -256,6 +264,7 @@ class TestEmptyTable:
 
 
 # --- hstack ---
+
 
 class TestHstack:
     def test_combined_cols(self):
@@ -287,6 +296,7 @@ class TestHstack:
 
 # --- shift_down ---
 
+
 class TestShiftDown:
     def test_new_row_prepended(self):
         t = Table([["a", "b"]])
@@ -307,6 +317,7 @@ class TestShiftDown:
 
 
 # --- join_horizontal ---
+
 
 class TestJoinHorizontal:
     def test_basic_join(self):
@@ -333,6 +344,7 @@ class TestJoinHorizontal:
 
 # --- join_vertical ---
 
+
 class TestJoinVertical:
     def test_basic_vertical_join(self):
         t1 = Table([["a", "b"], ["c", "d"]])
@@ -351,6 +363,7 @@ class TestJoinVertical:
 
 # --- open_latex / close_latex ---
 
+
 class TestOpenCloseLaTeX:
     def test_open_latex_writes_documentclass(self):
         buf = io.StringIO()
@@ -367,6 +380,7 @@ class TestOpenCloseLaTeX:
 
 # --- to_camel_case ---
 
+
 class TestToCamelCase:
     def test_basic(self):
         assert to_camel_case("hello_world") == "helloWorld"
@@ -382,6 +396,7 @@ class TestToCamelCase:
 
 
 # --- write_values_tex ---
+
 
 class TestWriteValuesTex:
     def test_creates_file(self, tmp_path):
@@ -429,6 +444,8 @@ class TestWriteValuesTex:
 
     def test_no_prefix_in_command_when_add_prefix_false(self, tmp_path):
         out = str(tmp_path / "values.tex")
-        write_values_tex({"k": "v"}, path=out, prefix="abc", add_prefix_to_command=False)
+        write_values_tex(
+            {"k": "v"}, path=out, prefix="abc", add_prefix_to_command=False
+        )
         content = open(out).read()
         assert "\\val " in content or "\\val\n" in content or "\\val #" in content

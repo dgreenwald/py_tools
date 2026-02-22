@@ -2,9 +2,12 @@ import numpy as np
 import pandas as pd
 
 from . import config
-default_dir = config.base_dir() + 'hmda/'
+
+default_dir = config.base_dir() + "hmda/"
 DATASET_NAME = "hmda"
 DESCRIPTION = "Home Mortgage Disclosure Act (HMDA) dataset loader."
+
+
 def load(data_dir=None, **kwargs):
     """Load HMDA data from the local HDF store.
 
@@ -26,9 +29,9 @@ def load(data_dir=None, **kwargs):
         HMDA loan-application records for the requested year.
     """
     if data_dir is not None:
-        kwargs.setdefault('data_dir', data_dir)
-    if 'save_dir' not in kwargs or kwargs.get('save_dir') is None:
-        kwargs['save_dir'] = kwargs.get('data_dir', default_dir)
+        kwargs.setdefault("data_dir", data_dir)
+    if "save_dir" not in kwargs or kwargs.get("save_dir") is None:
+        kwargs["save_dir"] = kwargs.get("data_dir", default_dir)
     return load_hmda(**kwargs)
 
 
@@ -45,7 +48,8 @@ def cat(num):
     list
         ``[1, 2, ..., num]``.
     """
-    return list(range(1, num+1))
+    return list(range(1, num + 1))
+
 
 def to_float(df, var):
     """Convert a DataFrame column to float64 in-place.
@@ -64,8 +68,9 @@ def to_float(df, var):
     pandas.DataFrame
         The same ``df`` with ``df[var]`` cast to ``numpy.float64``.
     """
-    df[var] = pd.to_numeric(df[var], errors='coerce').astype(np.float64)
+    df[var] = pd.to_numeric(df[var], errors="coerce").astype(np.float64)
     return df
+
 
 def load_chunk(df, drop_columns=None, obj_columns=None, categories=None):
     """Process one chunk of HMDA data by dropping, casting, or categorising columns.
@@ -108,7 +113,7 @@ def load_chunk(df, drop_columns=None, obj_columns=None, categories=None):
         if col in drop_columns:
             df.drop(col, axis=1, inplace=True)
         elif col in obj_columns:
-            df[col] = df[col].astype('object')
+            df[col] = df[col].astype("object")
         elif col in categories:
             df[col] = pd.Categorical(df[col], categories=categories[col])
         else:
@@ -116,8 +121,16 @@ def load_chunk(df, drop_columns=None, obj_columns=None, categories=None):
 
     return df
 
-def store(yr, data_dir=default_dir, save_dir=default_dir, nrows=None,
-          usecols=None, reimport=False, chunksize=500000):
+
+def store(
+    yr,
+    data_dir=default_dir,
+    save_dir=default_dir,
+    nrows=None,
+    usecols=None,
+    reimport=False,
+    chunksize=500000,
+):
     """Read a raw HMDA fixed-width file in chunks and persist it to HDF5.
 
     The compressed fixed-width file for ``yr`` is read with
@@ -153,104 +166,228 @@ def store(yr, data_dir=default_dir, save_dir=default_dir, nrows=None,
     -------
     None
     """
-    store_file = save_dir + 'hmda.hd5'
-    key = 'hmda_{}'.format(yr)
+    store_file = save_dir + "hmda.hd5"
+    key = "hmda_{}".format(yr)
     store = pd.HDFStore(store_file)
 
     if yr == 2001:
-        filename = 'HMS.U2001.LARS.PUBLIC.DATA'
+        filename = "HMS.U2001.LARS.PUBLIC.DATA"
     elif yr == 2004:
-        filename = 'u2004lar.public.dat'
+        filename = "u2004lar.public.dat"
     elif yr in [2005, 2006]:
-        filename = 'LARS.ULTIMATE.{}.DAT'.format(yr)
+        filename = "LARS.ULTIMATE.{}.DAT".format(yr)
     elif yr in [2007, 2008]:
-        filename = 'lars.ultimate.{}.dat'.format(yr)
+        filename = "lars.ultimate.{}.dat".format(yr)
     elif yr == 2009:
-        filename = '2009_Ultimate_PUBLIC_LAR.dat'
+        filename = "2009_Ultimate_PUBLIC_LAR.dat"
     elif yr > 2009:
-        filename = 'Lars.ultimate.{0}.dat'.format(yr)
+        filename = "Lars.ultimate.{0}.dat".format(yr)
     else:
-        filename = 'HMS.U{}.LARS'.format(yr)
+        filename = "HMS.U{}.LARS".format(yr)
 
     if yr < 2004:
         widths = [
-                4, 10, 1, 1, 1,
-                1, 5, 1, 4, 2,
-                3, 7, 1, 1, 1,
-                1, 4, 1, 1, 1,
-                1, 1, 7,
-                ]
+            4,
+            10,
+            1,
+            1,
+            1,
+            1,
+            5,
+            1,
+            4,
+            2,
+            3,
+            7,
+            1,
+            1,
+            1,
+            1,
+            4,
+            1,
+            1,
+            1,
+            1,
+            1,
+            7,
+        ]
         names = [
-                'asof_date', 'resp_id', 'agency_code', 'loan_type', 'loan_purp',
-                'occupancy', 'loan_amt', 'action_taken', 'prop_msa', 'state_code',
-                'county_code', 'census_tract', 'app_race', 'co_app_race', 'app_sex',
-                'co_app_sex', 'app_income', 'purchaser_type', 'denial_reason_1', 'denial_reason_2',
-                'denial_reason_3', 'edit_status', 'seq_num',
-                ]
+            "asof_date",
+            "resp_id",
+            "agency_code",
+            "loan_type",
+            "loan_purp",
+            "occupancy",
+            "loan_amt",
+            "action_taken",
+            "prop_msa",
+            "state_code",
+            "county_code",
+            "census_tract",
+            "app_race",
+            "co_app_race",
+            "app_sex",
+            "co_app_sex",
+            "app_income",
+            "purchaser_type",
+            "denial_reason_1",
+            "denial_reason_2",
+            "denial_reason_3",
+            "edit_status",
+            "seq_num",
+        ]
     else:
-        widths=[
-                4, 10, 1, 1, 1,
-                1, 5, 1, 5, 2,
-                3, 7, 1, 1, 4,
-                1, 1, 1, 1, 1,
-                1, 1, 1, 1, 1,
-                1, 1, 1, 1, 1,
-                1, 1, 1, 1, 5,
-                1, 1, 7,
-                ]
+        widths = [
+            4,
+            10,
+            1,
+            1,
+            1,
+            1,
+            5,
+            1,
+            5,
+            2,
+            3,
+            7,
+            1,
+            1,
+            4,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            5,
+            1,
+            1,
+            7,
+        ]
         names = [
-                'asof_date', 'resp_id', 'agency_code', 'loan_type', 'loan_purp',
-                'occupancy', 'loan_amt', 'action_taken', 'prop_msa', 'state_code',
-                'county_code', 'census_tract', 'app_sex', 'co_app_sex', 'app_income', 
-                'purchaser_type', 'denial_reason_1', 'denial_reason_2', 'denial_reason_3', 'edit_status', 
-                'prop_type', 'preapprovals', 'app_ethnicity', 'co_app_ethnicity', 'app_race_1', 
-                'app_race_2', 'app_race_3', 'app_race_4', 'app_race_5', 'co_app_race_1', 
-                'co_app_race_2', 'co_app_race_3', 'co_app_race_4', 'co_app_race_5', 'rate_spread',
-                'hoepa_status', 'lien_status', 'seq_num',
-                ]
+            "asof_date",
+            "resp_id",
+            "agency_code",
+            "loan_type",
+            "loan_purp",
+            "occupancy",
+            "loan_amt",
+            "action_taken",
+            "prop_msa",
+            "state_code",
+            "county_code",
+            "census_tract",
+            "app_sex",
+            "co_app_sex",
+            "app_income",
+            "purchaser_type",
+            "denial_reason_1",
+            "denial_reason_2",
+            "denial_reason_3",
+            "edit_status",
+            "prop_type",
+            "preapprovals",
+            "app_ethnicity",
+            "co_app_ethnicity",
+            "app_race_1",
+            "app_race_2",
+            "app_race_3",
+            "app_race_4",
+            "app_race_5",
+            "co_app_race_1",
+            "co_app_race_2",
+            "co_app_race_3",
+            "co_app_race_4",
+            "co_app_race_5",
+            "rate_spread",
+            "hoepa_status",
+            "lien_status",
+            "seq_num",
+        ]
 
     # filepath = data_dir + filename + '.zip?download=true'
-    filepath = data_dir + filename + '.zip'
-    reader = pd.read_fwf(filepath, widths=widths, names=names,
-            usecols=usecols, nrows=nrows, compression='zip',
-            chunksize=chunksize)
+    filepath = data_dir + filename + ".zip"
+    reader = pd.read_fwf(
+        filepath,
+        widths=widths,
+        names=names,
+        usecols=usecols,
+        nrows=nrows,
+        compression="zip",
+        chunksize=chunksize,
+    )
 
-    data_columns = ['loan_type', 'loan_purp', 'occupancy',
-            'action_taken', 'lien_status', 'purchaser_type']
+    data_columns = [
+        "loan_type",
+        "loan_purp",
+        "occupancy",
+        "action_taken",
+        "lien_status",
+        "purchaser_type",
+    ]
 
     obj_columns = []
-    drop_columns = ['resp_id', 'agency_code', 'app_sex', 'co_app_sex',
-            'app_ethnicity', 'co_app_ethnicity', 'app_race', 'co_app_race',
-            'app_race_1', 'app_race_2', 'app_race_3', 'app_race_4',
-            'app_race_5', 'co_app_race_1', 'co_app_race_2', 'co_app_race_3',
-            'co_app_race_4', 'co_app_race_5', 'hoepa_status', 'seq_num']
+    drop_columns = [
+        "resp_id",
+        "agency_code",
+        "app_sex",
+        "co_app_sex",
+        "app_ethnicity",
+        "co_app_ethnicity",
+        "app_race",
+        "co_app_race",
+        "app_race_1",
+        "app_race_2",
+        "app_race_3",
+        "app_race_4",
+        "app_race_5",
+        "co_app_race_1",
+        "co_app_race_2",
+        "co_app_race_3",
+        "co_app_race_4",
+        "co_app_race_5",
+        "hoepa_status",
+        "seq_num",
+    ]
 
     # cat_vars = ['']
     categories = {
-            'loan_type' : cat(4),
-            'prop_type' : cat(3),
-            'loan_purp' : cat(3),
-            'occupancy' : cat(3),
-            'preapprovals' : cat(3),
-            'action_taken' : cat(8),
-            'denial_reason_1' : cat(9),
-            'denial_reason_2' : cat(9),
-            'denial_reason_3' : cat(9),
-            'edit_status' : list(range(5, 8)),
-            'state_code' : list(range(1, 100)),
-            'purchaser_type' : list(range(10)),
-            'lien_status' : list(range(5)),
-            }
+        "loan_type": cat(4),
+        "prop_type": cat(3),
+        "loan_purp": cat(3),
+        "occupancy": cat(3),
+        "preapprovals": cat(3),
+        "action_taken": cat(8),
+        "denial_reason_1": cat(9),
+        "denial_reason_2": cat(9),
+        "denial_reason_3": cat(9),
+        "edit_status": list(range(5, 8)),
+        "state_code": list(range(1, 100)),
+        "purchaser_type": list(range(10)),
+        "lien_status": list(range(5)),
+    }
 
     for ii, df in enumerate(reader):
-        
         print("reading chunk {}".format(ii))
 
         for col in df.columns:
             if col in drop_columns:
                 df.drop(col, axis=1, inplace=True)
             elif col in obj_columns:
-                df[col] = df[col].astype('object')
+                df[col] = df[col].astype("object")
             elif col in categories:
                 df[col] = pd.Categorical(df[col], categories=categories[col])
             else:
@@ -263,10 +400,10 @@ def store(yr, data_dir=default_dir, save_dir=default_dir, nrows=None,
 
     store.close()
 
-    return None 
+    return None
 
-def load_hmda(yr, data_dir=default_dir, save_dir=default_dir, query=None,
-              columns=None):
+
+def load_hmda(yr, data_dir=default_dir, save_dir=default_dir, query=None, columns=None):
     """Load HMDA data for a given year from the local HDF5 store.
 
     Opens the HDF5 store at ``save_dir/hmda.hd5``, selects the table stored
@@ -296,8 +433,8 @@ def load_hmda(yr, data_dir=default_dir, save_dir=default_dir, query=None,
         HMDA loan-application records for the requested year, filtered
         according to ``query`` and ``columns``.
     """
-    store_file = save_dir + 'hmda.hd5'
-    key = 'hmda_{}'.format(yr)
+    store_file = save_dir + "hmda.hd5"
+    key = "hmda_{}".format(yr)
     store = pd.HDFStore(store_file)
 
     store.open()

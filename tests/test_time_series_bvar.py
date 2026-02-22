@@ -33,7 +33,9 @@ def test_mniw_and_dummy_prior_builders_shapes():
     assert np.isclose(np.diagonal(Om_inv_bar)[-1], 1e-6)
     assert df_bar == Ny + 2
 
-    X_star, Y_star = bvm.co_persistence_prior(np.array([0.8, 1.2]), Nx, Ny, p, ybar=np.array([1.0, 2.0]))
+    X_star, Y_star = bvm.co_persistence_prior(
+        np.array([0.8, 1.2]), Nx, Ny, p, ybar=np.array([1.0, 2.0])
+    )
     assert X_star.shape == (Ny + 1, Nx)
     assert Y_star.shape == (Ny + 1, Ny)
 

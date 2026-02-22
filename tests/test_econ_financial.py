@@ -1,7 +1,6 @@
 """Tests for py_tools.econ.financial"""
 
 import numpy as np
-import pytest
 
 from py_tools.econ.financial import get_coupon
 

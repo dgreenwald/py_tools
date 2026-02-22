@@ -3,6 +3,7 @@ from scipy.optimize import minimize
 
 from py_tools.numerical import gradient
 
+
 def objfcn(b, err_fcn, *args):
     """
     NLS objective function (RMSE).
@@ -22,6 +23,7 @@ def objfcn(b, err_fcn, *args):
         Root-mean-square of the residuals returned by ``err_fcn``.
     """
     return np.sqrt(np.mean(err_fcn(b, *args) ** 2))
+
 
 def se_nls(err_fcn, b, args=()):
     """
@@ -64,7 +66,7 @@ def se_nls(err_fcn, b, args=()):
         outer_vals += grad_t2
         inner_vals += (e[tt] ** 2) * grad_t2
 
-    inner_vals *= (4.0 / Nt)
+    inner_vals *= 4.0 / Nt
     outer_vals /= Nt
 
     outer_vals_inv = np.linalg.inv(outer_vals)
@@ -72,6 +74,7 @@ def se_nls(err_fcn, b, args=()):
     se = np.sqrt(np.diagonal(V) / Nt)
 
     return se, V, e
+
 
 def nls(err_fcn, b0, args=(), **kwargs):
     """
@@ -110,16 +113,16 @@ def nls(err_fcn, b0, args=(), **kwargs):
     all_args = (err_fcn,) + args
     res = minimize(objfcn, b0, args=all_args, **kwargs)
 
-    # Compute standard errors 
+    # Compute standard errors
     b_hat = res.x
     se, V, e_hat = se_nls(err_fcn, b_hat, args=args)
 
     output = {
-        'b_hat' : b_hat,
-        'e_hat' : e_hat,
-        'V' : V,
-        'se' : se,
-        'res' : res,
+        "b_hat": b_hat,
+        "e_hat": e_hat,
+        "V": V,
+        "se": se,
+        "res": res,
     }
 
     return output

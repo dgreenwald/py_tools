@@ -46,7 +46,9 @@ def test_check_bounds():
 
 
 def test_metropolis_step_accept_and_reject():
-    f = lambda z: -np.sum(z * z)
+    def f(z):
+        return -np.sum(z * z)
+
     x = np.array([0.0])
     x_try = np.array([1.0])
     # Force reject
@@ -62,7 +64,9 @@ def test_metropolis_step_accept_and_reject():
 def test_importance_sample_serial_shapes():
     from scipy.stats import multivariate_normal as mv
 
-    f = lambda z: -0.5 * np.sum(z * z)
+    def f(z):
+        return -0.5 * np.sum(z * z)
+
     dist = mv(mean=np.zeros(2), cov=np.eye(2))
 
     draws, lw = importance_sample(f, dist, Nsim=1, Nx=2, parallel=False)
@@ -75,7 +79,9 @@ def test_importance_sample_serial_shapes():
 
 
 def test_rwmh_default_blocks_smoke():
-    post = lambda z: -0.5 * np.sum(z * z)
+    def post(z):
+        return -0.5 * np.sum(z * z)
+
     x_store, p_store, acc = rwmh(post, np.array([0.0]), Nstep=4)
     assert x_store.shape == (4, 1)
     assert p_store.shape == (4,)
@@ -85,13 +91,17 @@ def test_rwmh_default_blocks_smoke():
 def test_montecarlo_bounds_and_iterative_find_mode_without_names():
     prior = Prior()
     prior.add("norm", mean=0.0, sd=1.0)
-    mc = MonteCarlo(log_like=lambda x: -0.5 * np.sum(x * x), prior=prior, ub=np.array([1.0]))
+    mc = MonteCarlo(
+        log_like=lambda x: -0.5 * np.sum(x * x), prior=prior, ub=np.array([1.0])
+    )
     assert np.isneginf(mc.lb[0])
     assert mc.ub[0] == 1.0
     assert np.isfinite(mc.posterior(np.array([0.0])))
 
     # names=None should still work with iterate=True
-    res = mc.find_mode(np.array([0.2]), iterate=True, disp_iterate=True, method="Nelder-Mead")
+    res = mc.find_mode(
+        np.array([0.2]), iterate=True, disp_iterate=True, method="Nelder-Mead"
+    )
     assert np.isfinite(mc.post_mode)
     assert res.success or np.isfinite(res.fun)
 
@@ -112,7 +122,13 @@ def test_rwmc_sample_guard_and_run_all(tmp_path):
     prior = Prior()
     prior.add("norm", mean=0.0, sd=1.0, name="theta")
 
-    rw = RWMC(log_like=lambda x: -0.5 * np.sum(x * x), prior=prior, Nx=1, out_dir=None, suffix=None)
+    rw = RWMC(
+        log_like=lambda x: -0.5 * np.sum(x * x),
+        prior=prior,
+        Nx=1,
+        out_dir=None,
+        suffix=None,
+    )
     rw.initialize(x0=np.array([0.0]), C=np.eye(1), stride=1)
     with pytest.raises(ValueError):
         rw.sample(Nsim=4, n_save=2, log=False)
@@ -139,11 +155,18 @@ def test_smc_initialize_guard_and_serial_sample(tmp_path):
     prior = Prior()
     prior.add("norm", mean=0.0, sd=1.0)
 
-    smc_bad = SMC(log_like=lambda x: -0.5 * np.sum(x * x), prior=prior, Nx=1, out_dir=None)
+    smc_bad = SMC(
+        log_like=lambda x: -0.5 * np.sum(x * x), prior=prior, Nx=1, out_dir=None
+    )
     with pytest.raises(ValueError):
         smc_bad.initialize(Npt=8, Nstep=3, parallel=False, save_intermediate=True)
 
-    smc = SMC(log_like=lambda x: -0.5 * np.sum(x * x), prior=prior, Nx=1, out_dir=str(tmp_path))
+    smc = SMC(
+        log_like=lambda x: -0.5 * np.sum(x * x),
+        prior=prior,
+        Nx=1,
+        out_dir=str(tmp_path),
+    )
     smc.initialize(Npt=8, Nstep=3, parallel=False, save_intermediate=False)
     smc.sample(quiet=True)
     assert smc.draws.shape == (3, 8, 1)

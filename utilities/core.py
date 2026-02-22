@@ -3,6 +3,7 @@ import itertools
 import numpy as np
 from time import perf_counter
 
+
 def as_list(x):
     """Wrap a non-list value in a list, or return lists unchanged.
 
@@ -21,6 +22,7 @@ def as_list(x):
         return [x]
     else:
         return x
+
 
 def split(x, lengths, axis=0):
     """Split a NumPy array into pieces with specified lengths.
@@ -44,6 +46,7 @@ def split(x, lengths, axis=0):
         indices.append(indices[-1] + length)
     return np.split(x, indices, axis=axis)
 
+
 def split_str(string, length):
     """Split a string into two substrings at a given position.
 
@@ -62,6 +65,7 @@ def split_str(string, length):
     string = str(string)
     return (string[:length], string[length:])
 
+
 def split_list(x, n):
     """Split a list into two parts at index *n*.
 
@@ -78,6 +82,7 @@ def split_list(x, n):
         ``(x[:n], x[n:])``
     """
     return x[:n], x[n:]
+
 
 def any2(list_of_items, list_to_check):
     """Check whether any item from one list appears in another.
@@ -97,6 +102,7 @@ def any2(list_of_items, list_to_check):
     """
     return any([var in list_to_check for var in list_of_items])
 
+
 def join_lists(list_of_lists):
     """Flatten a list of lists into a single list.
 
@@ -111,6 +117,7 @@ def join_lists(list_of_lists):
         All elements from each sub-iterable concatenated in order.
     """
     return list(itertools.chain.from_iterable(list_of_lists))
+
 
 def check_duplicates(var_list):
     """Raise an exception if a list contains duplicate entries.
@@ -137,6 +144,7 @@ def check_duplicates(var_list):
                 duplicate.add(var)
         raise Exception("Repeated variables detected: {}".format(duplicate))
 
+
 def swap_all_axes(a, target_axes, count=0):
     """Recursively reorder array axes to match a target permutation.
 
@@ -157,11 +165,9 @@ def swap_all_axes(a, target_axes, count=0):
     """
 
     if count == len(a.shape):
-
         return a
 
     else:
-
         ix = target_axes.index(count)
 
         if ix != count:
@@ -169,12 +175,13 @@ def swap_all_axes(a, target_axes, count=0):
             a_new = np.swapaxes(a, ix, count)
 
             new_axes[count] = target_axes[ix]
-            new_axes[ix] = target_axes[count] 
+            new_axes[ix] = target_axes[count]
         else:
             new_axes = target_axes
             a_new = a
-        
-        return swap_all_axes(a_new, new_axes, count=(count+1))
+
+        return swap_all_axes(a_new, new_axes, count=(count + 1))
+
 
 def tic():
     """Return the current value of the performance counter.
@@ -187,6 +194,7 @@ def tic():
     """
 
     return perf_counter()
+
 
 def toc(start, display=True):
     """Print and return elapsed time since *start*.
@@ -208,6 +216,7 @@ def toc(start, display=True):
     print("Time elapsed: {:4.3g} seconds".format(elapsed))
     return elapsed
 
+
 def timer(func):
     """Decorator that prints the execution time of a function.
 
@@ -222,13 +231,16 @@ def timer(func):
         Wrapped function that times its own execution and prints the
         elapsed time via :func:`toc`.
     """
+
     def wrapper(*args, **kwargs):
         """Execute *func*, printing elapsed time afterwards."""
         start = tic()
         result = func(*args, **kwargs)
         toc(start)
         return result
+
     return wrapper
+
 
 def log_if_pos(x):
     """Compute the element-wise log of an array, or return NaNs if any value is non-positive.
@@ -249,6 +261,7 @@ def log_if_pos(x):
         return np.log(x)
     else:
         return np.nan * np.ones(x.shape)
+
 
 def cartesian(arrays, out=None):
     """Generate a Cartesian product of input arrays.
@@ -291,12 +304,13 @@ def cartesian(arrays, out=None):
         out = np.zeros([n, len(arrays)], dtype=dtype)
 
     m = n // arrays[0].size
-    out[:,0] = np.repeat(arrays[0], m)
+    out[:, 0] = np.repeat(arrays[0], m)
     if arrays[1:]:
-        cartesian(arrays[1:], out=out[0:m,1:])
+        cartesian(arrays[1:], out=out[0:m, 1:])
         for j in range(1, arrays[0].size):
-            out[j*m:(j+1)*m,1:] = out[0:m,1:]
+            out[j * m : (j + 1) * m, 1:] = out[0:m, 1:]
     return out
+
 
 def cartesian_matrices(A, B):
     """Compute the row-wise Cartesian product of two 2-D matrices.
@@ -324,13 +338,13 @@ def cartesian_matrices(A, B):
     C = np.zeros((Nx, Ny, 2))
 
     for ii, jj in itertools.product(range(A.shape[0]), range(B.shape[0])):
-
-        kk = B.shape[0] * ii + jj 
+        kk = B.shape[0] * ii + jj
         C[kk, :, :] = cartesian((A[ii, :], B[jj, :]))
 
     return C
 
-def get_env(name, default, prefix='', upper=True, dtype=None, no_underscore=False):
+
+def get_env(name, default, prefix="", upper=True, dtype=None, no_underscore=False):
     """Read a value from an environment variable with an optional prefix.
 
     Parameters
@@ -359,8 +373,8 @@ def get_env(name, default, prefix='', upper=True, dtype=None, no_underscore=Fals
         *default* if the variable is not set.
     """
 
-    if (prefix != '') and (not no_underscore) and (prefix[-1] != '_'):
-        prefix += '_'
+    if (prefix != "") and (not no_underscore) and (prefix[-1] != "_"):
+        prefix += "_"
 
     fullname = prefix + name
     if upper:

@@ -6,7 +6,6 @@ Created on Wed Oct 10 10:09:55 2018
 @author: dan
 """
 
-import matplotlib.pyplot as plt
 import numpy as np
 from py_tools import state_space
 from scipy.stats import multivariate_normal as mvn
@@ -28,18 +27,18 @@ dist_init = mvn(mean=x0, cov=P0)
 # Simulate data and compute true likelihood
 Nt = 20
 x_sim = np.zeros((Nt, 2))
-e_sim = dist.rvs(Nt-1)
+e_sim = dist.rvs(Nt - 1)
 L_all = np.zeros(Nt)
 
 x_sim[0, :] = dist_init.rvs(1)
 L_all[0] = dist_init.logpdf(x_sim[0, :])
 
 for tt in range(1, 20):
-    x_sim[tt, :] = np.dot(A, x_sim[tt-1, :]) + np.dot(R, e_sim[tt-1, :])
-    L_all[tt] = dist.logpdf(e_sim[tt-1, :])
+    x_sim[tt, :] = np.dot(A, x_sim[tt - 1, :]) + np.dot(R, e_sim[tt - 1, :])
+    L_all[tt] = dist.logpdf(e_sim[tt - 1, :])
 
 L_true = np.sum(L_all)
-#print(L_all)
+# print(L_all)
 
 y_sim = x_sim.copy()
 
@@ -51,11 +50,11 @@ print("True: {0:g}, filtered: {1:g}".format(L_true, sse.log_like))
 
 sse.disturbance_smoother()
 # Check
-#x0_hat = x0 + np.dot(P0, sse.r[0, :])
-#print(x0_hat - x_sim[0, :])
-#e_hat = np.dot(sse.r, np.dot(Q.T, R))
-#print(e_hat[1:, :] - e_sim)
+# x0_hat = x0 + np.dot(P0, sse.r[0, :])
+# print(x0_hat - x_sim[0, :])
+# e_hat = np.dot(sse.r, np.dot(Q.T, R))
+# print(e_hat[1:, :] - e_sim)
 
 sse.state_smoother()
 # Check
-#print(sse.x_smooth - x_sim)
+# print(sse.x_smooth - x_sim)

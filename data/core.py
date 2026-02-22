@@ -8,6 +8,7 @@ import statsmodels.formula.api as smf
 
 from py_tools import stats
 
+
 def pivot_no_hierarchical_columns(df, *args, **kwargs):
     """Pivot a DataFrame and flatten the resulting MultiIndex columns.
 
@@ -34,6 +35,7 @@ def pivot_no_hierarchical_columns(df, *args, **kwargs):
     df.columns = df.columns.get_level_values(1)
     return df
 
+
 def lowercase(df):
     """Rename all DataFrame columns to lowercase.
 
@@ -47,10 +49,12 @@ def lowercase(df):
     pandas.DataFrame
         DataFrame with all column names converted to lowercase.
     """
-    return df.rename(columns={var : var.lower() for var in df.columns})
+    return df.rename(columns={var: var.lower() for var in df.columns})
 
-def absorb(df, groups, value_var, weight_var=None, restore_mean=True, tol=1e-12,
-           display=False):
+
+def absorb(
+    df, groups, value_var, weight_var=None, restore_mean=True, tol=1e-12, display=False
+):
     """Remove the mean from a variable by group (alternating-projections FWL).
 
     Implements a Frisch-Waugh-Lovell style within-group demeaning via the
@@ -100,50 +104,55 @@ def absorb(df, groups, value_var, weight_var=None, restore_mean=True, tol=1e-12,
 
     # Set a default weight variable if none is specified
     if weight_var is None:
-        _df['_weight'] = 1.0
+        _df["_weight"] = 1.0
     else:
-        _df['_weight'] = _df[weight_var].copy()
+        _df["_weight"] = _df[weight_var].copy()
 
     # Make sure we cut down to overlapping sample of values and weights
-    _df['_x'] = _df[value_var].copy()
-    ix = np.any(pd.isnull(_df[[value_var, '_weight']]), axis=1) | (_df['_weight'] == 0.0)
-    _df.loc[ix, ['_weight', '_x']] = np.nan
-    
+    _df["_x"] = _df[value_var].copy()
+    ix = np.any(pd.isnull(_df[[value_var, "_weight"]]), axis=1) | (
+        _df["_weight"] == 0.0
+    )
+    _df.loc[ix, ["_weight", "_x"]] = np.nan
+
     # Weighted variable
-    _df['_x_weight'] = _df['_x'] * _df['_weight']
-    
+    _df["_x_weight"] = _df["_x"] * _df["_weight"]
+
     # Weighted means error
     def get_err():
-        
+
         err = 0.0
         for ii, group in enumerate(groups):
-            group_means = (gbfe_list[ii]['_res_weight'].transform('sum') / sum_weight_list[ii]).fillna(0.0)
+            group_means = (
+                gbfe_list[ii]["_res_weight"].transform("sum") / sum_weight_list[ii]
+            ).fillna(0.0)
             err += np.sqrt((group_means @ group_means) / len(group_means))
-            
+
         return err
-            
+
     # Prep across groups
-    fe_list = ['_fe' + str(ii) for ii in range(Ng)]
+    fe_list = ["_fe" + str(ii) for ii in range(Ng)]
     gbfe_list = [_df.groupby(group) for group in groups]
-    sum_weight_list = [gbfe['_weight'].transform('sum') for gbfe in gbfe_list]
+    sum_weight_list = [gbfe["_weight"].transform("sum") for gbfe in gbfe_list]
     for fe_var in fe_list:
         _df[fe_var] = 0.0
-        _df[fe_var + '_weight'] = 0.0
-        
-    _df['_res_weight'] = _df['_x_weight'].copy()
-    
+        _df[fe_var + "_weight"] = 0.0
+
+    _df["_res_weight"] = _df["_x_weight"].copy()
+
     err = get_err()
-        
+
     count = 0
     while err > tol:
-        
         for ii, group in enumerate(groups):
             fe_var = fe_list[ii]
-            _df['_res_weight'] += _df[fe_var + '_weight']
-            _df[fe_var] = gbfe_list[ii]['_res_weight'].transform('sum') / sum_weight_list[ii]
-            _df[fe_var + '_weight'] = _df[fe_var] * _df['_weight']
-            _df['_res_weight'] -= _df[fe_var + '_weight']
-                
+            _df["_res_weight"] += _df[fe_var + "_weight"]
+            _df[fe_var] = (
+                gbfe_list[ii]["_res_weight"].transform("sum") / sum_weight_list[ii]
+            )
+            _df[fe_var + "_weight"] = _df[fe_var] * _df["_weight"]
+            _df["_res_weight"] -= _df[fe_var + "_weight"]
+
         err = get_err()
         count += 1
         if display:
@@ -151,15 +160,25 @@ def absorb(df, groups, value_var, weight_var=None, restore_mean=True, tol=1e-12,
 
     # Restore original mean and output
     fe_means = np.sum(_df[fe_list], axis=1)
-    x = _df['_x'] - fe_means
+    x = _df["_x"] - fe_means
     if restore_mean:
-        x_mean = np.sum(_df['_x_weight']) / np.sum(_df['_weight'])
+        x_mean = np.sum(_df["_x_weight"]) / np.sum(_df["_weight"])
         x += x_mean
 
     return x
 
-def compute_binscatter(df_in, yvar, xvar, wvar=None, n_bins=10, bins=None, median=False, 
-                       control=None, absorb=None):
+
+def compute_binscatter(
+    df_in,
+    yvar,
+    xvar,
+    wvar=None,
+    n_bins=10,
+    bins=None,
+    median=False,
+    control=None,
+    absorb=None,
+):
     """Compute binscatter statistics for a pair of variables.
 
     Partitions *xvar* into quantile bins and computes the (weighted) mean or
@@ -216,33 +235,32 @@ def compute_binscatter(df_in, yvar, xvar, wvar=None, n_bins=10, bins=None, media
     if wvar is not None:
         df[wvar] = df_in[wvar]
     else:
-        wvar='weight'
+        wvar = "weight"
         df[wvar] = 1.0
-        
-    df = df.dropna()
-        
-    if bins is None:
-        df['x_bin'] = bin_data(df[xvar], n_bins, weights=df[wvar])
-    else:
-        df['x_bin'] = pd.cut(df[xvar], bins, labels=np.arange(len(bins)-1))
-        
-    if median:
-        
-        by_bin = df.groupby('x_bin', observed=False)[[xvar, yvar]].median()
-    
-    else:
 
+    df = df.dropna()
+
+    if bins is None:
+        df["x_bin"] = bin_data(df[xvar], n_bins, weights=df[wvar])
+    else:
+        df["x_bin"] = pd.cut(df[xvar], bins, labels=np.arange(len(bins) - 1))
+
+    if median:
+        by_bin = df.groupby("x_bin", observed=False)[[xvar, yvar]].median()
+
+    else:
         df[xvar] *= df[wvar]
         df[yvar] *= df[wvar]
-        
-        by_bin = df.groupby('x_bin', observed=False)[[xvar, yvar, wvar]].sum()
+
+        by_bin = df.groupby("x_bin", observed=False)[[xvar, yvar, wvar]].sum()
         by_bin[xvar] /= by_bin[wvar]
         by_bin[yvar] /= by_bin[wvar]
-        
+
         weight_adj = n_bins / len(df)
         by_bin[wvar] *= weight_adj
 
     return by_bin
+
 
 def bin_data(series, n_bins, weights=None):
     """Group data into bins based on quantile boundaries.
@@ -263,12 +281,12 @@ def bin_data(series, n_bins, weights=None):
         Series of integer bin labels (0-indexed) aligned with *series*.
     """
 
-    quantiles = np.linspace(0.0, 1.0, n_bins+1)
+    quantiles = np.linspace(0.0, 1.0, n_bins + 1)
     if weights is None:
-        bins = series.quantile(np.linspace(0.0, 1.0, n_bins+1)).values
+        bins = series.quantile(np.linspace(0.0, 1.0, n_bins + 1)).values
     else:
         bins = stats.weighted_quantile(series.values, weights.values, quantiles)
-        
+
     bins = np.unique(bins)
     bins = bins[np.isfinite(bins)]
 
@@ -276,6 +294,7 @@ def bin_data(series, n_bins, weights=None):
     bins[-1] = np.inf
 
     return pd.cut(series, bins, labels=np.arange(len(bins) - 1))
+
 
 class FullResults:
     """Regression results bundled with the sample index and design matrices.
@@ -303,6 +322,7 @@ class FullResults:
     zs : numpy.ndarray or None
         Dependent variable array/matrix.
     """
+
     def __init__(self, results, ix, Xs, zs):
         """Initialise a FullResults container.
 
@@ -321,6 +341,7 @@ class FullResults:
         self.ix = ix
         self.Xs = Xs
         self.zs = zs
+
 
 def winsorize(df_in, var_list, wvar=None, p_val=0.98):
     """Winsorize variables to the central *p_val* quantile mass.
@@ -359,19 +380,20 @@ def winsorize(df_in, var_list, wvar=None, p_val=0.98):
 
     df = df_in[keep_vars].copy()
     for var in var_list:
-
         if wvar is None:
             lb, ub = df_in[var].quantile([p_lo, p_hi]).values
         else:
             lb, ub = stats.weighted_quantile(
-                df[var].values, df[wvar].values,
+                df[var].values,
+                df[wvar].values,
                 [p_lo, p_hi],
             )
 
         df.loc[df[var] < lb, var] = lb
         df.loc[df[var] > ub, var] = ub
 
-    return df 
+    return df
+
 
 def add_bin_dummies(df, var_list, n_bins):
     """Add quantile bin dummy variables to a DataFrame.
@@ -396,13 +418,12 @@ def add_bin_dummies(df, var_list, n_bins):
     dummy_list : list of str
         Names of the newly created dummy columns.
     """
-    cutoffs = np.linspace(0.0, 1.0, n_bins+1)
+    cutoffs = np.linspace(0.0, 1.0, n_bins + 1)
     dummy_list = []
 
     for var in var_list:
         for ii in range(n_bins):
-
-            bin_var = var + '_bin{:d}'.format(ii+1)
+            bin_var = var + "_bin{:d}".format(ii + 1)
             dummy_list.append(bin_var)
 
             df[bin_var] = 0.0
@@ -415,12 +436,13 @@ def add_bin_dummies(df, var_list, n_bins):
             if ii == n_bins - 1:
                 ub = np.inf
             else:
-                ub = df[var].quantile(cutoffs[ii+1])
+                ub = df[var].quantile(cutoffs[ii + 1])
 
             ix = (df[var] >= lb) & (df[var] < ub)
             df.loc[ix, bin_var] = 1.0
 
     return df, dummy_list
+
 
 def demean(df_in, var_list, by_var, weight_var=None):
     """Subtract within-group means from variables, returning means and residuals.
@@ -454,26 +476,30 @@ def demean(df_in, var_list, by_var, weight_var=None):
     df = df_in[keep_list].copy()
 
     if weight_var is None:
-        df_by = df[keep_list].groupby(by_var).mean().rename(
-            columns={var : var + '_mean' for var in var_list}
+        df_by = (
+            df[keep_list]
+            .groupby(by_var)
+            .mean()
+            .rename(columns={var: var + "_mean" for var in var_list})
         )
     else:
         for var in var_list:
-            df[var + '_wtd'] = df[var] * df[weight_var]
+            df[var + "_wtd"] = df[var] * df[weight_var]
 
         df_by = df.groupby(by_var).sum()
         for var in var_list:
-            df_by[var + '_mean'] = df_by[var + '_wtd'] / df_by[weight_var]
+            df_by[var + "_mean"] = df_by[var + "_wtd"] / df_by[weight_var]
 
-    mean_list = [var + '_mean' for var in var_list]
+    mean_list = [var + "_mean" for var in var_list]
     df = pd.merge(df, df_by[mean_list], left_on=by_var, right_index=True)
     for var in var_list:
-        df[var + '_demeaned'] = df[var] - df[var + '_mean']
+        df[var + "_demeaned"] = df[var] - df[var + "_mean"]
 
-    demean_list = [var + '_demeaned' for var in var_list]
+    demean_list = [var + "_demeaned" for var in var_list]
     return (df[mean_list + demean_list], mean_list + demean_list)
 
-def match_sample(X, how='inner', ix=None):
+
+def match_sample(X, how="inner", ix=None):
     """Select a sample from a matrix by handling missing values.
 
     Parameters
@@ -502,19 +528,20 @@ def match_sample(X, how='inner', ix=None):
     Exception
         If *how* is not one of ``'inner'``, ``'outer'``, or ``'custom'``.
     """
-    if how == 'inner':
+    if how == "inner":
         ix = np.all(pd.notnull(X), axis=1)
-    elif how == 'outer':
+    elif how == "outer":
         ix = np.any(pd.notnull(X), axis=1)
-    elif how != 'custom':
+    elif how != "custom":
         raise Exception
-        
+
     Xs = X[ix, :]
     Xs[pd.isnull(Xs)] = 0.0
-    
+
     return (ix, Xs)
 
-def match_xy(X, z, how='inner', ix=None):
+
+def match_xy(X, z, how="inner", ix=None):
     """Select a common sample for design matrix *X* and outcome *z*.
 
     Stacks *X* and *z* horizontally, calls :func:`match_sample`, then
@@ -542,7 +569,7 @@ def match_xy(X, z, how='inner', ix=None):
     """
     if len(z.shape) == 1:
         z = z[:, np.newaxis]
-        
+
     if len(X.shape) == 1:
         X = X[:, np.newaxis]
 
@@ -553,12 +580,25 @@ def match_xy(X, z, how='inner', ix=None):
 
     Xs = Xall_s[:, :Nx]
     zs = Xall_s[:, Nx:]
-    
+
     return (ix, Xs, zs)
 
 
-def regression(df, lhs, rhs, fes=None, absorb_vars=None, intercept=True, formula_extra=None, ix=None, 
-               trend=None, cluster_var=None, cluster_groups=None, weight_var=None, **kwargs):
+def regression(
+    df,
+    lhs,
+    rhs,
+    fes=None,
+    absorb_vars=None,
+    intercept=True,
+    formula_extra=None,
+    ix=None,
+    trend=None,
+    cluster_var=None,
+    cluster_groups=None,
+    weight_var=None,
+    **kwargs,
+):
     """Run an OLS or WLS regression from a pandas DataFrame.
 
     Supports categorical fixed effects, absorbed fixed effects (via
@@ -614,9 +654,9 @@ def regression(df, lhs, rhs, fes=None, absorb_vars=None, intercept=True, formula
     if isinstance(rhs, str):
         rhs = [rhs]
 
-    formula = '{0} ~ {1}'.format(lhs, ' + '.join(rhs))
+    formula = "{0} ~ {1}".format(lhs, " + ".join(rhs))
     if fes:
-        formula += ' + '.join([''] + ['C({})'.format(fe) for fe in fes])
+        formula += " + ".join([""] + ["C({})".format(fe) for fe in fes])
 
     var_list = [lhs] + rhs + fes
     if weight_var is not None:
@@ -630,9 +670,9 @@ def regression(df, lhs, rhs, fes=None, absorb_vars=None, intercept=True, formula
             var_list += group
         else:
             raise Exception
-        
+
     var_list = list(set(var_list))
-        
+
     this_list = []
     for var in var_list:
         if var in df:
@@ -641,33 +681,39 @@ def regression(df, lhs, rhs, fes=None, absorb_vars=None, intercept=True, formula
             assert var in df.index.names
 
     _df = df[this_list].copy()
-    
-    ix_samp, _ = match_sample(_df.values, how='inner')
+
+    ix_samp, _ = match_sample(_df.values, how="inner")
     if ix is None:
         ix = ix_samp.copy()
-    
+
     ix_both = np.logical_and(ix, ix_samp)
 
     if absorb_vars:
         for var in [lhs] + rhs:
-            _df.loc[ix_both, var] = absorb(_df.loc[ix_both, :], absorb_vars, var, weight_var=weight_var, restore_mean=True)
-        
+            _df.loc[ix_both, var] = absorb(
+                _df.loc[ix_both, :],
+                absorb_vars,
+                var,
+                weight_var=weight_var,
+                restore_mean=True,
+            )
+
     Xs = _df.loc[ix_both, rhs].values
     zs = _df.loc[ix_both, lhs].values
 
     if trend is not None:
-        if trend in ['linear', 'quadratic']:
-            _df['t'] = np.arange(len(_df))
-            formula += ' + t '
-        if trend == 'quadratic':
-            _df['t2'] = np.arange(len(_df)) ** 2
-            formula += ' + t2 '
+        if trend in ["linear", "quadratic"]:
+            _df["t"] = np.arange(len(_df))
+            formula += " + t "
+        if trend == "quadratic":
+            _df["t2"] = np.arange(len(_df)) ** 2
+            formula += " + t2 "
 
     if formula_extra is not None:
-        formula += ' + ' + formula_extra
+        formula += " + " + formula_extra
 
     if not intercept:
-        formula += ' -1'
+        formula += " -1"
     else:
         Xs = np.hstack((np.ones((Xs.shape[0], 1)), Xs))
 
@@ -680,14 +726,32 @@ def regression(df, lhs, rhs, fes=None, absorb_vars=None, intercept=True, formula
         these_groups = None
 
     if weight_var is None:
-        fr = formula_regression(_df, formula, ix=ix, cluster_groups=these_groups, **kwargs)
+        fr = formula_regression(
+            _df, formula, ix=ix, cluster_groups=these_groups, **kwargs
+        )
     else:
-        fr = wls_formula(_df, formula, weight_var=weight_var, ix=ix, cluster_groups=these_groups, **kwargs)
+        fr = wls_formula(
+            _df,
+            formula,
+            weight_var=weight_var,
+            ix=ix,
+            cluster_groups=these_groups,
+            **kwargs,
+        )
 
     return FullResults(fr.results, ix=ix, Xs=Xs, zs=zs)
 
-def wls_formula(df, formula, weight_var=None, weights=None, ix=None, nw_lags=0,
-                cluster_groups=None, display=False):
+
+def wls_formula(
+    df,
+    formula,
+    weight_var=None,
+    weights=None,
+    ix=None,
+    nw_lags=0,
+    cluster_groups=None,
+    display=False,
+):
     """Fit a Weighted Least Squares model from a patsy formula string.
 
     Normalises weights to sum to 1, fits a WLS model via statsmodels, and
@@ -721,25 +785,28 @@ def wls_formula(df, formula, weight_var=None, weights=None, ix=None, nw_lags=0,
     """
     if ix is None:
         ix = np.ones(len(df), dtype=bool)
-        
+
     if weight_var is not None:
         assert weights is None
         weights = df.loc[ix, weight_var].copy()
 
     weights /= np.sum(weights)
-    
-    y, X = patsy.dmatrices(formula, df.loc[ix, :], return_type='dataframe')
-    results = sm.WLS(y, X, weights=weights).fit()
-    results = results.get_robustcov_results('HC3')
 
-    results = update_results_cov(results, nw_lags=nw_lags, cluster_groups=cluster_groups)
+    y, X = patsy.dmatrices(formula, df.loc[ix, :], return_type="dataframe")
+    results = sm.WLS(y, X, weights=weights).fit()
+    results = results.get_robustcov_results("HC3")
+
+    results = update_results_cov(
+        results, nw_lags=nw_lags, cluster_groups=cluster_groups
+    )
 
     if display:
         print(results.summary())
 
     return FullResults(results, ix=ix, Xs=None, zs=None)
 
-def compute_histogram(series, name='bin', **kwargs):
+
+def compute_histogram(series, name="bin", **kwargs):
     """Compute a histogram and return it as a named pandas Series.
 
     Parameters
@@ -760,6 +827,7 @@ def compute_histogram(series, name='bin', **kwargs):
     """
     this_hist, _ = np.histogram(series, **kwargs)
     return pd.Series(this_hist, index=[name + str(ii) for ii in range(len(this_hist))])
+
 
 def update_results_cov(results, nw_lags=0, cluster_groups=None):
     """Apply robust covariance correction to a statsmodels results object.
@@ -789,14 +857,15 @@ def update_results_cov(results, nw_lags=0, cluster_groups=None):
         If both *cluster_groups* and *nw_lags* > 0 are supplied.
     """
     if cluster_groups is not None:
-        assert(nw_lags == 0)
-        results = results.get_robustcov_results('cluster', groups=cluster_groups)
+        assert nw_lags == 0
+        results = results.get_robustcov_results("cluster", groups=cluster_groups)
     elif nw_lags > 0:
-        results = results.get_robustcov_results('HAC', maxlags=nw_lags)
+        results = results.get_robustcov_results("HAC", maxlags=nw_lags)
     else:
-        results = results.get_robustcov_results('HC3')
+        results = results.get_robustcov_results("HC3")
 
     return results
+
 
 def get_cluster_groups(df, cluster_var):
     """Map cluster variable values to contiguous integer group labels.
@@ -813,10 +882,13 @@ def get_cluster_groups(df, cluster_var):
     numpy.ndarray of int
         Array of integer group labels aligned with *df*'s row order.
     """
-    index_dict = {val : ii for ii, val in enumerate(df[cluster_var].unique())}
+    index_dict = {val: ii for ii, val in enumerate(df[cluster_var].unique())}
     return df[cluster_var].map(index_dict).values
 
-def formula_regression(df, formula, ix=None, nw_lags=0, cluster_groups=None, display=False):
+
+def formula_regression(
+    df, formula, ix=None, nw_lags=0, cluster_groups=None, display=False
+):
     """Fit an OLS model from a patsy formula string with robust standard errors.
 
     Parameters
@@ -847,14 +919,17 @@ def formula_regression(df, formula, ix=None, nw_lags=0, cluster_groups=None, dis
 
     results = model.fit()
 
-    results = update_results_cov(results, nw_lags=nw_lags, cluster_groups=cluster_groups)
+    results = update_results_cov(
+        results, nw_lags=nw_lags, cluster_groups=cluster_groups
+    )
 
     if display:
         print(results.summary())
 
     return FullResults(results, ix, Xs=None, zs=None)
 
-def sm_regression(df, lhs, rhs, match='inner', ix=None, nw_lags=0, display=False):
+
+def sm_regression(df, lhs, rhs, match="inner", ix=None, nw_lags=0, display=False):
     """Fit an OLS regression directly from numpy arrays via statsmodels.
 
     Extracts regressor and outcome arrays from *df*, handles missing values
@@ -887,8 +962,8 @@ def sm_regression(df, lhs, rhs, match='inner', ix=None, nw_lags=0, display=False
         matrix, and the outcome vector.
     """
 
-    if 'const' in rhs and 'const' not in df:
-        df['const'] = 1.0
+    if "const" in rhs and "const" not in df:
+        df["const"] = 1.0
 
     X = df.loc[:, rhs].values
     z = df.loc[:, lhs].values
@@ -898,14 +973,15 @@ def sm_regression(df, lhs, rhs, match='inner', ix=None, nw_lags=0, display=False
     model = sm.OLS(zs, Xs)
     results = model.fit()
     if nw_lags > 0:
-        results = results.get_robustcov_results('HAC', maxlags=nw_lags)
+        results = results.get_robustcov_results("HAC", maxlags=nw_lags)
     else:
-        results = results.get_robustcov_results('HC0')
+        results = results.get_robustcov_results("HC0")
 
     if display:
         print(results.summary())
 
     return FullResults(results, ix, Xs, zs)
+
 
 def clean(df_in, var_list):
     """Remove rows with infinite or NaN values from a DataFrame subset.
@@ -929,6 +1005,7 @@ def clean(df_in, var_list):
     df = df_in[good_list].copy().replace([np.inf, -np.inf], np.nan)
     return df.dropna()
 
+
 def dropna_ix(df):
     """Drop rows with any NaN value and return both the cleaned DataFrame and a mask.
 
@@ -946,6 +1023,7 @@ def dropna_ix(df):
     """
     ix = np.all(pd.notnull(df).values, axis=1)
     return df.loc[ix, :], ix
+
 
 class MVOLSResults:
     """Results container for multivariate OLS regressions.
@@ -994,10 +1072,24 @@ class MVOLSResults:
     llf, aic, bic, hqc : see Parameters
     """
 
-    def __init__(self, nobs, params, fittedvalues, resid, cov_e,
-                 cov_HC0, HC0_se, HC0_tstat,
-                 cov_HC1, HC1_se, HC1_tstat,
-                 llf, aic, bic, hqc):
+    def __init__(
+        self,
+        nobs,
+        params,
+        fittedvalues,
+        resid,
+        cov_e,
+        cov_HC0,
+        HC0_se,
+        HC0_tstat,
+        cov_HC1,
+        HC1_se,
+        HC1_tstat,
+        llf,
+        aic,
+        bic,
+        hqc,
+    ):
         """Initialise a MVOLSResults container.
 
         Parameters
@@ -1053,7 +1145,8 @@ class MVOLSResults:
         self.bic = bic
         self.hqc = hqc
 
-def mv_ols(df, lhs, rhs, match='inner', ix=None, nw_lags=0):
+
+def mv_ols(df, lhs, rhs, match="inner", ix=None, nw_lags=0):
     """Fit a multivariate OLS model with multiple dependent variables.
 
     Estimates a system of equations sharing the same regressor matrix.
@@ -1087,13 +1180,11 @@ def mv_ols(df, lhs, rhs, match='inner', ix=None, nw_lags=0):
     NotImplementedError
         If ``nw_lags > 0`` (not yet implemented).
     """
-    if 'const' in rhs and 'const' not in df:
-        df['const'] = 1.0
+    if "const" in rhs and "const" not in df:
+        df["const"] = 1.0
 
     if nw_lags > 0:
-        raise NotImplementedError(
-            "mv_ols with nw_lags > 0 is not implemented."
-        )
+        raise NotImplementedError("mv_ols with nw_lags > 0 is not implemented.")
 
     X = df[rhs].values
     z = df[lhs].values
@@ -1133,12 +1224,26 @@ def mv_ols(df, lhs, rhs, match='inner', ix=None, nw_lags=0):
     bic = log_det_cov_e + (np.log(T) / T) * n_free
     hqc = log_det_cov_e + (2.0 * np.log(np.log(T)) / T) * n_free
 
-    results = MVOLSResults(nobs, params, fittedvalues, resid, cov_e,
-                           cov_HC0, HC0_se, HC0_tstat,
-                           cov_HC1, HC1_se, HC1_tstat,
-                           llf, aic, bic, hqc)
+    results = MVOLSResults(
+        nobs,
+        params,
+        fittedvalues,
+        resid,
+        cov_e,
+        cov_HC0,
+        HC0_se,
+        HC0_tstat,
+        cov_HC1,
+        HC1_se,
+        HC1_tstat,
+        llf,
+        aic,
+        bic,
+        hqc,
+    )
 
     return FullResults(results, ix, Xs, zs)
+
 
 def hc0(x, e):
     """Compute the HC0 (homoskedastic sandwich) covariance matrix.
@@ -1161,6 +1266,7 @@ def hc0(x, e):
     cov_HC0 = np.kron(cov_x_inv, cov_e)
     return (cov_HC0, cov_e)
 
+
 def hc1(x, e):
     """Compute the HC1 (heteroskedasticity-robust sandwich) covariance matrix.
 
@@ -1182,7 +1288,7 @@ def hc1(x, e):
         Residual covariance matrix (also returned for convenience).
     """
     cov_e, cov_x, cov_x_inv, T, nz, k = init_cov(x, e)
-    cov_xeex = np.zeros((nz*k, nz*k))
+    cov_xeex = np.zeros((nz * k, nz * k))
     for tt in range(T):
         x_t = x[tt, :][:, np.newaxis]
         e_t = e[tt, :][:, np.newaxis]
@@ -1192,6 +1298,7 @@ def hc1(x, e):
     cov_X_inv = np.kron(cov_x_inv, np.eye(nz))
     cov_HC1 = np.dot(cov_X_inv, np.dot(cov_xeex, cov_X_inv))
     return (cov_HC1, cov_e)
+
 
 def init_cov(x, e):
     """Compute basic covariance building-blocks for multivariate OLS.
@@ -1225,13 +1332,14 @@ def init_cov(x, e):
     """
     T, k = x.shape
     Te, nz = e.shape
-    assert(T == Te)
+    assert T == Te
 
     cov_e = np.dot(e.T, e) / T
     cov_x = np.dot(x.T, x) / T
     cov_x_inv = np.linalg.inv(cov_x)
 
     return (cov_e, cov_x, cov_x_inv, T, nz, k)
+
 
 def standard_errors(V, T):
     """Compute standard errors from a covariance matrix.
@@ -1251,6 +1359,7 @@ def standard_errors(V, T):
     se = np.sqrt(np.diagonal(V) / T)
     return se
 
+
 def least_sq(X, z):
     """Solve the normal equations for OLS.
 
@@ -1267,6 +1376,7 @@ def least_sq(X, z):
         OLS coefficient estimate ``(X.T @ X)^{-1} X.T @ z``.
     """
     return np.linalg.solve(np.dot(X.T, X), np.dot(X.T, z))
+
 
 def to_pickle(x, path):
     """Serialize an object to a pickle file.
@@ -1285,6 +1395,7 @@ def to_pickle(x, path):
     with open(path, "wb") as f:
         pickle.dump(x, f)
 
+
 def read_pickle(path):
     """Deserialize an object from a pickle file.
 
@@ -1300,6 +1411,7 @@ def read_pickle(path):
     """
     with open(path, "rb") as f:
         return pickle.load(f)
+
 
 def demean_separate(df, var_list, group_list, **kwargs):
     """Demean variables sequentially by each group variable.
@@ -1325,11 +1437,12 @@ def demean_separate(df, var_list, group_list, **kwargs):
     pandas.DataFrame
         DataFrame with variables demeaned by each group in succession.
     """
-    
+
     for group in group_list:
         df = demean2(group, var_list, df, **kwargs)
-        
+
     return df
+
 
 def demean2(group_list, var_list, df, prefix=None):
     """Subtract within-group means, optionally writing to new columns.
@@ -1354,25 +1467,26 @@ def demean2(group_list, var_list, df, prefix=None):
     """
 
     if prefix is None:
-        full_prefix = ''
+        full_prefix = ""
     else:
-        full_prefix = prefix + '_'
+        full_prefix = prefix + "_"
 
     # Precautionarily drop means
     for var in var_list:
-        if 'MEAN_' + var in df:
-            df = df.drop(['MEAN_' + var], axis=1)
+        if "MEAN_" + var in df:
+            df = df.drop(["MEAN_" + var], axis=1)
 
     df_mean = df.groupby(group_list)[var_list].mean()
-    df_mean = df_mean.rename(columns={var : 'MEAN_' + var for var in var_list})
+    df_mean = df_mean.rename(columns={var: "MEAN_" + var for var in var_list})
     df = pd.merge(df, df_mean, left_on=group_list, right_index=True)
 
     for var in var_list:
-        df[full_prefix + var] = df[var] - df['MEAN_' + var]
+        df[full_prefix + var] = df[var] - df["MEAN_" + var]
 
-    df = df.drop(['MEAN_' + var for var in var_list], axis=1)
-        
+    df = df.drop(["MEAN_" + var for var in var_list], axis=1)
+
     return df
+
 
 def weight_regression_params(weights, params=None, cov=None, results=None):
     """Compute a weighted linear combination of regression coefficients and its SE.
@@ -1417,6 +1531,7 @@ def weight_regression_params(weights, params=None, cov=None, results=None):
 
     return x, se
 
+
 def sum_regression_params(positions, *args, **kwargs):
     """Compute the sum of selected regression coefficients and its standard error.
 
@@ -1458,7 +1573,8 @@ def sum_regression_params(positions, *args, **kwargs):
 
     return weight_regression_params(e_vec, *args, **kwargs)
 
-def collapse(df, method='mean', var_list=None, by=None, wvar=None):
+
+def collapse(df, method="mean", var_list=None, by=None, wvar=None):
     """Collapse a DataFrame to weighted means or sums within groups.
 
     Parameters
@@ -1490,31 +1606,35 @@ def collapse(df, method='mean', var_list=None, by=None, wvar=None):
     """
     if by is None:
         by = []
-    
+
     assert by
-    assert method in ['mean', 'sum']
-    assert wvar is not None # just do groupby otherwise
-    
+    assert method in ["mean", "sum"]
+    assert wvar is not None  # just do groupby otherwise
+
     if var_list is None:
-        var_list = [var for var in df.columns 
-                    if (var not in (by + [wvar])) and pd.api.types.is_numeric_dtype(df[var])]
-        
+        var_list = [
+            var
+            for var in df.columns
+            if (var not in (by + [wvar])) and pd.api.types.is_numeric_dtype(df[var])
+        ]
+
     assert wvar not in var_list
-        
+
     keep_vars = list(set(var_list + by + [wvar]))
     _df = df[keep_vars].copy()
 
     for var in var_list:
         if (var not in by) and (var != wvar):
             _df[var] *= _df[wvar]
-            
+
     collapsed = _df.groupby(by)[var_list + [wvar]].sum()
-    if method == 'mean':
+    if method == "mean":
         for var in var_list:
             collapsed[var] /= collapsed[wvar]
-        
+
     return collapsed
-    
+
+
 def safe_sum(x):
     """Sum a Series without skipping NaN values.
 

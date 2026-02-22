@@ -1,6 +1,7 @@
 import numpy as np
 import itertools
 
+
 def quad_form(A, X):
     """Compute the quadratic form ``A' X A``.
 
@@ -17,6 +18,7 @@ def quad_form(A, X):
         Array of shape ``(m, m)`` equal to ``A.T @ X @ A``.
     """
     return np.dot(A.T, np.dot(X, A))
+
 
 def rsolve(b, A):
     """Solve the right-hand linear system ``b A^{-1}``.
@@ -37,6 +39,7 @@ def rsolve(b, A):
         Solution array of shape ``(m, n)``.
     """
     return np.linalg.solve(A.T, b.T).T
+
 
 def gradient(f, x, args=None, kwargs=None, step=1e-5, two_sided=True, f_val=None):
     """Estimate the Jacobian of *f* at *x* by finite differences.
@@ -82,26 +85,22 @@ def gradient(f, x, args=None, kwargs=None, step=1e-5, two_sided=True, f_val=None
 
     grad = None
     for ii in range(len(x)):
-
         x[ii] += step
         f_hi = f(x, *args, **kwargs)
 
         if two_sided:
-
-            x[ii] -= (2.0 * step)
+            x[ii] -= 2.0 * step
             f_lo = f(x, *args, **kwargs)
             x[ii] += step
 
             df_i = np.array(f_hi - f_lo) / (2.0 * step)
 
         else:
-
             x[ii] -= step
 
             df_i = np.array(f_hi - f_val) / step
 
         if grad is None:
-
             if df_i.shape == ():
                 ncols = 1
             else:
@@ -112,6 +111,7 @@ def gradient(f, x, args=None, kwargs=None, step=1e-5, two_sided=True, f_val=None
         grad[ii, :] = df_i
 
     return grad
+
 
 def hessian(f, x_in, eps=1e-4):
     """Estimate the Hessian of *f* at *x_in* by finite differences.
@@ -138,9 +138,7 @@ def hessian(f, x_in, eps=1e-4):
     n = len(x)
     H = np.zeros((n, n))
     for ii, jj in itertools.product(range(n), repeat=2):
-
         if ii <= jj:
-
             x[ii] += eps
             x[jj] += eps
             H[ii, jj] += f(x)
@@ -162,10 +160,10 @@ def hessian(f, x_in, eps=1e-4):
             x[jj] -= eps
 
         else:
-
             H[ii, jj] = H[jj, ii]
 
-    return H / (4.0 * (eps ** 2))
+    return H / (4.0 * (eps**2))
+
 
 def svd_inv(A, sv_tol=1e-8, **kwargs):
     """Compute a pseudo-inverse of *A* using singular value decomposition.
@@ -197,6 +195,7 @@ def svd_inv(A, sv_tol=1e-8, **kwargs):
     S_inv = np.diag(s_inv)
     A_inv = np.dot(vh.T, np.dot(S_inv, u.T))
     return A_inv
+
 
 def ghquad_norm(degree, mu=0.0, sig=1.0):
     """Return nodes and weights for Gauss-Hermite quadrature over a normal distribution.
@@ -231,6 +230,7 @@ def ghquad_norm(degree, mu=0.0, sig=1.0):
 
     return x, w
 
+
 def gauss_legendre_norm(degree, a=-1.0, b=1.0):
     """Return nodes and weights for Gauss-Legendre quadrature on ``[a, b]``.
 
@@ -263,6 +263,7 @@ def gauss_legendre_norm(degree, a=-1.0, b=1.0):
 
     return x, w
 
+
 def logit(x, lb=0.0, ub=1.0):
     """Apply the logit (log-odds) transform to map ``(lb, ub)`` to the real line.
 
@@ -281,6 +282,7 @@ def logit(x, lb=0.0, ub=1.0):
         Transformed values in ``(-inf, +inf)``.
     """
     return np.log(x - lb) - np.log(ub - x)
+
 
 def logistic(x, lb=0.0, ub=1.0):
     """Apply the logistic transform to map the real line to ``(lb, ub)``.
@@ -302,6 +304,7 @@ def logistic(x, lb=0.0, ub=1.0):
         Transformed values in ``(lb, ub)``.
     """
     return lb + (ub - lb) / (1.0 + np.exp(-x))
+
 
 def bound_transform(vals, lb, ub, to_bdd=True):
     """Transform values between unbounded and bounded representations.
@@ -354,6 +357,7 @@ def bound_transform(vals, lb, ub, to_bdd=True):
 
     return trans_vals
 
+
 def robust_cholesky(A, min_eig=1e-12):
     """Compute a Cholesky-like factor of *A*, clipping small eigenvalues.
 
@@ -379,6 +383,7 @@ def robust_cholesky(A, min_eig=1e-12):
     Dhalf = np.diag(np.sqrt(vals))
     return vecs @ Dhalf
 
+
 def my_chol(A_in):
     """Compute the lower-triangular Cholesky factor of *A_in*.
 
@@ -403,11 +408,11 @@ def my_chol(A_in):
 
     for jj in range(N):
         Dj = np.sqrt(A[jj, jj])
-        aj = A[jj+1:, jj]
+        aj = A[jj + 1 :, jj]
         Aj = aj[:, np.newaxis]
         L[jj, jj] = Dj
-        L[jj+1:, jj] = aj / Dj
+        L[jj + 1 :, jj] = aj / Dj
         if jj < N - 1:
-            A[jj+1:, jj+1:] -= (Aj @ Aj.T) / (Dj**2)
+            A[jj + 1 :, jj + 1 :] -= (Aj @ Aj.T) / (Dj**2)
 
     return L

@@ -8,14 +8,21 @@ from pandas_datareader import data as web  # noqa: E402
 import pickle  # noqa: E402
 
 from . import config  # noqa: E402
-default_dir = config.base_dir() + 'fred/'
+
+default_dir = config.base_dir() + "fred/"
 # data_dir = '/home/dan/Dropbox/data/fred/'
 DATASET_NAME = "fred"
 DESCRIPTION = "FRED macroeconomic time series dataset loader."
-def load(codes=None, code_names=None,
-         start=datetime.datetime(1900, 1, 1),
-         end = datetime.datetime.today(),
-         reimport=False, data_dir=default_dir):
+
+
+def load(
+    codes=None,
+    code_names=None,
+    start=datetime.datetime(1900, 1, 1),
+    end=datetime.datetime.today(),
+    reimport=False,
+    data_dir=default_dir,
+):
     """Load time series data from FRED.
 
     Downloaded series are cached as individual pickle files so that
@@ -53,13 +60,13 @@ def load(codes=None, code_names=None,
         code_names = {}
     if codes is None:
         codes = list(code_names.keys())
-        
+
     if isinstance(codes, str):
         codes = [codes]
 
-    stored_series_file = data_dir + 'series.pkl'
+    stored_series_file = data_dir + "series.pkl"
     if os.path.isfile(stored_series_file):
-        stored_series = pickle.load(open(stored_series_file, 'rb'))
+        stored_series = pickle.load(open(stored_series_file, "rb"))
     else:
         stored_series = []
 
@@ -76,20 +83,19 @@ def load(codes=None, code_names=None,
 
         # Store
         for series in download_series:
-            df[series].to_pickle(data_dir + series + '.pkl')
+            df[series].to_pickle(data_dir + series + ".pkl")
 
         stored_series = list(set(stored_series + download_series))
-        pickle.dump(stored_series, open(stored_series_file, 'wb'))
+        pickle.dump(stored_series, open(stored_series_file, "wb"))
 
     # Now load stored series
     for series in set(codes) - set(download_series):
-
-        infile = data_dir + series + '.pkl'
+        infile = data_dir + series + ".pkl"
         df_in = pd.read_pickle(infile).to_frame()
         if df is None:
             df = df_in
         else:
-            df = pd.merge(df, df_in, left_index=True, right_index=True, how='outer')
+            df = pd.merge(df, df_in, left_index=True, right_index=True, how="outer")
 
     df = df.rename(columns=code_names)
 

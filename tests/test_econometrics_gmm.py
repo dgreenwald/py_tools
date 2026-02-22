@@ -1,8 +1,12 @@
 import numpy as np
 import pytest
 from py_tools.econometrics.gmm import (
-    compute_g, compute_dg, compute_d2g,
-    obj_gmm, jac_gmm, hess_gmm, solve_gmm,
+    compute_g,
+    compute_dg,
+    compute_d2g,
+    obj_gmm,
+    jac_gmm,
+    solve_gmm,
 )
 
 
@@ -11,8 +15,10 @@ from py_tools.econometrics.gmm import (
 def _h(x_t, params):
     return x_t - params
 
+
 def _dh(x_t, params):
     return -np.ones((1, 1))
+
 
 _d2h = [lambda x_t, params: np.zeros((1, 1))]
 
@@ -22,12 +28,11 @@ def simple_data():
     rng = np.random.default_rng(0)
     Nt = 20
     x = rng.normal(loc=3.0, size=Nt)
-    data = x[np.newaxis, :]   # shape (1, Nt)
+    data = x[np.newaxis, :]  # shape (1, Nt)
     return data, x
 
 
 class TestComputeG:
-
     def test_at_true_mean(self, simple_data):
         data, x = simple_data
         params = np.array([np.mean(x)])
@@ -54,7 +59,6 @@ class TestComputeG:
 
 
 class TestComputeDg:
-
     def test_value(self, simple_data):
         data, x = simple_data
         params = np.array([0.0])
@@ -75,7 +79,6 @@ class TestComputeDg:
 
 
 class TestComputeD2g:
-
     def test_zero_second_deriv(self, simple_data):
         data, x = simple_data
         params = np.array([0.0])
@@ -92,7 +95,6 @@ class TestComputeD2g:
 
 
 class TestObjGmm:
-
     def test_zero_at_true_mean(self, simple_data):
         data, x = simple_data
         params = np.array([np.mean(x)])
@@ -109,7 +111,6 @@ class TestObjGmm:
 
 
 class TestJacGmm:
-
     def test_shape(self, simple_data):
         data, x = simple_data
         params = np.array([0.0])
@@ -128,20 +129,19 @@ class TestJacGmm:
 
 
 class TestSolveGmm:
-
     def test_recovers_mean(self, simple_data):
         # dogleg requires hess to share the same args tuple as the objective,
         # which precludes passing d2h separately; use BFGS with analytic jac
         data, x = simple_data
         params_guess = np.array([0.0])
         W = np.eye(1)
-        res = solve_gmm(params_guess, _h, data, W=W, dh=_dh, algorithm='BFGS')
+        res = solve_gmm(params_guess, _h, data, W=W, dh=_dh, algorithm="BFGS")
         np.testing.assert_allclose(res.x, [np.mean(x)], atol=1e-6)
 
     def test_recovers_mean_bfgs(self, simple_data):
         data, x = simple_data
         params_guess = np.array([0.0])
-        res = solve_gmm(params_guess, _h, data, algorithm='BFGS')
+        res = solve_gmm(params_guess, _h, data, algorithm="BFGS")
         np.testing.assert_allclose(res.x, [np.mean(x)], atol=1e-6)
 
     def test_default_W_identity(self, simple_data):

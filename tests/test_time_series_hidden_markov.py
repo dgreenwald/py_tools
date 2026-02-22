@@ -5,11 +5,13 @@ from py_tools.time_series.hidden_markov import HiddenMarkov, make_2d
 
 def _build_hm():
     x_grid = np.array([-1.0, 0.0, 2.0])
-    P = np.array([
-        [0.85, 0.10, 0.05],
-        [0.10, 0.80, 0.10],
-        [0.05, 0.10, 0.85],
-    ])
+    P = np.array(
+        [
+            [0.85, 0.10, 0.05],
+            [0.10, 0.80, 0.10],
+            [0.05, 0.10, 0.85],
+        ]
+    )
     y_vals = np.array([[-0.3], [1.4], [0.2], [1.8]])
     sig2 = 0.25
 

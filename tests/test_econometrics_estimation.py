@@ -20,7 +20,6 @@ def linear_data():
 
 
 class TestObjfcn:
-
     def test_zero_at_perfect_fit(self):
         x = np.array([1.0, 2.0, 3.0])
         y = np.array([2.0, 4.0, 6.0])
@@ -42,7 +41,6 @@ class TestObjfcn:
 
 
 class TestSeNls:
-
     def test_output_shapes(self, linear_data):
         x, y, a_true, b_true = linear_data
         params = np.array([a_true, b_true])
@@ -73,29 +71,28 @@ class TestSeNls:
 
 
 class TestNls:
-
     def test_recovers_true_params(self, linear_data):
         x, y, a_true, b_true = linear_data
         b0 = np.array([1.0, 0.0])
         out = nls(_err_linear, b0, args=(x, y))
-        np.testing.assert_allclose(out['b_hat'], [a_true, b_true], atol=0.05)
+        np.testing.assert_allclose(out["b_hat"], [a_true, b_true], atol=0.05)
 
     def test_output_keys(self, linear_data):
         x, y, a_true, b_true = linear_data
         b0 = np.array([a_true, b_true])
         out = nls(_err_linear, b0, args=(x, y))
-        assert set(out.keys()) == {'b_hat', 'e_hat', 'V', 'se', 'res'}
+        assert set(out.keys()) == {"b_hat", "e_hat", "V", "se", "res"}
 
     def test_se_shape(self, linear_data):
         x, y, a_true, b_true = linear_data
         b0 = np.array([a_true, b_true])
         out = nls(_err_linear, b0, args=(x, y))
-        assert out['se'].shape == (2,)
-        assert out['V'].shape == (2, 2)
-        assert out['e_hat'].shape == (100,)
+        assert out["se"].shape == (2,)
+        assert out["V"].shape == (2, 2)
+        assert out["e_hat"].shape == (100,)
 
     def test_optimization_successful(self, linear_data):
         x, y, a_true, b_true = linear_data
         b0 = np.array([1.0, 0.0])
         out = nls(_err_linear, b0, args=(x, y))
-        assert out['res'].success
+        assert out["res"].success

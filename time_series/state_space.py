@@ -4,6 +4,7 @@ from scipy.stats import multivariate_normal as mvn
 
 from py_tools import numerical as nm, stats as st
 
+
 def init_to_val(shape, val):
     """Create an array of a given shape filled with a specified value.
 
@@ -23,6 +24,7 @@ def init_to_val(shape, val):
     x = np.empty(shape)
     x[:] = val
     return x
+
 
 class StateSpaceModel:
     """Linear Gaussian state space model.
@@ -89,7 +91,7 @@ class StateSpaceModel:
 
         # Set sizes
         self.Nx, self.Ne = R.shape
-        
+
         if self.Z is not None:
             self.Ny, _ = Z.shape
         else:
@@ -109,15 +111,15 @@ class StateSpaceModel:
         if c is not None:
             assert len(c) == self.Nx
             x_bar = np.linalg.solve(np.eye(self.Nx) - self.A, c)
-            self.b -= np.dot(Z, x_bar) 
+            self.b -= np.dot(Z, x_bar)
 
         self.QR = self.Q @ self.R.T
         self.RQR = self.R @ self.QR
-        
+
         self.CQT = nm.robust_cholesky(self.Q, min_eig=0.0).T
         if H is not None:
             self.CHT = nm.robust_cholesky(self.H, min_eig=0.0).T
-        
+
     def unconditional_cov(self, fixed_init=None):
         """Compute the unconditional covariance of the state vector.
 
@@ -135,29 +137,28 @@ class StateSpaceModel:
 
         if fixed_init is None:
             fixed_init = []
-        
-        if not fixed_init:
 
-            try: 
+        if not fixed_init:
+            try:
                 return sp.linalg.solve_discrete_lyapunov(self.A, self.RQR)
             except Exception:
                 return None
-            
+
         else:
-            
             free_init = [ii for ii in range(self.Nx) if ii not in fixed_init]
             A_trunc = self.A[free_init, :][:, free_init]
             RQR_trunc = self.RQR[free_init, :][:, free_init]
-            
+
             V_trunc = sp.linalg.solve_discrete_lyapunov(A_trunc, RQR_trunc)
             V_full = np.zeros((self.Nx, self.Nx))
             for itrunc, ifull in enumerate(free_init):
                 V_full[ifull, free_init] = V_trunc[itrunc, :]
-            
+
             return V_full
 
-    def simulate(self, x_1=None, Nt=None, shocks=None, meas_err=None, ix=None,
-                 use_b=True):
+    def simulate(
+        self, x_1=None, Nt=None, shocks=None, meas_err=None, ix=None, use_b=True
+    ):
         """Simulate observations and states from the model.
 
         Parameters
@@ -193,7 +194,7 @@ class StateSpaceModel:
 
         if shocks is None:
             shocks = self.draw_shocks(Nt - 1)
-        
+
         if meas_err is None:
             meas_err = self.draw_meas_err(Nt)
 
@@ -209,17 +210,16 @@ class StateSpaceModel:
             ix = np.ones((Nt, self.Ny), dtype=bool)
         else:
             assert ix.shape == (Nt, self.Ny)
-            
+
         y_sim = init_to_val((Nt, self.Ny), np.nan)
         x_sim = np.zeros((Nt, self.Nx))
 
         x_t = x_1
 
         for tt in range(Nt):
-
             ix_t = ix[tt, :]
             y_sim[tt, ix_t] = np.dot(self.Z[ix_t, :], x_t) + meas_err[tt, ix_t]
-            if use_b: 
+            if use_b:
                 y_sim[tt, ix_t] += self.b[ix_t]
             x_sim[tt, :] = x_t
 
@@ -283,10 +283,12 @@ class StateSpaceModel:
         )
 
         if start_ix > 0:
-            shock_components = np.concatenate((np.zeros((self.Ne, start_ix, self.Nx)),
-                                          shock_components_samp), axis=1)
-            det_component = np.concatenate((states[:start_ix, :], 
-                                          det_component_samp), axis=0)
+            shock_components = np.concatenate(
+                (np.zeros((self.Ne, start_ix, self.Nx)), shock_components_samp), axis=1
+            )
+            det_component = np.concatenate(
+                (states[:start_ix, :], det_component_samp), axis=0
+            )
             return shock_components, det_component
         else:
             return shock_components_samp, det_component_samp
@@ -314,21 +316,25 @@ class StateSpaceModel:
         # Compute deterministic component
         det_component = np.zeros((Nt, self.Nx))
         det_component[0, :] = x1
-            
+
         for tt in range(1, Nt):
-            det_component[tt, :] = self.A @ det_component[tt-1, :]
+            det_component[tt, :] = self.A @ det_component[tt - 1, :]
 
         # Compute shock components
         shock_components = np.zeros((Nt, self.Nx, self.Ne))
-        Ri_shock_list = [shocks[:, ishock][:, np.newaxis] @ self.R[:, ishock][np.newaxis, :] 
-                         for ishock in range(self.Ne)]
+        Ri_shock_list = [
+            shocks[:, ishock][:, np.newaxis] @ self.R[:, ishock][np.newaxis, :]
+            for ishock in range(self.Ne)
+        ]
         R_shocks = np.concatenate([x[:, :, np.newaxis] for x in Ri_shock_list], axis=2)
 
         for tt in range(Nt - 1):
-            shock_components[tt + 1, :, :] = self.A @ shock_components[tt, :, :] + R_shocks[tt, :, :]
+            shock_components[tt + 1, :, :] = (
+                self.A @ shock_components[tt, :, :] + R_shocks[tt, :, :]
+            )
 
         shock_components = np.moveaxis(shock_components, [0, 1, 2], [1, 2, 0])
-        
+
         return shock_components, det_component
 
     def decompose_y_by_shock(self, shocks, states, y=None, start_ix=0):
@@ -361,10 +367,12 @@ class StateSpaceModel:
             shocks[start_ix:, :], states[start_ix, :]
         )
 
-        y_shock_components_samp = np.concatenate([
-            shock_components_samp[ishock, :, :] @ self.Z.T
-            for ishock in range(self.Ne)
-        ])
+        y_shock_components_samp = np.concatenate(
+            [
+                shock_components_samp[ishock, :, :] @ self.Z.T
+                for ishock in range(self.Ne)
+            ]
+        )
 
         y_det_component_samp = det_component_samp @ self.Z.T
 
@@ -372,7 +380,6 @@ class StateSpaceModel:
         y_shock_removed_samp = y - y_shock_components_samp
 
         if start_ix > 0:
-
             this_y = y[np.newaxis, :start_ix, :]
 
             y_shock_only = np.concatenate((this_y, y_shock_only_samp), axis=0)
@@ -381,7 +388,6 @@ class StateSpaceModel:
             return y_shock_only, y_shock_removed
 
         else:
-
             return y_shock_only_samp, y_shock_removed_samp
 
     def decompose_y_by_state(self, states, y=None, start_ix=0):
@@ -407,16 +413,21 @@ class StateSpaceModel:
         if y is None:
             y = states @ self.Z.T + self.b[np.newaxis, :]
 
-        y_state_components_samp = np.concatenate([
-            (states[start_ix:, istate][:, np.newaxis] @ self.Z[:, istate][np.newaxis, :])[np.newaxis, :, :]
-            for istate in range(self.Nx)
-        ], axis=0)
+        y_state_components_samp = np.concatenate(
+            [
+                (
+                    states[start_ix:, istate][:, np.newaxis]
+                    @ self.Z[:, istate][np.newaxis, :]
+                )[np.newaxis, :, :]
+                for istate in range(self.Nx)
+            ],
+            axis=0,
+        )
 
         y_state_only_samp = y_state_components_samp + self.b[np.newaxis, np.newaxis, :]
         y_state_removed_samp = y[np.newaxis, start_ix:, :] - y_state_components_samp
 
         if start_ix > 0:
-
             this_y = y[np.newaxis, :start_ix, :]
 
             y_state_only = np.concatenate((this_y, y_state_only_samp), axis=0)
@@ -425,8 +436,8 @@ class StateSpaceModel:
             return y_state_only, y_state_removed
 
         else:
-
             return y_state_only_samp, y_state_removed_samp
+
 
 class StateSpaceEstimates:
     """Estimated states from applying a state space model to a dataset.
@@ -483,7 +494,7 @@ class StateSpaceEstimates:
             fixed_init = []
 
         # Fixed vars for initial condition
-        self.fixed_init = fixed_init        
+        self.fixed_init = fixed_init
 
         self.set_data(y)
         self.set_ssm(ssm)
@@ -495,13 +506,13 @@ class StateSpaceEstimates:
         if P_init is None:
             P_init = self.ssm.unconditional_cov(self.fixed_init)
             if P_init is None:
-                self.valid = False # bad model
+                self.valid = False  # bad model
             else:
                 self.valid = True
 
         self.x_init = x_init
         self.P_init = P_init
-        
+
         # Item for smoother
         self.r = None
         self.state_draw = None
@@ -537,8 +548,7 @@ class StateSpaceEstimates:
         # Observables net of constant
         self.y_til = self.y - self.ssm.b[np.newaxis, :]
 
-    def kalman_filter(self, x_init=None, P_init=None, overwrite_r=True,
-                      y_til=None):
+    def kalman_filter(self, x_init=None, P_init=None, overwrite_r=True, y_til=None):
         """Run the Kalman filter on the observed data.
 
         Parameters
@@ -566,7 +576,7 @@ class StateSpaceEstimates:
             y_til = self.y_til
         else:
             self.base_data_results = False
-            
+
         x_pred_t = self.x_init
         P_pred_t = self.P_init
 
@@ -579,10 +589,9 @@ class StateSpaceEstimates:
         self.K = np.zeros((self.Nt, self.Nx, self.Ny))
         self.G = np.zeros((self.Nt, self.Nx, self.Nx))
 
-        self.log_like = 0.0 # log likelihood
+        self.log_like = 0.0  # log likelihood
 
         for tt in range(self.Nt):
-
             self.x_pred[tt, :] = x_pred_t
             self.P_pred[tt, :, :] = P_pred_t
 
@@ -594,20 +603,22 @@ class StateSpaceEstimates:
             H_t = self.ssm.H[ix_t, :][:, ix_t]
             PZ = np.dot(P_pred_t, Z_t.T)
             F_t = np.dot(Z_t, PZ) + H_t
-            
+
             if np.any(ix_t):
                 try:
-                    self.log_like += mvn.logpdf(err_t, mean=np.zeros(np.sum(ix_t)), cov=F_t) 
+                    self.log_like += mvn.logpdf(
+                        err_t, mean=np.zeros(np.sum(ix_t)), cov=F_t
+                    )
                 except Exception:
-                    self.log_like = -1e+10
+                    self.log_like = -1e10
                     return None
-            
+
             # Update step (DK style)
             ZFi_t = nm.rsolve(Z_t.T, F_t)
             AP_t = np.dot(self.ssm.A, P_pred_t)
             K_t = np.dot(AP_t, ZFi_t)
             G_t = self.ssm.A - np.dot(K_t, Z_t)
-            
+
             x_pred_t = np.dot(self.ssm.A, x_pred_t) + np.dot(K_t, err_t)
             P_pred_t = np.dot(AP_t, G_t.T) + self.ssm.RQR
 
@@ -632,11 +643,11 @@ class StateSpaceEstimates:
         r_t = np.zeros(self.Nx)
 
         for tt in range(self.Nt - 1, -1, -1):
-
             ix_t = self.ix[tt, :]
-            r_t = (np.dot(self.ZFi[tt, :, ix_t].T, self.err[tt, ix_t]) 
-                   + np.dot(self.G[tt, :, :].T, r_t))
-            
+            r_t = np.dot(self.ZFi[tt, :, ix_t].T, self.err[tt, ix_t]) + np.dot(
+                self.G[tt, :, :].T, r_t
+            )
+
             self.r[tt, :] = r_t
 
         return None
@@ -650,7 +661,7 @@ class StateSpaceEstimates:
             If True, re-run the disturbance smoother even if r is already set.
             Default is False.
         """
-        
+
         if (self.r is None) or (disturbance_smooth):
             self.disturbance_smoother()
 
@@ -661,9 +672,9 @@ class StateSpaceEstimates:
 
         # Recursively compute later values
         for tt in range(1, self.Nt):
-
-            self.x_smooth[tt, :] = (np.dot(self.ssm.A, self.x_smooth[tt-1, :]) 
-                                          + np.dot(self.ssm.RQR, self.r[tt, :]))
+            self.x_smooth[tt, :] = np.dot(
+                self.ssm.A, self.x_smooth[tt - 1, :]
+            ) + np.dot(self.ssm.RQR, self.r[tt, :])
 
         return None
 
@@ -678,7 +689,7 @@ class StateSpaceEstimates:
 
         if (self.r is None) or disturbance_smooth:
             self.disturbance_smoother()
-            
+
         self.shocks_smooth = self.r[1:, :] @ self.ssm.QR.T
         return None
 
@@ -694,7 +705,7 @@ class StateSpaceEstimates:
         -----
         This method has not been fully tested.
         """
-        
+
         if (self.r is None) or disturbance_smooth:
             self.disturbance_smoother()
 
@@ -702,15 +713,16 @@ class StateSpaceEstimates:
 
         # Recursively compute values
         for tt in range(self.Nt):
-
             ix_t = self.ix[tt, :]
             H_t = self.ssm.H[ix_t, :][:, ix_t]
             Z_t = self.ssm.Z[ix_t, :]
-            F_t = (Z_t @ (self.P_pred[tt, :, :] @ Z_t.T))
+            F_t = Z_t @ (self.P_pred[tt, :, :] @ Z_t.T)
 
             HFi_t = nm.rsolve(H_t, F_t)
 
-            self.meas_err_smooth[tt, ix_t] = HFi_t @ self.err[tt, ix_t] - (H_t @ self.K[tt, :, ix_t]) @ self.r[tt, :]
+            self.meas_err_smooth[tt, ix_t] = (
+                HFi_t @ self.err[tt, ix_t] - (H_t @ self.K[tt, :, ix_t]) @ self.r[tt, :]
+            )
 
         return None
 
@@ -741,7 +753,7 @@ class StateSpaceEstimates:
         # Run Kalman filter and smoother
         self.kalman_filter(x_init=self.x_init, P_init=self.P_init, y_til=y_star)
         self.state_smoother(disturbance_smooth=True)
-        
+
         # State draw is difference between random states and smoothed "star" states
         self.state_draw = x_plus + self.x_smooth
 
@@ -777,5 +789,6 @@ class StateSpaceEstimates:
         if redraw_shocks or (self.shock_draw is None) or (self.state_draw is None):
             self.draw_states(draw_shocks=True)
 
-        return self.ssm.decompose_by_shock(self.shock_draw, self.state_draw,
-                                           start_ix=start_ix)
+        return self.ssm.decompose_by_shock(
+            self.shock_draw, self.state_draw, start_ix=start_ix
+        )

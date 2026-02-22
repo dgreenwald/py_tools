@@ -98,7 +98,9 @@ class ConfigRegistry:
     {'name': 'Derived', 'x': 10, 'y': 2}  # x overridden, y inherited
     """
 
-    def __init__(self, configs: Dict[Union[str, int], Dict], merge_strategy: str = 'deep'):
+    def __init__(
+        self, configs: Dict[Union[str, int], Dict], merge_strategy: str = "deep"
+    ):
         self.configs = configs
         self._cache = {}
         self._merge_strategy = merge_strategy
@@ -152,7 +154,9 @@ class ConfigRegistry:
 
         return resolved
 
-    def _resolve_inheritance(self, config_id: Union[str, int], visited: set) -> Dict[str, Any]:
+    def _resolve_inheritance(
+        self, config_id: Union[str, int], visited: set
+    ) -> Dict[str, Any]:
         """
         Recursively resolve inheritance chain.
 
@@ -176,7 +180,9 @@ class ConfigRegistry:
         # Detect circular inheritance
         if config_id in visited:
             cycle = list(visited) + [config_id]
-            raise ValueError(f"Circular inheritance detected: {' -> '.join(map(str, cycle))}")
+            raise ValueError(
+                f"Circular inheritance detected: {' -> '.join(map(str, cycle))}"
+            )
 
         visited = visited | {config_id}
 
@@ -184,11 +190,11 @@ class ConfigRegistry:
         config = copy.deepcopy(self.configs[config_id])
 
         # Check for inheritance
-        if 'inherits_from' not in config:
+        if "inherits_from" not in config:
             return config
 
         # Get parent
-        parent_id = config.pop('inherits_from')
+        parent_id = config.pop("inherits_from")
 
         # Handle inheritance from another config
         if isinstance(parent_id, (str, int)) and parent_id in self.configs:
@@ -221,18 +227,22 @@ class ConfigRegistry:
         dict
             Merged configuration
         """
-        if self._merge_strategy == 'shallow':
+        if self._merge_strategy == "shallow":
             # Shallow merge: child overwrites parent at top level
             result = parent.copy()
             result.update(child)
             return result
 
-        elif self._merge_strategy == 'deep':
+        elif self._merge_strategy == "deep":
             # Deep merge: recursively merge nested dicts
             result = copy.deepcopy(parent)
 
             for key, child_value in child.items():
-                if key in result and isinstance(result[key], dict) and isinstance(child_value, dict):
+                if (
+                    key in result
+                    and isinstance(result[key], dict)
+                    and isinstance(child_value, dict)
+                ):
                     # Both are dicts: merge recursively
                     result[key] = self._merge_dicts(result[key], child_value)
                 else:
@@ -291,8 +301,7 @@ class ConfigRegistry:
         """
         if config_id not in self.configs:
             raise KeyError(
-                f"Config '{config_id}' does not exist. "
-                f"Use add() to create new configs."
+                f"Config '{config_id}' does not exist. Use add() to create new configs."
             )
 
         self.configs[config_id].update(updates)
@@ -333,7 +342,7 @@ class ConfigRegistry:
         result = []
         for config_id in sorted(self.configs.keys()):
             config = self.configs[config_id]
-            name = config.get('name', config.get('description', str(config_id)))
+            name = config.get("name", config.get("description", str(config_id)))
             result.append((config_id, name))
 
         return result
@@ -352,29 +361,31 @@ class ConfigRegistry:
         config = self.get(config_id)
 
         # Get name/description if available
-        title = config.get('name', config.get('description', f'Config {config_id}'))
+        title = config.get("name", config.get("description", f"Config {config_id}"))
 
-        print(f"\n{'='*70}")
+        print(f"\n{'=' * 70}")
         print(f"Configuration: {config_id}")
-        if title != f'Config {config_id}':
+        if title != f"Config {config_id}":
             print(f"  {title}")
-        print(f"{'='*70}")
+        print(f"{'=' * 70}")
 
         # Check if this config inherits from anything
-        if config_id in self.configs and 'inherits_from' in self.configs[config_id]:
-            parent_id = self.configs[config_id]['inherits_from']
+        if config_id in self.configs and "inherits_from" in self.configs[config_id]:
+            parent_id = self.configs[config_id]["inherits_from"]
             print(f"\nInherits from: {parent_id}")
 
         # Print all fields (except name/description already shown)
         print()
         for key, value in sorted(config.items()):
-            if key in ['name', 'description']:
+            if key in ["name", "description"]:
                 continue
             self._print_value(key, value, indent=0, max_depth=max_depth)
 
         print()
 
-    def _print_value(self, key: str, value: Any, indent: int = 0, max_depth: int = None):
+    def _print_value(
+        self, key: str, value: Any, indent: int = 0, max_depth: int = None
+    ):
         """Recursively print a single configuration key-value pair.
 
         Nested dicts are printed with increased indentation up to *max_depth*.
@@ -430,26 +441,26 @@ class ConfigRegistry:
         config2 = self.get(config_id2)
 
         # Get names for display
-        name1 = config1.get('name', str(config_id1))
-        name2 = config2.get('name', str(config_id2))
+        name1 = config1.get("name", str(config_id1))
+        name2 = config2.get("name", str(config_id2))
 
-        print(f"\n{'='*70}")
+        print(f"\n{'=' * 70}")
         print("Comparing Configurations")
-        print(f"{'='*70}")
+        print(f"{'=' * 70}")
         print(f"Config 1: {config_id1} - {name1}")
         print(f"Config 2: {config_id2} - {name2}")
         print()
 
         # Find all keys
         all_keys = set(config1.keys()) | set(config2.keys())
-        all_keys.discard('name')  # Don't compare names
-        all_keys.discard('description')
+        all_keys.discard("name")  # Don't compare names
+        all_keys.discard("description")
 
         # Compare each key
         differences = []
         for key in sorted(all_keys):
-            val1 = config1.get(key, '<not set>')
-            val2 = config2.get(key, '<not set>')
+            val1 = config1.get(key, "<not set>")
+            val2 = config2.get(key, "<not set>")
 
             if val1 != val2:
                 differences.append((key, val1, val2))
@@ -560,44 +571,44 @@ def create_registry(configs: Dict, **kwargs) -> ConfigRegistry:
     return ConfigRegistry(configs, **kwargs)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     # Example usage
     print("ConfigRegistry - Example Usage")
-    print("="*70)
+    print("=" * 70)
 
     # Define some example configs
     EXAMPLE_CONFIGS = {
-        'baseline': {
-            'name': 'Baseline Model',
-            'parameters': {
-                'alpha': 0.5,
-                'beta': 0.9,
-                'gamma': 0.1,
+        "baseline": {
+            "name": "Baseline Model",
+            "parameters": {
+                "alpha": 0.5,
+                "beta": 0.9,
+                "gamma": 0.1,
             },
-            'flags': {
-                'use_feature_x': True,
-                'use_feature_y': False,
-            },
-        },
-        'variant_a': {
-            'name': 'Variant A - Higher Alpha',
-            'inherits_from': 'baseline',
-            'parameters': {
-                'alpha': 0.7,  # Override alpha
+            "flags": {
+                "use_feature_x": True,
+                "use_feature_y": False,
             },
         },
-        'variant_b': {
-            'name': 'Variant B - Enable Feature Y',
-            'inherits_from': 'baseline',
-            'flags': {
-                'use_feature_y': True,  # Override flag
+        "variant_a": {
+            "name": "Variant A - Higher Alpha",
+            "inherits_from": "baseline",
+            "parameters": {
+                "alpha": 0.7,  # Override alpha
             },
         },
-        'variant_c': {
-            'name': 'Variant C - Based on A',
-            'inherits_from': 'variant_a',  # Inherit from variant_a
-            'parameters': {
-                'gamma': 0.2,  # Add new parameter
+        "variant_b": {
+            "name": "Variant B - Enable Feature Y",
+            "inherits_from": "baseline",
+            "flags": {
+                "use_feature_y": True,  # Override flag
+            },
+        },
+        "variant_c": {
+            "name": "Variant C - Based on A",
+            "inherits_from": "variant_a",  # Inherit from variant_a
+            "parameters": {
+                "gamma": 0.2,  # Add new parameter
             },
         },
     }
@@ -611,10 +622,10 @@ if __name__ == '__main__':
         print(f"  {config_id:15s} - {name}")
 
     # Print a config
-    registry.print('variant_c')
+    registry.print("variant_c")
 
     # Compare two configs
-    registry.compare('baseline', 'variant_a')
+    registry.compare("baseline", "variant_a")
 
     # Validate all
     errors = registry.validate_all()

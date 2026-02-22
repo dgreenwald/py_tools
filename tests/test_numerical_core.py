@@ -1,7 +1,6 @@
 """Tests for py_tools.numerical.core"""
 
 import numpy as np
-import pytest
 
 from py_tools.numerical.core import (
     quad_form,
@@ -21,6 +20,7 @@ from py_tools.numerical.core import (
 
 # --- quad_form ---
 
+
 class TestQuadForm:
     def test_identity_weight(self):
         A = np.array([[1.0, 2.0], [3.0, 4.0]])
@@ -33,6 +33,7 @@ class TestQuadForm:
 
 
 # --- rsolve ---
+
 
 class TestRsolve:
     def test_recovers_b(self):
@@ -48,28 +49,37 @@ class TestRsolve:
 
 # --- gradient ---
 
+
 class TestGradient:
     def test_two_sided(self):
-        f = lambda x: np.sum(x ** 2)
+        def f(x):
+            return np.sum(x**2)
+
         x = np.array([1.0, 2.0, 3.0])
         grad = gradient(f, x)
         assert np.allclose(grad.ravel(), 2 * x, atol=1e-8)
 
     def test_one_sided(self):
-        f = lambda x: np.sum(x ** 2)
+        def f(x):
+            return np.sum(x**2)
+
         x = np.array([1.0, 2.0, 3.0])
         grad = gradient(f, x, two_sided=False)
         assert np.allclose(grad.ravel(), 2 * x, atol=1e-4)
 
     def test_vector_valued(self):
         # f(x) = x^2 elementwise, Jacobian = diag(2x)
-        f = lambda x: x ** 2
+        def f(x):
+            return x**2
+
         x = np.array([1.0, 3.0])
         grad = gradient(f, x)
         assert np.allclose(grad, np.diag(2 * x), atol=1e-8)
 
     def test_does_not_mutate_x(self):
-        f = lambda x: np.sum(x ** 2)
+        def f(x):
+            return np.sum(x**2)
+
         x = np.array([1.0, 2.0, 3.0])
         x_orig = x.copy()
         gradient(f, x)
@@ -78,20 +88,27 @@ class TestGradient:
 
 # --- hessian ---
 
+
 class TestHessian:
     def test_quadratic(self):
         Q = np.array([[2.0, 1.0], [1.0, 3.0]])
-        f = lambda x: x @ Q @ x
+
+        def f(x):
+            return x @ Q @ x
+
         H = hessian(f, np.array([1.0, 2.0]))
         assert np.allclose(H, 2 * Q, atol=1e-6)
 
     def test_diagonal(self):
-        f = lambda x: np.sum(x ** 2)
+        def f(x):
+            return np.sum(x**2)
+
         H = hessian(f, np.zeros(3))
         assert np.allclose(H, 2 * np.eye(3), atol=1e-6)
 
 
 # --- svd_inv ---
+
 
 class TestSvdInv:
     def test_full_rank(self):
@@ -108,6 +125,7 @@ class TestSvdInv:
 
 # --- ghquad_norm ---
 
+
 class TestGhquadNorm:
     def test_weights_sum_to_one(self):
         _, w = ghquad_norm(5)
@@ -121,10 +139,11 @@ class TestGhquadNorm:
     def test_variance(self):
         mu, sig = 1.0, 2.0
         x, w = ghquad_norm(10, mu=mu, sig=sig)
-        assert np.isclose(w @ (x - mu) ** 2, sig ** 2, atol=1e-10)
+        assert np.isclose(w @ (x - mu) ** 2, sig**2, atol=1e-10)
 
 
 # --- gauss_legendre_norm ---
+
 
 class TestGaussLegendreNorm:
     def test_weights_integrate_constant(self):
@@ -136,7 +155,7 @@ class TestGaussLegendreNorm:
         # n=2 Gauss-Legendre is exact for polynomials of degree <= 3
         a, b = 0.0, 2.0
         x, w = gauss_legendre_norm(2, a=a, b=b)
-        assert np.isclose(w @ x ** 3, (b ** 4 - a ** 4) / 4.0, atol=1e-12)
+        assert np.isclose(w @ x**3, (b**4 - a**4) / 4.0, atol=1e-12)
 
     def test_nodes_in_interval(self):
         a, b = -2.0, 3.0
@@ -145,6 +164,7 @@ class TestGaussLegendreNorm:
 
 
 # --- logit / logistic ---
+
 
 class TestLogitLogistic:
     def test_logistic_inverts_logit(self):
@@ -163,30 +183,32 @@ class TestLogitLogistic:
 
 # --- bound_transform ---
 
+
 class TestBoundTransform:
     def test_both_bounds_roundtrip(self):
-        lb = np.array([0.0,  1.0, -2.0])
-        ub = np.array([1.0,  3.0,  0.0])
-        x  = np.array([0.3,  2.0, -1.0])
+        lb = np.array([0.0, 1.0, -2.0])
+        ub = np.array([1.0, 3.0, 0.0])
+        x = np.array([0.3, 2.0, -1.0])
         u = bound_transform(x, lb, ub, to_bdd=False)
         assert np.allclose(bound_transform(u, lb, ub, to_bdd=True), x, atol=1e-12)
 
     def test_lb_only_roundtrip(self):
         lb = np.array([0.0, 1.0])
         ub = np.array([np.inf, np.inf])
-        x  = np.array([0.5, 2.5])
+        x = np.array([0.5, 2.5])
         u = bound_transform(x, lb, ub, to_bdd=False)
         assert np.allclose(bound_transform(u, lb, ub, to_bdd=True), x, atol=1e-12)
 
     def test_ub_only_roundtrip(self):
         lb = np.array([-np.inf, -np.inf])
         ub = np.array([1.0, 3.0])
-        x  = np.array([0.5, 2.0])
+        x = np.array([0.5, 2.0])
         u = bound_transform(x, lb, ub, to_bdd=False)
         assert np.allclose(bound_transform(u, lb, ub, to_bdd=True), x, atol=1e-12)
 
 
 # --- robust_cholesky ---
+
 
 class TestRobustCholesky:
     def test_pd_matrix(self):
@@ -203,17 +225,14 @@ class TestRobustCholesky:
 
 # --- my_chol ---
 
+
 class TestMyChol:
     def test_lower_triangular(self):
-        A = np.array([[4.0, 2.0, 1.0],
-                      [2.0, 5.0, 3.0],
-                      [1.0, 3.0, 6.0]])
+        A = np.array([[4.0, 2.0, 1.0], [2.0, 5.0, 3.0], [1.0, 3.0, 6.0]])
         assert np.allclose(np.triu(my_chol(A), 1), 0)
 
     def test_reconstruction(self):
-        A = np.array([[4.0, 2.0, 1.0],
-                      [2.0, 5.0, 3.0],
-                      [1.0, 3.0, 6.0]])
+        A = np.array([[4.0, 2.0, 1.0], [2.0, 5.0, 3.0], [1.0, 3.0, 6.0]])
         L = my_chol(A)
         assert np.allclose(L @ L.T, A, atol=1e-10)
 

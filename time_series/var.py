@@ -2,7 +2,8 @@ import numpy as np
 from py_tools import data as dt, time_series as ts
 from py_tools.utilities import as_list
 
-def instrument_var(df, var_list, policy_var, instrument, Sig=None, resid_prefix='u_'):
+
+def instrument_var(df, var_list, policy_var, instrument, Sig=None, resid_prefix="u_"):
     """Estimate the structural shock impact vector using an external instrument (IV).
 
     Parameters
@@ -26,29 +27,27 @@ def instrument_var(df, var_list, policy_var, instrument, Sig=None, resid_prefix=
         Impact vector for the structural shock.
     """
 
-    assert policy_var == var_list[0] # Is this important?
+    assert policy_var == var_list[0]  # Is this important?
 
     ix_samp = np.ones(len(df), dtype=bool)
     for var in var_list:
-
         # Regress residuals on instrument
         lhs = resid_prefix + var
-        rhs = ['const', instrument]
+        rhs = ["const", instrument]
         fr_u = dt.sm_regression(df, lhs, rhs)
 
         # Store fitted values
-        df[resid_prefix + 'hat_' + var] = np.nan
-        df.loc[fr_u.ix, resid_prefix + 'hat_' + var] = fr_u.results.fittedvalues
+        df[resid_prefix + "hat_" + var] = np.nan
+        df.loc[fr_u.ix, resid_prefix + "hat_" + var] = fr_u.results.fittedvalues
 
         # Update sample
         ix_samp = np.logical_and(ix_samp, fr_u.ix)
 
     gam = np.zeros((len(var_list) - 1, 1))
     for ii, var in enumerate(var_list[1:]):
-
         # Regress residuals on u_hat_policy
         lhs = resid_prefix + var
-        rhs = ['const', resid_prefix + 'hat_' + policy_var]
+        rhs = ["const", resid_prefix + "hat_" + policy_var]
         fr_2s = dt.sm_regression(df, lhs, rhs)
 
         # Store coefficient on u_hat_policy
@@ -64,18 +63,20 @@ def instrument_var(df, var_list, policy_var, instrument, Sig=None, resid_prefix=
     Sig21 = Sig[1:, 0][:, np.newaxis]
     Sig22 = Sig[1:, 1:]
 
-    Q = (np.dot(gam, np.dot(Sig11, gam.T))
-         - (np.dot(Sig21, gam.T) + np.dot(gam, Sig21.T))
-         + Sig22)
-    s12s12p = np.dot((Sig21 - np.dot(gam, Sig11)).T,
-                     np.linalg.solve(
-                         Q, Sig21 - np.dot(gam, Sig11)
-                     ))
+    Q = (
+        np.dot(gam, np.dot(Sig11, gam.T))
+        - (np.dot(Sig21, gam.T) + np.dot(gam, Sig21.T))
+        + Sig22
+    )
+    s12s12p = np.dot(
+        (Sig21 - np.dot(gam, Sig11)).T, np.linalg.solve(Q, Sig21 - np.dot(gam, Sig11))
+    )
     s11 = np.sqrt(Sig11 - s12s12p)
 
     S = np.vstack((s11, s11 * gam))
 
-    return S 
+    return S
+
 
 def companion_form(A, use_const=True):
     """Convert a VAR coefficient matrix to companion form.
@@ -108,15 +109,14 @@ def companion_form(A, use_const=True):
 
     # Remaining blocks: identity matrices
     for lag in range(1, Nlags):
-        A_comp[Ny*lag : Ny * (lag + 1), 
-               Ny * (lag - 1) : Ny * lag] \
-            = np.eye(Ny)
+        A_comp[Ny * lag : Ny * (lag + 1), Ny * (lag - 1) : Ny * lag] = np.eye(Ny)
 
     # One for constant term
     if use_const:
         A_comp[-1, -1] = 1.0
 
     return A_comp
+
 
 def compute_irfs(A, B, Nt_irf):
     """Compute impulse response functions for a VAR.
@@ -139,7 +139,7 @@ def compute_irfs(A, B, Nt_irf):
     # Get sizes
     Ny, Nx = A.shape
     Ne = B.shape[1]
-    assert(A.shape[0] == B.shape[0])
+    assert A.shape[0] == B.shape[0]
 
     # Update to companion form
     A_comp = companion_form(A)
@@ -150,10 +150,11 @@ def compute_irfs(A, B, Nt_irf):
     irf_comp_mats = np.zeros((Nx, Ne, Nt_irf))
     irf_comp_mats[:, :, 0] = B_comp
     for tt in range(1, Nt_irf):
-        irf_comp_mats[:, :, tt] = np.dot(A_comp, irf_comp_mats[:, :, tt-1])
+        irf_comp_mats[:, :, tt] = np.dot(A_comp, irf_comp_mats[:, :, tt - 1])
 
     # Chop extraneous rows
     return irf_comp_mats[:Ny, :, :]
+
 
 class VAR:
     """Vector Autoregression (VAR) estimated by OLS.
@@ -183,8 +184,7 @@ class VAR:
         Bootstrapped coefficient matrices (set after wild_bootstrap()).
     """
 
-    def __init__(self, df_in, var_list, n_var_lags=1, use_const=True,
-                 copy_df=True):
+    def __init__(self, df_in, var_list, n_var_lags=1, use_const=True, copy_df=True):
         """Initialize the VAR model.
 
         Parameters
@@ -220,8 +220,13 @@ class VAR:
 
     def fit(self):
         """Estimate the VAR coefficients using OLS."""
-        self.fr = ts.lagged_reg(self.df, self.var_list, self.var_list, 
-                                self.n_var_lags, use_const=self.use_const)
+        self.fr = ts.lagged_reg(
+            self.df,
+            self.var_list,
+            self.var_list,
+            self.n_var_lags,
+            use_const=self.use_const,
+        )
 
         # Process results
         self.A = self.fr.results.params.T
@@ -268,11 +273,17 @@ class VAR:
         A1_new = np.zeros((Ny_old, self.Nx))
 
         for lag in range(self.n_var_lags):
-            A1_new[:, self.Ny * lag : self.Ny * lag + Ny_old] \
-                = A_old[:, Ny_old * lag : Ny_old * (lag + 1)]
+            A1_new[:, self.Ny * lag : self.Ny * lag + Ny_old] = A_old[
+                :, Ny_old * lag : Ny_old * (lag + 1)
+            ]
 
-        fr_new = ts.lagged_reg(self.df, new_series, self.var_list, self.n_var_lags, 
-                               use_const=self.use_const)
+        fr_new = ts.lagged_reg(
+            self.df,
+            new_series,
+            self.var_list,
+            self.n_var_lags,
+            use_const=self.use_const,
+        )
 
         A2_new = fr_new.results.params.T
         self.A = np.vstack((A1_new, A2_new))
@@ -301,8 +312,9 @@ class VAR:
         if bootstrap:
             self.irfs_boot = np.zeros((self.irfs.shape + (self.Nboot,)))
             for i_boot in range(self.Nboot):
-                self.irfs_boot[:, :, :, i_boot] = compute_irfs(self.A_boot[:, :, i_boot], 
-                                                               B, self.Nt_irf)
+                self.irfs_boot[:, :, :, i_boot] = compute_irfs(
+                    self.A_boot[:, :, i_boot], B, self.Nt_irf
+                )
 
         return
 
@@ -332,13 +344,12 @@ class VAR:
         A_comp = companion_form(self.A)
 
         for i_boot in range(Nboot):
-
             x = x_init
             for tt in range(self.Nt):
                 X_i[tt, :] = x
                 x = np.dot(A_comp, x)
-                x[:self.Ny] += self.resid_boot[tt, :, i_boot]
-                y_i[tt, :] = x[:self.Ny]
+                x[: self.Ny] += self.resid_boot[tt, :, i_boot]
+                y_i[tt, :] = x[: self.Ny]
 
             # Store results
             self.y_boot[:, :, i_boot] = y_i
@@ -364,11 +375,13 @@ class VAR:
             self.wild_bootstrap(**kwargs)
 
         if self.Nt_irf is None:
-            self.Nt_irf = kwargs.get('Nt_irf', 20) # TODO don't hard code number
+            self.Nt_irf = kwargs.get("Nt_irf", 20)  # TODO don't hard code number
 
-        Ne = B.shape[1] # TODO: should be a way to set B
+        Ne = B.shape[1]  # TODO: should be a way to set B
         self.irfs_boot = np.zeros((self.Ny, Ne, self.Nt_irf, self.Nboot))
         for i_boot in range(self.Nboot):
-            self.irfs_boot[:, :, :, i_boot] = compute_irfs(self.A_boot[:, :, i_boot], B, self.Nt_irf)
-             
+            self.irfs_boot[:, :, :, i_boot] = compute_irfs(
+                self.A_boot[:, :, i_boot], B, self.Nt_irf
+            )
+
         return

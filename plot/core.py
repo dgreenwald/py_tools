@@ -1,8 +1,8 @@
 import matplotlib
 import os
 
-if os.environ.get('USE_MATPLOTLIB_AGG', 0):
-    matplotlib.use('Agg')
+if os.environ.get("USE_MATPLOTLIB_AGG", 0):
+    matplotlib.use("Agg")
 
 import matplotlib.pyplot as plt
 import matplotlib.style as plt_style
@@ -14,6 +14,7 @@ from py_tools import data as dt, stats
 
 pd.plotting.register_matplotlib_converters()
 
+
 def set_fontsizes(ax, fontsize):
     """Set the font size for all text elements on a matplotlib axis.
 
@@ -24,9 +25,13 @@ def set_fontsizes(ax, fontsize):
     fontsize : int or float
         The font size to apply to the title, axis labels, and tick labels.
     """
-    for item in ([ax.title, ax.xaxis.label, ax.yaxis.label] +
-                 ax.get_xticklabels() + ax.get_yticklabels()):
+    for item in (
+        [ax.title, ax.xaxis.label, ax.yaxis.label]
+        + ax.get_xticklabels()
+        + ax.get_yticklabels()
+    ):
         item.set_fontsize(fontsize)
+
 
 def save_hist(vals, path, **kwargs):
     """Compute a histogram and save it as a pickle file.
@@ -43,6 +48,7 @@ def save_hist(vals, path, **kwargs):
     h = np.histogram(vals, **kwargs)
     dt.to_pickle(h, path)
 
+
 def save_hist_npy(vals, base_path, **kwargs):
     """Compute a histogram and save the counts and bin edges as .npy files.
 
@@ -58,8 +64,9 @@ def save_hist_npy(vals, base_path, **kwargs):
         Additional keyword arguments forwarded to ``numpy.histogram``.
     """
     hist, bin_edges = np.histogram(vals, **kwargs)
-    np.save(base_path + 'hist.npy', hist) 
-    np.save(base_path + 'bin_edges.npy', bin_edges) 
+    np.save(base_path + "hist.npy", hist)
+    np.save(base_path + "bin_edges.npy", bin_edges)
+
 
 def load_hist_npy(base_path):
     """Load histogram counts and bin edges previously saved with :func:`save_hist_npy`.
@@ -77,19 +84,44 @@ def load_hist_npy(base_path):
     bin_edges : numpy.ndarray
         Array of bin edge values (length ``len(hist) + 1``).
     """
-    hist = np.load(base_path + 'hist.npy') 
-    bin_edges = np.load(base_path + 'bin_edges.npy') 
+    hist = np.load(base_path + "hist.npy")
+    bin_edges = np.load(base_path + "bin_edges.npy")
 
     return hist, bin_edges
 
-def two_axis(df_in, var1, var2, filepath=None, loc1='upper left', 
-             loc2='upper right', loc_single=None, legend_font=10, label_font=12,
-             normalize=False, color1=None, color2=None, colors=None, flip1=False,
-             flip2=False, legend=True,
-             single_legend=False, print_legend_axis=True, labels=None,
-             leglabels=None, drop=True, kwargs1=None, kwargs2=None, format_dates=False,
-             title=None, figsize=None, style=None,
-             savefig_kwargs=None, axvline=None, axvline_kwargs=None):
+
+def two_axis(
+    df_in,
+    var1,
+    var2,
+    filepath=None,
+    loc1="upper left",
+    loc2="upper right",
+    loc_single=None,
+    legend_font=10,
+    label_font=12,
+    normalize=False,
+    color1=None,
+    color2=None,
+    colors=None,
+    flip1=False,
+    flip2=False,
+    legend=True,
+    single_legend=False,
+    print_legend_axis=True,
+    labels=None,
+    leglabels=None,
+    drop=True,
+    kwargs1=None,
+    kwargs2=None,
+    format_dates=False,
+    title=None,
+    figsize=None,
+    style=None,
+    savefig_kwargs=None,
+    axvline=None,
+    axvline_kwargs=None,
+):
     """Plot two time series on separate left and right y-axes.
 
     Parameters
@@ -184,34 +216,42 @@ def two_axis(df_in, var1, var2, filepath=None, loc1='upper left',
         savefig_kwargs = {}
     if axvline_kwargs is None:
         axvline_kwargs = {}
-    
+
     if style is not None:
         plt_style.use(style)
-    
+
     kwargs1_copy = kwargs1.copy()
-    kwargs1 = {'linewidth' : 2,}
+    kwargs1 = {
+        "linewidth": 2,
+    }
     kwargs1.update(kwargs1_copy)
-    
+
     kwargs2_copy = kwargs2.copy()
-    kwargs2 = {'linewidth' : 2, 'marker' : 'o', 'markevery' : 4,
-               'fillstyle' : 'none', 'markersize' : 5, 'mew' : 1.5}
+    kwargs2 = {
+        "linewidth": 2,
+        "marker": "o",
+        "markevery": 4,
+        "fillstyle": "none",
+        "markersize": 5,
+        "mew": 1.5,
+    }
     kwargs2.update(kwargs2_copy)
 
-    matplotlib.rcParams.update({'font.size' : label_font})
-    
+    matplotlib.rcParams.update({"font.size": label_font})
+
     df = df_in[[var1, var2]].copy()
     if drop:
         df = df.dropna()
 
     for these_kwargs in [kwargs1, kwargs2]:
-            if these_kwargs.get('marker', None) is not None:
-                if these_kwargs.get('markevery', None) is None:
-                    these_kwargs['markevery'] = max(1, len(df) // 20)
+        if these_kwargs.get("marker", None) is not None:
+            if these_kwargs.get("markevery", None) is None:
+                these_kwargs["markevery"] = max(1, len(df) // 20)
 
     if color1 is None:
-        color1 = colors.get(var1, '#1f77b4')
+        color1 = colors.get(var1, "#1f77b4")
     if color2 is None:
-        color2 = colors.get(var2, '#ff7f0e')
+        color2 = colors.get(var2, "#ff7f0e")
 
     fig, ax1 = plt.subplots(figsize=figsize)
 
@@ -221,18 +261,21 @@ def two_axis(df_in, var1, var2, filepath=None, loc1='upper left',
     leglabel1 = leglabels.get(var1, label1)
     leglabel2 = leglabels.get(var2, label2)
     if print_legend_axis:
-        leglabel1 = leglabel1 + ' (left)'
-        leglabel2 = leglabel2 + ' (right)'
+        leglabel1 = leglabel1 + " (left)"
+        leglabel2 = leglabel2 + " (right)"
 
     if flip1:
-        line1 = ax1.plot(df.index, -df[var1], label=('(-1) x ' + leglabel1), color=color1, **kwargs1)
+        line1 = ax1.plot(
+            df.index, -df[var1], label=("(-1) x " + leglabel1), color=color1, **kwargs1
+        )
     else:
         line1 = ax1.plot(df.index, df[var1], label=leglabel1, color=color1, **kwargs1)
 
     ax2 = ax1.twinx()
     if flip2:
-        line2 = ax2.plot(df.index, -df[var2], label=('(-1) x ' + leglabel2), 
-                         color=color2, **kwargs2)
+        line2 = ax2.plot(
+            df.index, -df[var2], label=("(-1) x " + leglabel2), color=color2, **kwargs2
+        )
     else:
         line2 = ax2.plot(df.index, df[var2], label=leglabel2, color=color2, **kwargs2)
 
@@ -260,23 +303,27 @@ def two_axis(df_in, var1, var2, filepath=None, loc1='upper left',
         ax1_ylim_norm = (np.array(ax1_ylim) - df[var1].mean()) / df[var1].std()
         ax2_ylim_norm = (np.array(ax2_ylim) - df[var2].mean()) / df[var2].std()
 
-        ylim_norm = np.array([np.minimum(ax1_ylim_norm[0], ax2_ylim_norm[0]),
-                             np.maximum(ax1_ylim_norm[1], ax2_ylim_norm[1])])
+        ylim_norm = np.array(
+            [
+                np.minimum(ax1_ylim_norm[0], ax2_ylim_norm[0]),
+                np.maximum(ax1_ylim_norm[1], ax2_ylim_norm[1]),
+            ]
+        )
 
         ax1_ylim_new = df[var1].std() * ylim_norm + df[var1].mean()
         ax2_ylim_new = df[var2].std() * ylim_norm + df[var2].mean()
 
         ax1.set_ylim(ax1_ylim_new)
         ax2.set_ylim(ax2_ylim_new)
-        
+
     if axvline is not None:
         ax1.axvline(axvline, **axvline_kwargs)
 
     plt.xlim(df.index[[0, -1]])
-    
+
     if title is not None:
         plt.title(title)
-    
+
     if format_dates:
         fig.autofmt_xdate()
 
@@ -289,6 +336,7 @@ def two_axis(df_in, var1, var2, filepath=None, loc1='upper left',
     plt.close(fig)
 
     return None
+
 
 def normalized(df, var_list, filepath=None, invert_list=None):
     """Plot multiple series after standardizing each to zero mean and unit variance.
@@ -312,21 +360,20 @@ def normalized(df, var_list, filepath=None, invert_list=None):
     """
     if invert_list is None:
         invert_list = len(var_list) * [False]
-    
+
     fig = plt.figure()
-    
+
     for this_var, invert in zip(var_list, invert_list):
-        
         x = df[this_var].values.copy()
         x -= np.mean(x)
         x /= np.std(x)
-        
+
         if invert:
             x *= -1
-            invert_str = '(-1) x '
+            invert_str = "(-1) x "
         else:
-            invert_str = ''
-            
+            invert_str = ""
+
         plt.plot(df.index, x, label=invert_str + this_var)
 
     plt.legend()
@@ -337,13 +384,28 @@ def normalized(df, var_list, filepath=None, invert_list=None):
         plt.show()
 
     plt.close(fig)
-    
+
     return None
 
-def hist(df_in, var, label=None, xlabel=None, ylabel=None, wvar=None, 
-         bins=None, xlim=None, ylim=None, filepath=None,
-         legend_font=10, label_font=12, copy_path=None, x_vertline=None,
-         vertline_kwargs=None, **kwargs):
+
+def hist(
+    df_in,
+    var,
+    label=None,
+    xlabel=None,
+    ylabel=None,
+    wvar=None,
+    bins=None,
+    xlim=None,
+    ylim=None,
+    filepath=None,
+    legend_font=10,
+    label_font=12,
+    copy_path=None,
+    x_vertline=None,
+    vertline_kwargs=None,
+    **kwargs,
+):
     """Plot a weighted, normalized histogram for a single variable.
 
     Parameters
@@ -404,14 +466,21 @@ def hist(df_in, var, label=None, xlabel=None, ylabel=None, wvar=None,
         w = np.ones(len(df))
 
     # Normalize
-    kwargs['density'] = True
+    kwargs["density"] = True
 
     # TODO: could use kwargs for some of these
     fig = plt.figure()
-    matplotlib.rcParams.update({'font.size' : label_font})
-    plt.hist(df[var].values, bins=bins, alpha=0.5, edgecolor='black',
-             weights=w, label=label, **kwargs)
-    
+    matplotlib.rcParams.update({"font.size": label_font})
+    plt.hist(
+        df[var].values,
+        bins=bins,
+        alpha=0.5,
+        edgecolor="black",
+        weights=w,
+        label=label,
+        **kwargs,
+    )
+
     if x_vertline is not None:
         plt.axvline(x=x_vertline, **vertline_kwargs)
 
@@ -439,6 +508,7 @@ def hist(df_in, var, label=None, xlabel=None, ylabel=None, wvar=None,
 
     return True
 
+
 def compute_hist(df, var, bins, wvar=None):
     """Compute a normalized weighted histogram and return it as a Series.
 
@@ -464,26 +534,47 @@ def compute_hist(df, var, bins, wvar=None):
     this_list = [var]
     if wvar is not None:
         this_list.append(wvar)
-        
+
     _df = df[this_list].copy()
     if wvar is None:
-        wvar = '_ONES_'
+        wvar = "_ONES_"
         _df[wvar] = 1.0
-    
-    _df['bin'] = pd.cut(_df[var], bins, labels=bins[:-1])
-    hist = _df.groupby('bin', observed=False)[wvar].sum()
+
+    _df["bin"] = pd.cut(_df[var], bins, labels=bins[:-1])
+    hist = _df.groupby("bin", observed=False)[wvar].sum()
     hist /= np.sum(hist)
 
     return hist
 
-def multi_hist(dfs, labels=None, xvar=None, xvars=None, bins=None, wvar=None, wvars=None,
-                filepath=None, xlabel=None, ylabel=None, xlim=None,
-                ylim=None, legend_font=10, label_font=12, copy_paths=None,
-                colors=None, edgecolor='black', alpha=0.5, use_bar=False, 
-                kwarg_list=None, x_vertline=None,
-                vertline_kwargs=None, topcode=False, bottomcode=False, 
-                density=True,
-                **kwargs):
+
+def multi_hist(
+    dfs,
+    labels=None,
+    xvar=None,
+    xvars=None,
+    bins=None,
+    wvar=None,
+    wvars=None,
+    filepath=None,
+    xlabel=None,
+    ylabel=None,
+    xlim=None,
+    ylim=None,
+    legend_font=10,
+    label_font=12,
+    copy_paths=None,
+    colors=None,
+    edgecolor="black",
+    alpha=0.5,
+    use_bar=False,
+    kwarg_list=None,
+    x_vertline=None,
+    vertline_kwargs=None,
+    topcode=False,
+    bottomcode=False,
+    density=True,
+    **kwargs,
+):
     """Plot overlapping histograms for multiple datasets or variables.
 
     Each element of *dfs* (or each variable in *xvars*) is drawn as a
@@ -566,103 +657,113 @@ def multi_hist(dfs, labels=None, xvar=None, xvars=None, bins=None, wvar=None, wv
             return len(x)
         else:
             return 0
-        
+
     def to_list(x_in, n_plots, default=None):
-        
+
         if x_in is None:
             x_in = default
-            
+
         if isinstance(x_in, list):
             x = x_in.copy()
         else:
             x = [x_in]
-            
+
         if (len(x) == 1) and (n_plots > 1):
             x = n_plots * x
-            
+
         assert len(x) == n_plots
-        
+
         return x
-        
+
     # Number of independent plots
     n_plots = max([get_length(x) for x in [dfs, xvars, wvars]])
     ilist = list(range(n_plots))
-        
+
     # Default: equal weights
     if wvar is None:
-        wvar = '_count'
-        
+        wvar = "_count"
+
     # Bound at edges of bins
     if (xlim is None) and (bins is not None):
         xlim = bins[[0, -1]]
-        
+
     # Normalize
     if density and (not use_bar):
-        kwargs['density'] = True
-        
+        kwargs["density"] = True
+
     dfs = to_list(dfs, n_plots)
     labels = to_list(labels, n_plots)
     colors = to_list(colors, n_plots)
-    
+
     xvars = to_list(xvars, n_plots, xvar)
     wvars = to_list(wvars, n_plots, wvar)
     kwarg_list = to_list(kwarg_list, n_plots, {})
-    
+
     for ii in ilist:
         these_kwargs = kwargs.copy()
         these_kwargs.update(kwarg_list[ii])
         kwarg_list[ii] = these_kwargs
 
     _dfs = []
-    
+
     for ii in ilist:
-        
         xv = xvars[ii]
         wv = wvars[ii]
-        
+
         df = dfs[ii][[xv]].copy()
-        
-        if wvars[ii] == '_count':
-            df['_count'] = 1.0
+
+        if wvars[ii] == "_count":
+            df["_count"] = 1.0
         else:
             df[wv] = dfs[ii][wv]
-            
+
         df = dt.clean(df, [xv, wv])
 
         if topcode:
             df[xv] = np.minimum(df[xv], bins[-1])
-            
+
         if bottomcode:
             df[xv] = np.maximum(df[xv], bins[0])
-    
+
         _dfs.append(df)
-        
+
     fig = plt.figure()
-    matplotlib.rcParams.update({'font.size' : label_font})
-        
+    matplotlib.rcParams.update({"font.size": label_font})
+
     if use_bar:
-        
         assert bins is not None
-        
+
         # TODO:
         bins = np.array(bins)
         bin_width = bins[1:] - bins[:-1]
 
         for ii in ilist:
-            
             hist = compute_hist(_dfs[ii], xvars[ii], bins, wvar=wvars[ii])
-            
-            plt.bar(np.array(hist.index), hist.values, width=bin_width,
-                    alpha=alpha, edgecolor=edgecolor, align='edge',
-                    label=str(labels[ii]), color=colors[ii], **kwarg_list[ii]
-                    )
+
+            plt.bar(
+                np.array(hist.index),
+                hist.values,
+                width=bin_width,
+                alpha=alpha,
+                edgecolor=edgecolor,
+                align="edge",
+                label=str(labels[ii]),
+                color=colors[ii],
+                **kwarg_list[ii],
+            )
 
     else:
-        
         for ii in ilist:
-
-            plt.hist(_dfs[ii][xvars[ii]].values, bins=bins, alpha=alpha, edgecolor=edgecolor,
-                     weights=_dfs[ii][wvars[ii]].copy(), label=str(labels[ii]), color=colors[ii], **kwarg_list[ii])
+            plt.hist(
+                _dfs[ii][xvars[ii]].values,
+                bins=bins,
+                alpha=alpha,
+                edgecolor=edgecolor,
+                weights=_dfs[ii][wvars[ii]].copy(),
+                label=str(labels[ii]),
+                color=colors[ii],
+                **kwarg_list[ii],
+            )
 
     if x_vertline is not None:
         plt.axvline(x=x_vertline, **vertline_kwargs)
@@ -678,7 +779,7 @@ def multi_hist(dfs, labels=None, xvar=None, xvars=None, bins=None, wvar=None, wv
         plt.xlim((xlim))
     if ylim is not None:
         plt.ylim((ylim))
-        
+
     plt.tight_layout()
 
     if filepath is not None:
@@ -690,17 +791,52 @@ def multi_hist(dfs, labels=None, xvar=None, xvars=None, bins=None, wvar=None, wv
 
     if copy_paths is not None:
         for ii in ilist:
-            save_hist(_dfs[ii][xvars[ii]].values, copy_paths[ii], density=True, bins=bins, weights=_dfs[ii][wvars[ii]].values)
+            save_hist(
+                _dfs[ii][xvars[ii]].values,
+                copy_paths[ii],
+                density=True,
+                bins=bins,
+                weights=_dfs[ii][wvars[ii]].values,
+            )
 
     return True
 
-def double_hist(df1, df2=None, label1=None, label2=None, var=None,
-                var1=None, var2=None, bins=None, wvar=None, wvar1=None,
-                wvar2=None, filepath=None, xlabel=None, ylabel=None, xlim=None,
-                ylim=None, legend_font=10, label_font=12, copy_path1=None,
-                copy_path2=None, color1=None, color2=None, edgecolor='black', 
-                alpha=0.5, use_bar=False, labels=None, kwargs1=None, kwargs2=None, x_vertline=None,
-                vertline_kwargs=None, topcode=False, bottomcode=False, **kwargs):
+
+def double_hist(
+    df1,
+    df2=None,
+    label1=None,
+    label2=None,
+    var=None,
+    var1=None,
+    var2=None,
+    bins=None,
+    wvar=None,
+    wvar1=None,
+    wvar2=None,
+    filepath=None,
+    xlabel=None,
+    ylabel=None,
+    xlim=None,
+    ylim=None,
+    legend_font=10,
+    label_font=12,
+    copy_path1=None,
+    copy_path2=None,
+    color1=None,
+    color2=None,
+    edgecolor="black",
+    alpha=0.5,
+    use_bar=False,
+    labels=None,
+    kwargs1=None,
+    kwargs2=None,
+    x_vertline=None,
+    vertline_kwargs=None,
+    topcode=False,
+    bottomcode=False,
+    **kwargs,
+):
     """Plot two overlapping histograms on the same axes.
 
     Parameters
@@ -808,13 +944,13 @@ def double_hist(df1, df2=None, label1=None, label2=None, var=None,
         assert var1 is None and var2 is None
         var1 = var
         var2 = var
-        
+
     if wvar is None:
-        wvar = '_count'
-        
+        wvar = "_count"
+
     if wvar1 is None:
         wvar1 = wvar
-        
+
     if wvar2 is None:
         wvar2 = wvar
 
@@ -825,32 +961,32 @@ def double_hist(df1, df2=None, label1=None, label2=None, var=None,
         label2 = labels.get(var2, var2)
 
     # Normalize
-    kwargs['density'] = True
-        
+    kwargs["density"] = True
+
     _df1 = df1[[var1]].copy()
     _df2 = df2[[var2]].copy()
-    
-    if wvar1 == '_count':
-        _df1['_weight1'] = 1.0
-    else:
-        _df1['_weight1'] = df1[wvar1]
-        
-    if wvar2 == '_count':
-        _df2['_weight2'] = 1.0
-    else:
-        _df2['_weight2'] = df2[wvar2]
 
-    wvar1 = '_weight1'
-    wvar2 = '_weight2'
+    if wvar1 == "_count":
+        _df1["_weight1"] = 1.0
+    else:
+        _df1["_weight1"] = df1[wvar1]
+
+    if wvar2 == "_count":
+        _df2["_weight2"] = 1.0
+    else:
+        _df2["_weight2"] = df2[wvar2]
+
+    wvar1 = "_weight1"
+    wvar2 = "_weight2"
 
     _df1 = dt.clean(_df1, [var1, wvar1])
     _df2 = dt.clean(_df2, [var2, wvar2])
-    
+
     if topcode:
         assert bins is not None
         _df1[var1] = np.minimum(_df1[var1], bins[-1])
         _df2[var2] = np.minimum(_df2[var2], bins[-1])
-    
+
     if bottomcode:
         assert bins is not None
         _df1[var1] = np.maximum(_df1[var1], bins[0])
@@ -871,35 +1007,65 @@ def double_hist(df1, df2=None, label1=None, label2=None, var=None,
         w2 = _df2[wvar2].values
     else:
         w2 = np.ones(len(_df2))
-        
+
     if (xlim is None) and (bins is not None):
         xlim = bins[[0, -1]]
 
     fig = plt.figure()
-    matplotlib.rcParams.update({'font.size' : label_font})
+    matplotlib.rcParams.update({"font.size": label_font})
 
     if use_bar:
-        
         assert bins is not None
-        
+
         bin_width = bins[1] - bins[0]
 
         hist1 = compute_hist(_df1, var1, bins, wvar=wvar1)
         hist2 = compute_hist(_df2, var2, bins, wvar=wvar2)
 
-        plt.bar(np.array(hist1.index), hist1.values, width=bin_width,
-                alpha=alpha, edgecolor=edgecolor, align='edge',
-                label=str(label1), color=color1, **kwargs1)
-        plt.bar(np.array(hist2.index), hist2.values, width=bin_width,
-                alpha=alpha, edgecolor=edgecolor, align='edge',
-                label=str(label2), color=color2, **kwargs2)
+        plt.bar(
+            np.array(hist1.index),
+            hist1.values,
+            width=bin_width,
+            alpha=alpha,
+            edgecolor=edgecolor,
+            align="edge",
+            label=str(label1),
+            color=color1,
+            **kwargs1,
+        )
+        plt.bar(
+            np.array(hist2.index),
+            hist2.values,
+            width=bin_width,
+            alpha=alpha,
+            edgecolor=edgecolor,
+            align="edge",
+            label=str(label2),
+            color=color2,
+            **kwargs2,
+        )
 
     else:
-
-        plt.hist(_df1[var1].values, bins=bins, alpha=alpha, edgecolor=edgecolor,
-                 weights=w1, label=str(label1), color=color1, **kwargs1)
-        plt.hist(_df2[var2].values, bins=bins, alpha=alpha, edgecolor=edgecolor,
-                 weights=w2, label=str(label2), color=color2, **kwargs2)
+        plt.hist(
+            _df1[var1].values,
+            bins=bins,
+            alpha=alpha,
+            edgecolor=edgecolor,
+            weights=w1,
+            label=str(label1),
+            color=color1,
+            **kwargs1,
+        )
+        plt.hist(
+            _df2[var2].values,
+            bins=bins,
+            alpha=alpha,
+            edgecolor=edgecolor,
+            weights=w2,
+            label=str(label2),
+            color=color2,
+            **kwargs2,
+        )
 
     if x_vertline is not None:
         plt.axvline(x=x_vertline, **vertline_kwargs)
@@ -915,7 +1081,7 @@ def double_hist(df1, df2=None, label1=None, label2=None, var=None,
         plt.xlim((xlim))
     if ylim is not None:
         plt.ylim((ylim))
-        
+
     plt.tight_layout()
 
     if filepath is not None:
@@ -932,8 +1098,16 @@ def double_hist(df1, df2=None, label1=None, label2=None, var=None,
 
     return True
 
-def var_irfs(irfs, var_list, shock_list=None, titles=None, filepath=None,
-             n_per_row=None, plot_scale=3):
+
+def var_irfs(
+    irfs,
+    var_list,
+    shock_list=None,
+    titles=None,
+    filepath=None,
+    n_per_row=None,
+    plot_scale=3,
+):
     """Plot impulse response functions (IRFs) from a posterior simulation.
 
     Creates a grid of subplots, one per (variable, shock) pair, showing the
@@ -981,18 +1155,18 @@ def var_irfs(irfs, var_list, shock_list=None, titles=None, filepath=None,
     fig = plt.figure()
     for iy in range(Ny):
         for ishock in range(Nshock):
-            plt.subplot(n_rows, n_per_row, Ny*ishock + iy + 1)
+            plt.subplot(n_rows, n_per_row, Ny * ishock + iy + 1)
 
-            plt.plot(np.zeros(Nirf), color='gray', linestyle=':')
-            plt.plot(center[:, iy, ishock], color='blue')
-            plt.plot(bands[0, :, iy, ishock], color='black', linestyle='--')
-            plt.plot(bands[1, :, iy, ishock], color='black', linestyle='--')
+            plt.plot(np.zeros(Nirf), color="gray", linestyle=":")
+            plt.plot(center[:, iy, ishock], color="blue")
+            plt.plot(bands[0, :, iy, ishock], color="black", linestyle="--")
+            plt.plot(bands[1, :, iy, ishock], color="black", linestyle="--")
 
             plt.xlim((0, Nirf - 1))
 
             var_title = titles.get(var_list[iy], var_list[iy])
             shock_title = titles.get(shock_list[ishock], shock_list[ishock])
-            plt.title('{0} to {1}'.format(var_title, shock_title))
+            plt.title("{0} to {1}".format(var_title, shock_title))
 
     if filepath is None:
         plt.show()
@@ -1002,15 +1176,35 @@ def var_irfs(irfs, var_list, shock_list=None, titles=None, filepath=None,
         plt.savefig(filepath)
         plt.close(fig)
 
-    return None 
+    return None
 
-def plot_series(df_in, var_names, filepath=None, directory=None, filename=None, labels=None,
-                linestyles=None, markers=None, colors=None, markevery=8,
-                markersize=5, mew=2, fillstyle='none', fontsize=12,
-                plot_type=None,
-                ylabel=None, sample='outer', title=None, 
-                single_legend=True, vertline_ix=None,
-                vertline_kwargs=None, linewidths=None, ylim=None, dpi=None):
+
+def plot_series(
+    df_in,
+    var_names,
+    filepath=None,
+    directory=None,
+    filename=None,
+    labels=None,
+    linestyles=None,
+    markers=None,
+    colors=None,
+    markevery=8,
+    markersize=5,
+    mew=2,
+    fillstyle="none",
+    fontsize=12,
+    plot_type=None,
+    ylabel=None,
+    sample="outer",
+    title=None,
+    single_legend=True,
+    vertline_ix=None,
+    vertline_kwargs=None,
+    linewidths=None,
+    ylim=None,
+    dpi=None,
+):
     """Plot one or more time series from a DataFrame.
 
     Parameters
@@ -1083,8 +1277,8 @@ def plot_series(df_in, var_names, filepath=None, directory=None, filename=None, 
     if linewidths is None:
         linewidths = {}
 
-    matplotlib.rcParams.update({'font.size' : fontsize})
-    
+    matplotlib.rcParams.update({"font.size": fontsize})
+
     if (directory is not None) or (filename is not None) or (plot_type is not None):
         raise ValueError(
             "Deprecated arguments `directory`, `filename`, and `plot_type` are no longer supported. "
@@ -1093,9 +1287,9 @@ def plot_series(df_in, var_names, filepath=None, directory=None, filename=None, 
 
     fig = plt.figure()
 
-    if sample == 'outer':
+    if sample == "outer":
         ix = np.any(pd.notnull(df_in[var_names]), axis=1)
-    elif sample == 'inner':
+    elif sample == "inner":
         ix = np.all(pd.notnull(df_in[var_names]), axis=1)
     else:
         raise ValueError("`sample` must be 'outer' or 'inner'.")
@@ -1103,18 +1297,24 @@ def plot_series(df_in, var_names, filepath=None, directory=None, filename=None, 
     df = df_in.loc[ix, var_names].copy()
 
     for var in var_names:
-
         label = labels.get(var, var)
-        linestyle = linestyles.get(var, '-')
+        linestyle = linestyles.get(var, "-")
         color = colors.get(var, None)
-        linewidth=linewidths.get(var, 2)
+        linewidth = linewidths.get(var, 2)
 
         marker = markers.get(var, None)
 
         plt.plot(
-            df.index, df[var].values,
-            linewidth=linewidth, linestyle=linestyle, label=label, marker=marker,
-            markevery=markevery, markersize=markersize, mew=mew, color=color
+            df.index,
+            df[var].values,
+            linewidth=linewidth,
+            linestyle=linestyle,
+            label=label,
+            marker=marker,
+            markevery=markevery,
+            markersize=markersize,
+            mew=mew,
+            color=color,
         )
 
     if vertline_ix is not None:
@@ -1124,7 +1324,7 @@ def plot_series(df_in, var_names, filepath=None, directory=None, filename=None, 
         plt.legend(fontsize=fontsize)
 
     plt.xlim(df.index[[0, -1]])
-    
+
     if ylim is not None:
         plt.ylim(ylim)
 
@@ -1142,8 +1342,19 @@ def plot_series(df_in, var_names, filepath=None, directory=None, filename=None, 
 
     plt.close(fig)
 
-def projection(x, se, var_titles, shock_title, p=0.9, n_per_row=4, plot_size=3.0,
-               out_dir=None, label=None, shock_name=None): 
+
+def projection(
+    x,
+    se,
+    var_titles,
+    shock_title,
+    p=0.9,
+    n_per_row=4,
+    plot_size=3.0,
+    out_dir=None,
+    label=None,
+    shock_name=None,
+):
     """Plot impulse responses from a local projection estimation.
 
     Parameters
@@ -1179,8 +1390,8 @@ def projection(x, se, var_titles, shock_title, p=0.9, n_per_row=4, plot_size=3.0
     """
 
     Ny, Nt = x.shape
-    n_rows = (Ny - 1) // n_per_row + 1 # number of rows needed
-    
+    n_rows = (Ny - 1) // n_per_row + 1  # number of rows needed
+
     if n_rows == 1:
         n_per_row = Ny
 
@@ -1190,41 +1401,43 @@ def projection(x, se, var_titles, shock_title, p=0.9, n_per_row=4, plot_size=3.0
     # Plot
     fig = plt.figure()
     for iy in range(Ny):
-
         plt.subplot(n_rows, n_per_row, iy + 1)
 
-        plt.plot(np.arange(Nt), np.zeros(x[iy, :].shape), linestyle=':', color='gray') 
-        plt.plot(np.arange(Nt), x[iy, :], linestyle='-', color='blue') 
-        plt.plot(np.arange(Nt), x[iy, :] + z_star * se[iy, :], linestyle='--', color='black') 
-        plt.plot(np.arange(Nt), x[iy, :] - z_star * se[iy, :], linestyle='--', color='black')
+        plt.plot(np.arange(Nt), np.zeros(x[iy, :].shape), linestyle=":", color="gray")
+        plt.plot(np.arange(Nt), x[iy, :], linestyle="-", color="blue")
+        plt.plot(
+            np.arange(Nt), x[iy, :] + z_star * se[iy, :], linestyle="--", color="black"
+        )
+        plt.plot(
+            np.arange(Nt), x[iy, :] - z_star * se[iy, :], linestyle="--", color="black"
+        )
 
-        plt.title('{0} to {1}'.format(var_titles[iy], shock_title))
+        plt.title("{0} to {1}".format(var_titles[iy], shock_title))
 
         plt.xlim((0, Nt - 1))
-        plt.xlabel('Quarters')
+        plt.xlabel("Quarters")
 
     fig.set_size_inches((plot_size * n_per_row, plot_size * n_rows))
     plt.tight_layout()
 
     if out_dir is None:
-
         plt.show()
 
     else:
-
         if label is None:
-            prefix = ''
+            prefix = ""
         else:
-            prefix = label + '_'
+            prefix = label + "_"
 
         if shock_name is None:
             shock_name = shock_title
 
-        plt.savefig('{0}/{1}{2}_projections.pdf'.format(out_dir, prefix, shock_name))
+        plt.savefig("{0}/{1}{2}_projections.pdf".format(out_dir, prefix, shock_name))
 
     plt.close(fig)
 
     return None
+
 
 def get_45_bounds(df, xvar, yvar, margin=0.05):
     """Compute symmetric axis bounds for a 45-degree line plot.
@@ -1254,19 +1467,44 @@ def get_45_bounds(df, xvar, yvar, margin=0.05):
     min_val = np.amin(df[[yvar, xvar]].values)
     max_val = np.amax(df[[yvar, xvar]].values)
     dist = max_val - min_val
-    
+
     plot_lb = min_val - margin * dist
     plot_ub = max_val + margin * dist
-    
+
     return plot_lb, plot_ub
 
-def binscatter(df_in, yvars, xvar, wvar=None, fit_var=None, labels=None, n_bins=20, bins=None,
-               filepath=None, xlim=None, ylim=None, plot_line=True, 
-               control=None, absorb=None, bin_scale=None, raw_scale=10.0,
-               plot_raw_data=False, bin_kwargs=None, raw_kwargs=None, line_kwargs=None,
-               legend_font=10, label_font=12, use_legend=True, median=False,
-               restore_mean=False, title=None, include45=False, include0=False,
-               **kwargs):
+
+def binscatter(
+    df_in,
+    yvars,
+    xvar,
+    wvar=None,
+    fit_var=None,
+    labels=None,
+    n_bins=20,
+    bins=None,
+    filepath=None,
+    xlim=None,
+    ylim=None,
+    plot_line=True,
+    control=None,
+    absorb=None,
+    bin_scale=None,
+    raw_scale=10.0,
+    plot_raw_data=False,
+    bin_kwargs=None,
+    raw_kwargs=None,
+    line_kwargs=None,
+    legend_font=10,
+    label_font=12,
+    use_legend=True,
+    median=False,
+    restore_mean=False,
+    title=None,
+    include45=False,
+    include0=False,
+    **kwargs,
+):
     """Create a binned scatter plot with optional OLS fit line.
 
     Bins *xvar* into *n_bins* equal-frequency bins and plots the
@@ -1362,84 +1600,90 @@ def binscatter(df_in, yvars, xvar, wvar=None, fit_var=None, labels=None, n_bins=
         raw_kwargs = {}
     if line_kwargs is None:
         line_kwargs = {}
-        
-    matplotlib.rcParams.update({'font.size' : label_font})
-    
+
+    matplotlib.rcParams.update({"font.size": label_font})
+
     if isinstance(yvars, str):
         yvars = [yvars]
     combined = len(yvars) > 1
-        
+
     if isinstance(absorb, str):
         absorb = [absorb]
-        
+
     absorb_list = []
     for item in absorb:
         if isinstance(item, str):
             absorb_list.append(item)
         else:
             absorb_list += item
-    
+
     keep_list = [xvar] + yvars + control + absorb_list
     if wvar is not None:
         keep_list.append(wvar)
     if fit_var is not None:
         keep_list.append(fit_var)
-        
+
     df = df_in.reset_index()
     df = df[keep_list]
     df = df.dropna()
-    
+
     bin_kwargs_new = {
-        'alpha' : 1.0,
-        'edgecolor' : 'black',
-        'zorder' : 2,
-        'label' : 'Binscatter',
+        "alpha": 1.0,
+        "edgecolor": "black",
+        "zorder": 2,
+        "label": "Binscatter",
     }
-    
+
     line_kwargs_new = {
-            'linewidth' : 2,
-            'zorder' : 1,
-            'color' : 'firebrick',
-            'label' : '_nolabel',
-            }
-    
+        "linewidth": 2,
+        "zorder": 1,
+        "color": "firebrick",
+        "label": "_nolabel",
+    }
+
     raw_kwargs_new = {
-        'marker' : 'o',
-        'color' : 'cornflowerblue',
-        'alpha' : 0.5,
-        'edgecolor' : 'black',
-        'label' : 'Raw Data',
+        "marker": "o",
+        "color": "cornflowerblue",
+        "alpha": 0.5,
+        "edgecolor": "black",
+        "label": "Raw Data",
     }
 
     if plot_raw_data:
-
         if bin_scale is None:
             bin_scale = 100.0
 
-        bin_kwargs_new.update({
-            'marker' : '*',
-            'color' : 'firebrick',
-        })
+        bin_kwargs_new.update(
+            {
+                "marker": "*",
+                "color": "firebrick",
+            }
+        )
     else:
-
         if bin_scale is None:
             bin_scale = 50.0
 
-        bin_kwargs_new.update({
-            'marker' : 'o',
-            'color' : 'cornflowerblue',
-        })
+        bin_kwargs_new.update(
+            {
+                "marker": "o",
+                "color": "cornflowerblue",
+            }
+        )
 
         raw_kwargs_new = {}
-        
+
     if combined:
-        line_kwargs_new.update({
-                'linestyle' : '--',
-                })
+        line_kwargs_new.update(
+            {
+                "linestyle": "--",
+            }
+        )
     else:
-        raw_kwargs_new.update({
-                'label' : 'Raw Data',
-                })
+        raw_kwargs_new.update(
+            {
+                "label": "Raw Data",
+            }
+        )
 
     bin_kwargs_new.update(bin_kwargs)
     raw_kwargs_new.update(raw_kwargs)
@@ -1449,16 +1693,15 @@ def binscatter(df_in, yvars, xvar, wvar=None, fit_var=None, labels=None, n_bins=
         weights = np.ones(len(df))
     else:
         weights = df[wvar].astype(np.float64).values
-        
-    if control or absorb:
-        
-        for this_var in [xvar] + yvars:
 
+    if control or absorb:
+        for this_var in [xvar] + yvars:
             this_mean = stats.weighted_mean(df[this_var].values, weights)
 
             if absorb:
-                df[this_var] = dt.absorb(df, absorb, this_var, weight_var=wvar, 
-                                    restore_mean=restore_mean)
+                df[this_var] = dt.absorb(
+                    df, absorb, this_var, weight_var=wvar, restore_mean=restore_mean
+                )
 
             if control:
                 fr = dt.regression(df, this_var, control, weight_var=wvar)
@@ -1469,56 +1712,60 @@ def binscatter(df_in, yvars, xvar, wvar=None, fit_var=None, labels=None, n_bins=
 
     fig, ax = plt.subplots()
     for iy, yvar in enumerate(yvars):
-        
         if combined:
             assert not plot_raw_data
-            this_color = 'C{:d}'.format(iy)
-            bin_kwargs_new.update({
-                    'color' : this_color,
-                    'label' : labels.get(yvar, yvar),
-                    })
-            line_kwargs_new.update({
-                    'color' : this_color,
-                    })
-        
-        by_bin = dt.compute_binscatter(df, yvar, xvar, wvar=wvar, n_bins=n_bins, 
-                                       bins=bins, median=median)
-        
+            this_color = "C{:d}".format(iy)
+            bin_kwargs_new.update(
+                {
+                    "color": this_color,
+                    "label": labels.get(yvar, yvar),
+                }
+            )
+            line_kwargs_new.update(
+                {
+                    "color": this_color,
+                }
+            )
+
+        by_bin = dt.compute_binscatter(
+            df, yvar, xvar, wvar=wvar, n_bins=n_bins, bins=bins, median=median
+        )
+
         if plot_line and (fit_var is None):
             fr = dt.regression(df, yvar, [xvar], weight_var=wvar)
-            df.loc[fr.ix, yvar + '_fit'] = fr.results.fittedvalues
-        
+            df.loc[fr.ix, yvar + "_fit"] = fr.results.fittedvalues
+
         if plot_line:
             x = df[xvar].values
-            fit_col = fit_var if fit_var is not None else yvar + '_fit'
+            fit_col = fit_var if fit_var is not None else yvar + "_fit"
             y_fit = df[fit_col].values
             imin = np.argmin(x)
             imax = np.argmax(x)
             x_line = np.array((x[imin], x[imax]))
             y_line = np.array((y_fit[imin], y_fit[imax]))
             ax.plot(x_line, y_line, **line_kwargs_new)
-                        
+
         if plot_raw_data:
-                
-            weights *= (raw_scale / np.mean(weights))
-            
-            ax.scatter(df[xvar].values, df[yvar].values, 
-                       s=weights, **raw_kwargs_new
-                    )
-            
-        ax.scatter(by_bin[xvar].values, by_bin[yvar].values, 
-                   s=bin_scale, **bin_kwargs_new,
-                    )
-        
+            weights *= raw_scale / np.mean(weights)
+
+            ax.scatter(df[xvar].values, df[yvar].values, s=weights, **raw_kwargs_new)
+
+        ax.scatter(
+            by_bin[xvar].values,
+            by_bin[yvar].values,
+            s=bin_scale,
+            **bin_kwargs_new,
+        )
+
     plt.xlabel(labels.get(xvar, xvar))
-    
+
     if use_legend:
         plt.legend(fontsize=legend_font)
-        
+
     if not combined:
         yvar = yvars[0]
         plt.ylabel(labels.get(yvar, yvar))
-    
+
     if xlim is None:
         if plot_raw_data:
             xlim = stats.weighted_quantile(df[xvar].values, weights, [0.005, 0.995])
@@ -1536,47 +1783,64 @@ def binscatter(df_in, yvars, xvar, wvar=None, fit_var=None, labels=None, n_bins=
             bin_max = np.amax(by_bin[yvar].values)
             tot_range = bin_max - bin_min
             ylim = (bin_min - 0.1 * tot_range, bin_max + 0.1 * tot_range)
-                    
+
     if include0 or include45:
-        assert (xlim != 'default') and (ylim != 'default')
-        
+        assert (xlim != "default") and (ylim != "default")
+
     if include45:
         assert not include0
         plot_lb = min(xlim[0], ylim[0])
         plot_ub = max(xlim[1], ylim[1])
         xlim = (plot_lb, plot_ub)
         ylim = (plot_lb, plot_ub)
-        plt.plot([plot_lb, plot_ub], [plot_lb, plot_ub], 'k--')
+        plt.plot([plot_lb, plot_ub], [plot_lb, plot_ub], "k--")
     elif include0:
-        plt.plot(xlim, np.zeros(2), 'k--')
+        plt.plot(xlim, np.zeros(2), "k--")
         if ylim[0] > 0.0:
             ylim = (-0.1 * ylim[1], ylim[1])
         elif ylim[1] < 0.0:
             ylim = (ylim[0], -0.1 * ylim[0])
-        
-    if (xlim is not None) and (xlim != 'default') and all([np.isfinite(val) for val in xlim]):
-        plt.xlim(xlim)   
-        
-    if (ylim is not None) and (ylim != 'default') and all([np.isfinite(val) for val in ylim]):
-        plt.ylim(ylim)   
+
+    if (
+        (xlim is not None)
+        and (xlim != "default")
+        and all([np.isfinite(val) for val in xlim])
+    ):
+        plt.xlim(xlim)
+
+    if (
+        (ylim is not None)
+        and (ylim != "default")
+        and all([np.isfinite(val) for val in ylim])
+    ):
+        plt.ylim(ylim)
 
     if title is not None:
         plt.title(title)
 
     plt.tight_layout()
-    
+
     if filepath is None:
         plt.show()
     else:
         plt.savefig(filepath)
 
     plt.close(fig)
-    
+
     return by_bin
 
-def scatter(df, yvar, xvar, labels=None,
-            multicolor=False, cmap_name='plasma', color='C0', 
-            include45=False, filepath=None):
+
+def scatter(
+    df,
+    yvar,
+    xvar,
+    labels=None,
+    multicolor=False,
+    cmap_name="plasma",
+    color="C0",
+    include45=False,
+    filepath=None,
+):
     """Create a simple scatter plot of two columns from a DataFrame.
 
     Parameters
@@ -1606,30 +1870,31 @@ def scatter(df, yvar, xvar, labels=None,
 
     if labels is None:
         labels = {}
-    
+
     if multicolor:
         cmap = plt.get_cmap(cmap_name)
         colors = cmap(np.linspace(0.0, 1.0, len(df)))[::-1]
     else:
         colors = color
-    
+
     fig = plt.figure()
-    plt.scatter(df[xvar], df[yvar], c=colors, edgecolor='gray', alpha=0.75)
-    
+    plt.scatter(df[xvar], df[yvar], c=colors, edgecolor="gray", alpha=0.75)
+
     if include45:
         plot_lb, plot_ub = get_45_bounds(df, xvar, yvar)
-        plt.plot([plot_lb, plot_ub], [plot_lb, plot_ub], 'k--')
-    
+        plt.plot([plot_lb, plot_ub], [plot_lb, plot_ub], "k--")
+
     plt.xlabel(labels.get(xvar, xvar))
     plt.ylabel(labels.get(yvar, yvar))
     plt.tight_layout()
-    
+
     if filepath is None:
         plt.show()
     else:
         plt.savefig(filepath)
     plt.close(fig)
-    
+
+
 def state_scatter_inner(ax, this_df, yvar, xvar):
     """Annotate each data point with the corresponding state name.
 
@@ -1651,6 +1916,7 @@ def state_scatter_inner(ax, this_df, yvar, xvar):
     for ii, state in enumerate(this_df.index):
         ax.annotate(state, (this_df.loc[state, xvar], this_df.loc[state, yvar]))
     return None
+
 
 def get_colors(n, cmap_name, startval=0.0, endval=1.0):
     """Sample *n* evenly spaced colors from a matplotlib colormap.

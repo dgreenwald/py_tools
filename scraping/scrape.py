@@ -2,6 +2,7 @@ from bs4 import BeautifulSoup
 import requests
 import time
 
+
 def get_soup(url, delay=1e-4):
     """Fetch and parse the HTML at *url* as a BeautifulSoup object.
 
@@ -22,10 +23,11 @@ def get_soup(url, delay=1e-4):
     time.sleep(delay)
     if req.status_code == 200:
         html = req.content
-        return BeautifulSoup(html, 'lxml')
+        return BeautifulSoup(html, "lxml")
     else:
         print("{:d} Error".format(req.status_code))
         return None
+
 
 def strip_html(url):
     """Strip HTML tags from a URL and return the plain text.
@@ -48,8 +50,10 @@ def strip_html(url):
 
     return soup.get_text(strip=True)
 
+
 # Backward-compatible alias.
 stripHTML = strip_html
+
 
 def url_to_nltk(url, lower=False):
     """Fetch a URL, strip its HTML, and return an NLTK Text object.
@@ -76,7 +80,9 @@ def url_to_nltk(url, lower=False):
     try:
         import nltk
     except ImportError as exc:
-        raise ImportError("url_to_nltk requires the optional dependency 'nltk'.") from exc
+        raise ImportError(
+            "url_to_nltk requires the optional dependency 'nltk'."
+        ) from exc
 
     raw = strip_html(url)
     if raw is None:

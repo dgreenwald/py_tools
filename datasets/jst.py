@@ -1,10 +1,13 @@
 import pandas as pd
 
 from . import config
-default_dir = config.base_dir() + 'jst/'
+
+default_dir = config.base_dir() + "jst/"
 # data_dir = '/home/dan/Dropbox/data/jst/'
 DATASET_NAME = "jst"
 DESCRIPTION = "Jorda-Schularick-Taylor (JST) macro-financial dataset loader."
+
+
 def load(data_dir=default_dir):
     """Load the Jorda-Schularick-Taylor macro-financial dataset.
 
@@ -20,7 +23,7 @@ def load(data_dir=default_dir):
     pandas.DataFrame
         DataFrame containing the full JST macro-financial dataset.
     """
-    dta_file = data_dir + 'JSTdatasetR2.dta'
+    dta_file = data_dir + "JSTdatasetR2.dta"
     df = pd.read_stata(dta_file)
 
     return df

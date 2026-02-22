@@ -42,7 +42,7 @@ gpu = [
 dev = [
     "pytest>=7.0",
     "pytest-cov>=4.0",
-    "flake8>=6.0",
+    "ruff>=0.6",
 ]
 all = [
     "scikit-learn>=1.1",
@@ -92,3 +92,6 @@ norecursedirs = [
     ".eggs",
     "*.egg-info",
 ]
+
+[tool.ruff]
+target-version = "py311"

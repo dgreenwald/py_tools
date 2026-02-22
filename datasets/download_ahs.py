@@ -4,6 +4,7 @@ import zipfile
 
 from py_tools.in_out import core as in_out
 
+
 def download_if_exists(url, filename):
     """Attempt to download a URL to a local file.
 
@@ -30,16 +31,21 @@ def download_if_exists(url, filename):
         print(e)
         return False
 
-DEFAULT_SAVE_DIR = '/data/ahs/'
+
+DEFAULT_SAVE_DIR = "/data/ahs/"
 # Note: no national file in 1982
 DEFAULT_YEARS = list(range(1973, 1982)) + list(range(1983, 2016, 2))
 
 
 def _get_ahs_url(year):
     if year <= 1983:
-        return "http://www2.census.gov/programs-surveys/ahs/{0}/AHS_{0}_National_PUF_CSV.zip".format(year)
+        return "http://www2.census.gov/programs-surveys/ahs/{0}/AHS_{0}_National_PUF_CSV.zip".format(
+            year
+        )
     if year <= 2009:
-        return "http://www2.census.gov/programs-surveys/ahs/{0}/AHS%20{0}%20National%20PUF%20v1.1%20CSV.zip".format(year)
+        return "http://www2.census.gov/programs-surveys/ahs/{0}/AHS%20{0}%20National%20PUF%20v1.1%20CSV.zip".format(
+            year
+        )
     if year == 2011:
         return "http://www2.census.gov/programs-surveys/ahs/2011/AHS%202011%20National%20and%20Metropolitan%20PUF%20v1.4%20CSV.zip"
     if year == 2013:
@@ -55,10 +61,10 @@ def download_all(save_dir=DEFAULT_SAVE_DIR, years=None):
 
     for year in years:
         year_str = str(year)
-        year_dir = save_dir + year_str + '/'
-        filename = year_dir + 'ahs{}.zip'.format(year)
+        year_dir = save_dir + year_str + "/"
+        filename = year_dir + "ahs{}.zip".format(year)
 
-        print('\n\nYEAR = {}'.format(year))
+        print("\n\nYEAR = {}".format(year))
 
         url = _get_ahs_url(year)
         in_out.make_dir(year_dir)

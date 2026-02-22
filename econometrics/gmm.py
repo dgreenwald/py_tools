@@ -1,6 +1,7 @@
 import numpy as np
 import scipy
 
+
 def compute_g(params, h, data):
     """
     Compute the sample average of moment conditions.
@@ -28,6 +29,7 @@ def compute_g(params, h, data):
     g /= Nt
 
     return g
+
 
 def compute_dg(params, dh, data):
     """
@@ -57,6 +59,7 @@ def compute_dg(params, dh, data):
     dg /= Nt
 
     return dg
+
 
 def compute_d2g(params, d2h, data):
     """
@@ -92,6 +95,7 @@ def compute_d2g(params, d2h, data):
 
     return d2g
 
+
 def obj_gmm(params, h, data, W, dh=None):
     """
     GMM objective function.
@@ -117,6 +121,7 @@ def obj_gmm(params, h, data, W, dh=None):
     """
     g = compute_g(params, h, data)
     return 0.5 * np.dot(g.T, np.dot(W, g))
+
 
 def jac_gmm(params, h, data, W, dh=None):
     """
@@ -145,6 +150,7 @@ def jac_gmm(params, h, data, W, dh=None):
     dg = compute_dg(params, dh, data)
 
     return np.dot(dg.T, np.dot(W, g))
+
 
 def hess_gmm(params, h, dh, d2h, data, W):
     """
@@ -182,6 +188,7 @@ def hess_gmm(params, h, dh, d2h, data, W):
 
     return hess
 
+
 def solve_gmm(params_guess, h, data, W=None, dh=None, d2h=None, algorithm=None):
     """
     Estimate a GMM model by minimising the GMM objective function.
@@ -216,7 +223,7 @@ def solve_gmm(params_guess, h, data, W=None, dh=None, d2h=None, algorithm=None):
     Nmom = len(h(data[:, 1], params_guess))
 
     if W is None:
-        W = np.eye(Nmom)        
+        W = np.eye(Nmom)
 
     if dh is not None:
         jac = jac_gmm
@@ -227,12 +234,18 @@ def solve_gmm(params_guess, h, data, W=None, dh=None, d2h=None, algorithm=None):
         hess = hess_gmm
     else:
         hess = None
-    
+
     if algorithm is None:
         if (dh is not None) and (d2h is not None):
-            algorithm = 'dogleg'
+            algorithm = "dogleg"
         else:
-            algorithm = 'BFGS'
+            algorithm = "BFGS"
 
-    return scipy.optimize.minimize(obj_gmm, params_guess, args=(h, data, W, dh),
-                                   method=algorithm, jac=jac, hess=hess)
+    return scipy.optimize.minimize(
+        obj_gmm,
+        params_guess,
+        args=(h, data, W, dh),
+        method=algorithm,
+        jac=jac,
+        hess=hess,
+    )

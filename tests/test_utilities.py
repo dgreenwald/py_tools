@@ -1,6 +1,5 @@
 """Tests for py_tools.utilities (core and containers)."""
 
-import os
 import numpy as np
 import pytest
 
@@ -35,6 +34,7 @@ from py_tools.utilities.containers import (
 # ---------------------------------------------------------------------------
 # core.py
 # ---------------------------------------------------------------------------
+
 
 class TestAsList:
     def test_non_list_wrapped(self):
@@ -156,6 +156,7 @@ class TestTicToc:
 
     def test_elapsed_positive(self):
         import time as _time
+
         t = tic()
         _time.sleep(0.01)
         elapsed = toc(t)
@@ -265,6 +266,7 @@ class TestGetEnv:
 # containers.py
 # ---------------------------------------------------------------------------
 
+
 class TestMySet:
     def test_add(self):
         a = MySet([1, 2, 3])
@@ -299,6 +301,7 @@ class TestMyDict:
 class TestMyOrderedDict:
     def test_add_preserves_order(self):
         from collections import OrderedDict
+
         a = MyOrderedDict([("a", 1), ("b", 2)])
         b = a + OrderedDict([("b", 99), ("c", 3)])
         assert isinstance(b, MyOrderedDict)

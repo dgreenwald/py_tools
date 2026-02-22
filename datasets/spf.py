@@ -3,12 +3,15 @@ import pandas as pd
 import py_tools.time_series as ts
 
 from . import config
+
 default_dir = config.base_dir()
 
 idx = pd.IndexSlice
 DATASET_NAME = "spf"
 DESCRIPTION = "Survey of Professional Forecasters (SPF) dataset loader."
-def load(table, data_dir=default_dir+'/spf/', reimport=False):
+
+
+def load(table, data_dir=default_dir + "/spf/", reimport=False):
     """Load SPF mean forecast level for a single variable from CSV.
 
     Reads the Philadelphia Fed SPF mean-level CSV file for the specified
@@ -32,22 +35,23 @@ def load(table, data_dir=default_dir+'/spf/', reimport=False):
         Quarterly date-indexed DataFrame with a single column named after
         ``table`` (uppercased).
     """
-    filebase = data_dir + 'Mean_' + table.upper() + '_Level'
-    pkl_file = filebase + '.pkl'
-    
+    filebase = data_dir + "Mean_" + table.upper() + "_Level"
+    pkl_file = filebase + ".pkl"
+
     if reimport or not os.path.exists(pkl_file):
         # excel_file = filebase + '.xlsx'
         # df = pd.read_excel(excel_file)
-        df = pd.read_csv(filebase + '.csv')
-        df['date'] = ts.date_from_qtr(df['YEAR'], df['QUARTER'])
-        df = df.set_index('date')[[table.upper()]]
+        df = pd.read_csv(filebase + ".csv")
+        df["date"] = ts.date_from_qtr(df["YEAR"], df["QUARTER"])
+        df = df.set_index("date")[[table.upper()]]
         df.to_pickle(pkl_file)
     else:
         df = pd.read_pickle(pkl_file)
-    
+
     return df
 
-def load_master(table, data_dir=default_dir + '/spf/', reimport=False, growth=False):
+
+def load_master(table, data_dir=default_dir + "/spf/", reimport=False, growth=False):
     """Load SPF forecasts for a table from the master Excel file.
 
     Reads the specified sheet from the SPF master mean-level or mean-growth
@@ -75,28 +79,26 @@ def load_master(table, data_dir=default_dir + '/spf/', reimport=False, growth=Fa
         requested table.
     """
     if growth:
-        base_name = 'meanGrowth'
+        base_name = "meanGrowth"
     else:
-        base_name = 'meanLevel'
-    
-    pkl_file = data_dir + base_name + '_' + table + '.pkl'
-    
+        base_name = "meanLevel"
+
+    pkl_file = data_dir + base_name + "_" + table + ".pkl"
+
     if reimport or not os.path.exists(pkl_file):
-        
-        excel_file = data_dir + base_name + '.xlsx'
+        excel_file = data_dir + base_name + ".xlsx"
         df = pd.read_excel(excel_file, sheet_name=table)
-        
-        df = df.dropna(subset=['YEAR', 'QUARTER'])
-        for var in ['YEAR', 'QUARTER']:
+
+        df = df.dropna(subset=["YEAR", "QUARTER"])
+        for var in ["YEAR", "QUARTER"]:
             df[var] = df[var].astype(int)
-            
-        df['date'] = ts.date_from_qtr(df['YEAR'], df['QUARTER'])
-        df = df.set_index('date').drop(columns=['YEAR', 'QUARTER'])
-        
+
+        df["date"] = ts.date_from_qtr(df["YEAR"], df["QUARTER"])
+        df = df.set_index("date").drop(columns=["YEAR", "QUARTER"])
+
         df.to_pickle(pkl_file)
-        
+
     else:
-        
         df = pd.read_pickle(pkl_file)
-        
+
     return df

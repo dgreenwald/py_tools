@@ -28,13 +28,14 @@ def lag_var(df, var, lag):
         If ``lag`` is zero.
     """
     if lag > 0:
-        df['L{0}_{1}'.format(lag, var)] = df[var].shift(lag)
+        df["L{0}_{1}".format(lag, var)] = df[var].shift(lag)
     elif lag < 0:
-        df['F{0}_{1}'.format(-lag, var)] = df[var].shift(lag)
+        df["F{0}_{1}".format(-lag, var)] = df[var].shift(lag)
     else:
         raise Exception
 
     return df
+
 
 def add_lags(df, var, max_lags):
     """
@@ -62,6 +63,7 @@ def add_lags(df, var, max_lags):
 
     return df
 
+
 def add_leads(df, var, max_leads):
     """
     Add multiple leads of a variable to a DataFrame.
@@ -88,6 +90,7 @@ def add_leads(df, var, max_leads):
 
     return df
 
+
 def formula_lags(var, max_lags):
     """
     Generate a patsy/statsmodels formula fragment for lags of a variable.
@@ -105,14 +108,16 @@ def formula_lags(var, max_lags):
         A formula fragment of the form ``'+ L1_{var} + L2_{var} + ...'``.
         Returns an empty string when ``max_lags`` is zero.
     """
-    formula = ''
+    formula = ""
     for lag in range(1, max_lags + 1):
-        formula += '+ L{0}_{1}'.format(lag, var)
+        formula += "+ L{0}_{1}".format(lag, var)
 
     return formula
 
-def get_formula(horizon, y_var, shock_var, control_vars, fe_vars, shock_lags,
-                y_lags, control_lags):
+
+def get_formula(
+    horizon, y_var, shock_var, control_vars, fe_vars, shock_lags, y_lags, control_lags
+):
     """
     Build a regression formula string for a local projection at a given horizon.
 
@@ -150,16 +155,16 @@ def get_formula(horizon, y_var, shock_var, control_vars, fe_vars, shock_lags,
     ############################################################################
 
     if horizon > 0:
-        formula = 'F{0}_{1} ~'.format(horizon, y_var)
+        formula = "F{0}_{1} ~".format(horizon, y_var)
     else:
-        formula = '{0} ~'.format(y_var)
+        formula = "{0} ~".format(y_var)
 
     ############################################################################
     # RHS
     ############################################################################
 
     # shocks
-    formula += ' ' + shock_var
+    formula += " " + shock_var
     formula += formula_lags(shock_var, shock_lags)
 
     # y_var
@@ -171,12 +176,22 @@ def get_formula(horizon, y_var, shock_var, control_vars, fe_vars, shock_lags,
         formula += formula_lags(var, max_lags)
 
     for var in fe_vars:
-        formula += ' C({0})'.format(var)
+        formula += " C({0})".format(var)
 
     return formula
 
-def estimate(df_in, y_var, shock_var, control_vars=None, fe_vars=None,
-             shock_lags=2, y_lags=1, periods=20, control_lags=None):
+
+def estimate(
+    df_in,
+    y_var,
+    shock_var,
+    control_vars=None,
+    fe_vars=None,
+    shock_lags=2,
+    y_lags=1,
+    periods=20,
+    control_lags=None,
+):
     """
     Estimate impulse responses via local projections.
 
@@ -225,7 +240,7 @@ def estimate(df_in, y_var, shock_var, control_vars=None, fe_vars=None,
 
     # Copy relevant dataframe columns
     unique_controls = [var for var in control_vars if var not in [y_var, shock_var]]
-    
+
     all_vars = list(set([y_var] + [shock_var] + unique_controls + fe_vars))
     df = df_in[all_vars].copy()
 
@@ -244,20 +259,27 @@ def estimate(df_in, y_var, shock_var, control_vars=None, fe_vars=None,
     fr_list = []
 
     for jj in range(periods):
-
-        formula = get_formula(jj, y_var, shock_var, unique_controls, fe_vars,
-                              shock_lags, y_lags, control_lags)
+        formula = get_formula(
+            jj,
+            y_var,
+            shock_var,
+            unique_controls,
+            fe_vars,
+            shock_lags,
+            y_lags,
+            control_lags,
+        )
 
         fr_list.append(dt.formula_regression(df, formula, nw_lags=jj))
 
     for jj in range(periods):
-
         x[jj] = fr_list[jj].results.params[1]
         # Use the covariance estimator currently attached to `results`
         # (HAC/Newey-West for jj > 0, robust default otherwise).
         se[jj] = fr_list[jj].results.bse[1]
-        
+
     return fr_list, x, se
+
 
 class LocalProjection:
     """
@@ -299,7 +321,7 @@ class LocalProjection:
         """
         self.df = df
         self.labels = labels or {}
-        
+
     def estimate(self, y_var_list, shock_var, **kwargs):
         """
         Estimate local projections for each outcome variable.
@@ -320,21 +342,22 @@ class LocalProjection:
         """
         self.y_var_list = y_var_list
         self.shock_var = shock_var
-        
+
         self.var_titles = [self.labels.get(y_var, y_var) for y_var in self.y_var_list]
         self.shock_title = self.labels.get(shock_var, shock_var)
-        
+
         self.fr_list_all = {}
         self.x_all = {}
         self.se_all = {}
-        
+
         for y_var in self.y_var_list:
-            self.fr_list_all[y_var], self.x_all[y_var], self.se_all[y_var] \
-                = estimate(self.df, y_var, self.shock_var, **kwargs)
-        
+            self.fr_list_all[y_var], self.x_all[y_var], self.se_all[y_var] = estimate(
+                self.df, y_var, self.shock_var, **kwargs
+            )
+
         self.x = np.vstack([self.x_all[y_var] for y_var in self.y_var_list])
         self.se = np.vstack([self.se_all[y_var] for y_var in self.y_var_list])
-        
+
     def plot(self, **kwargs):
         """
         Plot impulse-response functions.
@@ -348,5 +371,11 @@ class LocalProjection:
             Keyword arguments forwarded to ``py_tools.plot.projection``
             (e.g. ``figsize``, ``nrows``, ``ncols``, ``plotpath``).
         """
-        pl.projection(self.x, self.se, self.var_titles, self.shock_title, shock_name=self.shock_var,
-                      **kwargs)
+        pl.projection(
+            self.x,
+            self.se,
+            self.var_titles,
+            self.shock_title,
+            shock_name=self.shock_var,
+            **kwargs,
+        )
