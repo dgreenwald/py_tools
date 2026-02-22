@@ -6,6 +6,10 @@ build-backend = "setuptools.build_meta"
 name = "dgreenwald-py-tools"
 version = "0.1.0"
 description = "Numerical economics and research utilities."
+authors = [
+    {name = "Dan Greenwald", email = "greenw2@gmail.com"},
+]
+license = {file = "LICENSE"}
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
@@ -16,6 +20,9 @@ dependencies = [
     "statsmodels>=0.13",
     "tabulate>=0.9",
 ]
+
+[project.urls]
+Repository = "https://github.com/dgreenwald/py_tools"
 
 [project.optional-dependencies]
 ml = [

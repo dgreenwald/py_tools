@@ -4,19 +4,27 @@
 
 ## Installation
 
-Clone the repository and install in editable mode:
+Install from PyPI:
 
 ```bash
-python -m pip install -e .
+pip install dgreenwald-py-tools
+```
+
+Or clone the repository and install in editable mode:
+
+```bash
+pip install -e .
 ```
 
 Optional extras:
 
 ```bash
-python -m pip install -e ".[dev]"       # pytest, flake8, coverage tools
-python -m pip install -e ".[ml]"        # scikit-learn, patsy
-python -m pip install -e ".[datasets]"  # pandas-datareader, python-dotenv
-python -m pip install -e ".[scraping]"  # requests, bs4
+pip install "dgreenwald-py-tools[ml]"        # scikit-learn, patsy
+pip install "dgreenwald-py-tools[datasets]"  # pandas-datareader, python-dotenv
+pip install "dgreenwald-py-tools[scraping]"  # requests, beautifulsoup4, lxml
+pip install "dgreenwald-py-tools[nlp]"       # nltk
+pip install "dgreenwald-py-tools[mpi]"       # mpi4py
+pip install "dgreenwald-py-tools[dev]"       # pytest, ruff
 ```
 
 If you use dataset loaders, set:
@@ -54,18 +62,26 @@ df = datasets.load_dataset("fred", codes=["UNRATE"])
 
 ## Module Overview
 
-- Core modules live at the repository root (for example `time_series.py`, `state_space.py`, `numerical.py`, `data.py`).
-- Dataset-specific loaders live in `datasets/`.
-- Future unit tests should live in `tests/`.
-
-The top-level package exposes a curated API via lazy imports in `py_tools.__all__`.
+| Import path | Contents |
+|---|---|
+| `py_tools.time_series` | Kalman filter, state-space models, VAR/BVAR, HMMs |
+| `py_tools.econometrics` | NLS/GMM, bootstrap, local projections, high-dimensional FE |
+| `py_tools.bayesian` | MCMC sampling, prior distributions |
+| `py_tools.numerical` | Root-finding, Chebyshev approximation |
+| `py_tools.datasets` | Loaders for ~38 economic data sources |
+| `py_tools.data` | Data manipulation, aggregation, matching |
+| `py_tools.econ` | Discrete choice, yield curves, AIM solver |
+| `py_tools.plot` | Plotting utilities |
+| `py_tools.config` | Named model specification registry |
+| `py_tools.scraping` | HTML scraping and text utilities |
+| `py_tools.compute` | MPI array distribution |
 
 ## Development
 
-Run test discovery (currently targets `tests/`):
-
 ```bash
-python -m pytest
+pip install -e ".[dev]"
+python -m pytest          # run tests
+ruff check .              # lint
 ```
 
 ## Contributing
@@ -73,3 +89,7 @@ python -m pytest
 - Keep changes focused and commit one logical change at a time.
 - Follow repository coding and workflow guidelines in `AGENTS.md`.
 - Prefer adding deterministic tests in `tests/` for new behavior.
+
+## License
+
+MIT — see [LICENSE](LICENSE).
