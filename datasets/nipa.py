@@ -10,6 +10,24 @@ idx = pd.IndexSlice
 DATASET_NAME = "nipa"
 DESCRIPTION = "National Income and Product Accounts (NIPA) dataset loader."
 def get_var_index(nipa_table, vintage='1706', add_prefix=False, **kwargs):
+    """Return a dict mapping variable names to NIPA series codes for a given table.
+
+    Parameters
+    ----------
+    nipa_table : str
+        NIPA table identifier (e.g., ``'10105'``, ``'20100'``).
+    vintage : str, optional
+        Vintage label indicating the download period (e.g., ``'1706'``).
+    add_prefix : bool, optional
+        If ``True``, prefix each key with ``'NIPA_{nipa_table}_'``.
+    **kwargs
+        Additional keyword arguments (unused; reserved for subclass use).
+
+    Returns
+    -------
+    dict
+        Mapping of human-readable variable names to BEA series codes.
+    """
 
     if nipa_table == '10105':
         
@@ -254,6 +272,29 @@ def get_var_index(nipa_table, vintage='1706', add_prefix=False, **kwargs):
     return var_index
 
 def load(nipa_table=None, nipa_source='xls', **kwargs):
+    """Dispatch to the appropriate NIPA data loader based on the source format.
+
+    Parameters
+    ----------
+    nipa_table : str or None, optional
+        NIPA table identifier to load (e.g., ``'10105'``). Must not be
+        ``None``.
+    nipa_source : str, optional
+        Data source format. Either ``'xls'`` (Excel files) or ``'flat'``
+        (flat text files).
+    **kwargs
+        Additional keyword arguments forwarded to the underlying loader.
+
+    Returns
+    -------
+    pandas.DataFrame
+        Loaded NIPA data for the requested table.
+
+    Raises
+    ------
+    Exception
+        When ``nipa_source`` is not ``'xls'`` or ``'flat'``.
+    """
 
     assert(nipa_table is not None) # Need to pick a table
 
@@ -267,7 +308,52 @@ def load(nipa_table=None, nipa_source='xls', **kwargs):
 def load_flat(nipa_table=None, data_dir=default_dir+'nipa/', var_list=None,
               reimport=False, billions=True, var_index=None, vintage='2103',
               named_only=True, nipa_vintage=None, freq='Q', **kwargs):
-    
+    """Load NIPA data from flat text format, caching the result as a parquet file.
+
+    Parameters
+    ----------
+    nipa_table : str or None, optional
+        NIPA table identifier (e.g., ``'10105'``). Required when
+        ``var_index`` is ``None``.
+    data_dir : str, optional
+        Base directory containing vintage sub-directories with the flat
+        text files.
+    var_list : list of str or None, optional
+        Subset of variable names to return. When ``None`` all named
+        variables for the table are returned.
+    reimport : bool, optional
+        If ``True``, re-read the raw text file even when a cached parquet
+        file already exists.
+    billions : bool, optional
+        If ``True``, divide values by 1000 to convert millions to billions.
+    var_index : dict or None, optional
+        Custom mapping of variable names to series codes. When ``None``
+        the mapping is derived from ``nipa_table`` via
+        :func:`get_var_index`.
+    vintage : str, optional
+        Vintage label for the data release (e.g., ``'2103'``).
+    named_only : bool, optional
+        If ``True``, restrict the output to named variables only.
+    nipa_vintage : str or None, optional
+        Deprecated alias for ``vintage``. Prints a warning when supplied.
+    freq : str, optional
+        Frequency of the data; ``'Q'`` for quarterly or ``'A'`` for
+        annual.  Annual loading is not yet supported and raises an
+        exception.
+    **kwargs
+        Additional keyword arguments forwarded to :func:`get_var_index`.
+
+    Returns
+    -------
+    pandas.DataFrame
+        DataFrame with a ``DatetimeIndex`` and one column per variable.
+
+    Raises
+    ------
+    Exception
+        When ``freq='A'`` (annual loading is not yet implemented).
+    """
+
     if nipa_vintage is not None:
         print("Need to switch to using vintage argument")
         vintage = nipa_vintage
@@ -339,7 +425,30 @@ def load_flat(nipa_table=None, data_dir=default_dir+'nipa/', var_list=None,
 
 def load_xls(nipa_table, vintage='1706', nipa_quarterly=True,
          master_dirs={}, **kwargs):
-    """Load NIPA table, specify table (e.g., 20100) vintage (when downloaded) and whether quarterly data"""
+    """Load a NIPA table from BEA Excel files.
+
+    Parameters
+    ----------
+    nipa_table : str
+        NIPA table identifier (e.g., ``'20100'``).
+    vintage : str, optional
+        Vintage label indicating when the Excel files were downloaded
+        (e.g., ``'1706'``).
+    nipa_quarterly : bool, optional
+        If ``True``, load the quarterly sheet; otherwise load the annual
+        sheet.
+    master_dirs : dict, optional
+        Directory overrides. May contain key ``'base'`` to override the
+        default data root.
+    **kwargs
+        Additional keyword arguments (unused).
+
+    Returns
+    -------
+    pandas.DataFrame
+        Combined current and historical NIPA data with renamed columns
+        and any derived series appended.
+    """
 
     dirs = master_dirs.copy()
     if 'base' not in dirs:
@@ -422,6 +531,27 @@ def load_xls(nipa_table, vintage='1706', nipa_quarterly=True,
     return df
 
 def clean_nipa(df_t, nipa_quarterly=True):
+    """Clean a raw NIPA Excel sheet and return a time-indexed DataFrame.
+
+    Removes blank rows, drops the ``Line`` and ``Unnamed: 1`` columns,
+    transposes the data, and sets a ``DatetimeIndex`` derived from the
+    numeric date values in the original column headers.
+
+    Parameters
+    ----------
+    df_t : pandas.DataFrame
+        Raw DataFrame read from a BEA NIPA Excel sheet (rows are series,
+        columns are time periods encoded as floats).
+    nipa_quarterly : bool, optional
+        If ``True``, interpret the date values as quarterly (YYYYQ
+        encoding); otherwise interpret as annual.
+
+    Returns
+    -------
+    pandas.DataFrame
+        Transposed DataFrame with a ``DatetimeIndex`` and series codes as
+        column labels.
+    """
 
     df_t = df_t.loc[df_t.index != ' ', :]
     df_t = df_t.loc[pd.notnull(df_t.index), :]

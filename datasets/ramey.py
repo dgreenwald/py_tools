@@ -7,7 +7,23 @@ default_dir = config.base_dir()
 DATASET_NAME = "ramey"
 DESCRIPTION = "Ramey macro shock datasets loader."
 def load(dataset, master_dirs={}):
-    """Load data from Ramey shocks file"""
+    """Load data from Ramey shocks file.
+
+    Parameters
+    ----------
+    dataset : str
+        Name of the Ramey shock dataset to load. Supported values are
+        ``'technology'`` (quarterly, starting 1947-01-01) and
+        ``'monetary'`` (monthly, starting 1959-01-01).
+    master_dirs : dict, optional
+        Directory overrides. May contain key ``'base'`` to override the
+        default data root.
+
+    Returns
+    -------
+    pandas.DataFrame
+        Loaded dataset with a ``DatetimeIndex``.
+    """
 
     dirs = master_dirs.copy()
     if 'base' not in dirs:
