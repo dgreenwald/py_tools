@@ -1,8 +1,7 @@
-import numpy as np
 import pandas as pd
 import os
 
-from . import config, misc
+from . import config
 default_dir = config.base_dir() + 'crosswalk/'
 
 data_dir = default_dir
@@ -22,7 +21,7 @@ def county_to_zip(year=2000, zip_level=5, data_dir=default_dir, reimport=False):
         if zip_level < 5:
             to_drop = 5 - zip_level
             zip_var = 'zip' + str(zip_level)
-            df[zip_var] = df['zip'].astype(str).str[:-to_drop].astype(np.int)
+            df[zip_var] = df['zip'].astype(str).str[:-to_drop].astype(int)
             df = df.groupby(['fips', zip_var])['factor'].sum().to_frame(name='factor')
             df = df.reset_index()
         else:

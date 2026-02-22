@@ -30,5 +30,3 @@ def load(data_dir=default_dir):
     df = pd.read_excel(data_dir + 'refi_nomacro.xlsx', skiprows=1).rename(columns=col_names)
     df = date_index(df, '1990-01-01', 'W')
     return df
-
-df = load()

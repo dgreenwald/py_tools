@@ -259,10 +259,10 @@ def load_from_source(dataset, data_dir, **kwargs):
         infile = data_dir + 'nber_dates.csv'
         df = pd.read_csv(infile)
 
-        df['peak_yr'] = 1800 + (df['Peak month number'].astype(np.int) - 1) // 12
-        df['peak_cal_mo'] = ((df['Peak month number'].astype(np.int) - 1) % 12) + 1
-        df['trough_yr'] = 1800 + (df['Trough month number'].astype(np.int) - 1) // 12
-        df['trough_cal_mo'] = ((df['Trough month number'].astype(np.int) - 1) % 12) + 1
+        df['peak_yr'] = 1800 + (df['Peak month number'].astype(int) - 1) // 12
+        df['peak_cal_mo'] = ((df['Peak month number'].astype(int) - 1) % 12) + 1
+        df['trough_yr'] = 1800 + (df['Trough month number'].astype(int) - 1) // 12
+        df['trough_cal_mo'] = ((df['Trough month number'].astype(int) - 1) % 12) + 1
 
         df['peak_date'] = df['peak_yr'].astype(str) + '-' + df['peak_cal_mo'].astype(str) + '-' + '01'
         df['peak_date'] = pd.to_datetime(df['peak_date'])

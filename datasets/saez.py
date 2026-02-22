@@ -1,5 +1,4 @@
 import os
-import numpy as np
 import pandas as pd
 import py_tools.time_series as ts
 

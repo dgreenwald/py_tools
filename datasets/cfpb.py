@@ -1,5 +1,4 @@
 import pandas as pd
-from py_tools import time_series as ts
 
 import os
 default_dir = os.environ['PY_TOOLS_DATA_DIR'] + 'cfpb/'

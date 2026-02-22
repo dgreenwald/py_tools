@@ -1,6 +1,5 @@
 import numpy as np
 import pandas as pd
-import py_tools.time_series as ts
 
 from . import config
 default_dir = config.base_dir() + 'fama_bliss/'

@@ -1,6 +1,4 @@
-import os
 import pandas as pd
-from py_tools.time_series import date_index
 from py_tools.datasets import misc, ramey
 
 from . import config

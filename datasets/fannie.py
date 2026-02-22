@@ -95,11 +95,14 @@ def hist(df, var_list, yr, q, base_title=None, titlestr=None, filestr=None,
             bins=None
 
         ix_hist = np.ones(len(df), dtype=bool)
-        if not np.any(ix_hist): return None
+        if not np.any(ix_hist):
+            return None
         ix_hist = np.logical_and(ix_hist, pd.notnull(df[var]))
-        if not np.any(ix_hist): return None
+        if not np.any(ix_hist):
+            return None
         ix_hist = np.logical_and(ix_hist, pd.notnull(df['orig_upb']))
-        if not np.any(ix_hist): return None
+        if not np.any(ix_hist):
+            return None
 
         if print_nobs:
             title += ' (nobs = {})'.format(np.sum(ix_hist))

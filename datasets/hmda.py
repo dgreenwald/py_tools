@@ -1,6 +1,5 @@
 import numpy as np
 import pandas as pd
-from py_tools import time_series as ts
 
 from . import config
 default_dir = config.base_dir() + 'hmda/'

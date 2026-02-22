@@ -25,7 +25,7 @@ def aggregate(df_in, weight='rpb'):
 
     var_list = ['cpr', 'wac', 'wam', 'wala']
 
-    df = df_in.ix[pd.notnull(df_in[weight]), :].copy()
+    df = df_in.loc[pd.notnull(df_in[weight]), :].copy()
     
     for var in var_list:
         df['wtd_' + var] = df[weight] * df[var]

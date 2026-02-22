@@ -1,4 +1,3 @@
-import os
 import pandas as pd
 from py_tools.time_series import date_index
 

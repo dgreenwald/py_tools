@@ -361,7 +361,6 @@ def store_hmda(yr, nrows=None, usecols=None, reimport=False, chunksize=500000):
 
 def load_hmda(yr, query=None, columns=None):
 
-    data_dir = '/nobackup1/dlg/hmda/ultimate/'
     save_dir = '/nobackup1/dlg/hmda/save/'
 
     store_file = save_dir + 'hmda.hd5'

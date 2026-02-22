@@ -21,7 +21,8 @@ def load(dataset, all_transactions=True, reimport=False, data_dir=default_dir):
 
         if dataset in ['metro', 'msa']:
     
-            if not all_transactions: raise Exception
+            if not all_transactions:
+                raise Exception
     
             # df = pd.read_csv(data_dir + 'HPI_AT_metro.csv')
             df = pd.read_csv(data_dir + 'HPI_AT_metro.csv', header=None, 

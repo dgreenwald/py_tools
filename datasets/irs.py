@@ -325,7 +325,7 @@ def load_state_zip_year(filename, year):
 
         ix = np.zeros(len(df), dtype=bool)
         for ii, (bin_name, zip_name) in enumerate(zip(bin_names, zip_names)):
-            if (not bin_name[0] in ['$', 'U']) and zip_pattern.match(zip_name):
+            if (bin_name[0] not in ['$', 'U']) and zip_pattern.match(zip_name):
                 ix[ii] = True
 
         df = df.loc[ix, :].drop(columns=[ix_bin])
@@ -534,7 +534,7 @@ def load_zip3_from_zip(data_dir=default_dir, reimport=False, zip_kwargs={}):
         df = load_zip(**zip_kwargs).reset_index()
         
         # Sum by ZIP-3
-        df['zip3'] = df['zip'].astype(str).str[:-2].astype(np.int)
+        df['zip3'] = df['zip'].astype(str).str[:-2].astype(int)
         df = df.drop(columns=['zip'])
         df = df.groupby(['zip3', 'date']).sum(min_count=1)
         

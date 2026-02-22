@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 import os
 
-from . import config, misc
+from . import config
 default_dir = config.base_dir() + 'intraday/'
 
 data_dir = default_dir

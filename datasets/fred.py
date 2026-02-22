@@ -4,10 +4,10 @@ import pandas as pd
 
 pd.core.common.is_list_like = pd.api.types.is_list_like
 
-from pandas_datareader import data as web
-import pickle
+from pandas_datareader import data as web  # noqa: E402
+import pickle  # noqa: E402
 
-from . import config
+from . import config  # noqa: E402
 default_dir = config.base_dir() + 'fred/'
 # data_dir = '/home/dan/Dropbox/data/fred/'
 DATASET_NAME = "fred"
