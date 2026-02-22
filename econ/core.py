@@ -431,8 +431,8 @@ def sim_ar1(rho, sig, mu=0.0, Nsim=100, e=None, x0=None):
     e : array_like of shape (Nsim,) or None, optional
         Pre-drawn standard-normal innovations.  If None, drawn internally.
     x0 : float or None, optional
-        Initial value of the process (in levels, before adding *mu*).
-        If None, drawn from the stationary distribution.
+        Initial demeaned value of the process (i.e., the initial offset from
+        *mu*).  If None, drawn from the stationary distribution.
 
     Returns
     -------
@@ -523,8 +523,10 @@ def sim_cir(rho, sig, mu=0.0, Nsim=100, e=None, x0=None, bound=False):
         Number of periods to simulate. Default is 100.
     e : array_like of shape (Nsim,) or None, optional
         Pre-drawn standard-normal innovations.  If None, drawn internally.
-    x0 : float
-        Initial value.  **Required**; raises ``Exception`` if not provided.
+    x0 : float or None
+        Initial value of the process.  **Required** (pass ``None`` only to
+        trigger an informative exception); raises ``Exception`` if not
+        provided.
     bound : bool, optional
         If True, take the absolute value of the process at each step to
         prevent negative values. Default is False.
