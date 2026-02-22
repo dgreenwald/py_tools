@@ -134,8 +134,7 @@ class DiscreteModel:
 
         R = np.vstack(self.flow_list)
         indices = np.concatenate(self.index_list)
-        
-        self.bP1s = sp.kron(self.bPs, np.ones((self.Nx, 1)))
+
 
         while not done:
             

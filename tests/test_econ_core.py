@@ -313,10 +313,9 @@ class TestSimAr1:
         assert len(x) == 50
 
     def test_with_fixed_errors(self):
+        # With zero shocks and mu=2.0, all values equal mu regardless of rho
         e = np.zeros(5)
         x = sim_ar1(0.9, 0.1, mu=2.0, Nsim=5, e=e)
-        # With zero errors: x[0] = 2 + 0 = 2 (x0 initialized from sigma), then x[t] = 0.9*x[t-1] + 0 + 2
-        # Starting from x[0]=2 (mu), should approach mu
         assert np.allclose(x, 2.0, atol=1e-10)
 
     def test_with_x0(self):
