@@ -11,7 +11,29 @@ from py_tools import data as dt
 from scipy.optimize import root_scalar
 
 def ar1_bootstrap_inner(rho, mu, eps_boot, x_init):
-    
+    """
+    Inner loop for AR(1) bootstrap simulation.
+
+    Simulates ``Nboot`` AR(1) paths using the supplied bootstrap residuals and
+    returns the mean OLS rho estimate across those paths.
+
+    Parameters
+    ----------
+    rho : float
+        AR(1) persistence coefficient used to simulate paths.
+    mu : float
+        Unconditional mean of the AR(1) process.
+    eps_boot : ndarray of shape (Nboot, Nt_eps)
+        Bootstrap residual draws (rows = bootstrap replications,
+        columns = time periods).
+    x_init : float
+        Initial value for each simulated path.
+
+    Returns
+    -------
+    rho_sim_avg : float
+        Mean OLS rho estimate computed across all ``Nboot`` simulated paths.
+    """
     Nboot, Nt_eps = eps_boot.shape
     
     X = np.zeros((Nboot, Nt_eps+1))
@@ -33,12 +55,67 @@ def ar1_bootstrap_inner(rho, mu, eps_boot, x_init):
     return rho_sim_avg
 
 def objfcn_ar1_bootstrap(rho, rho_ols, mu, eps_boot, x_init):
-    
+    """
+    Objective function for AR(1) bootstrap bias correction.
+
+    Returns the difference between the OLS estimate and the bootstrap-simulated
+    average rho.  Pass to ``scipy.optimize.root_scalar`` to find the true rho
+    whose simulated OLS average equals ``rho_ols``.
+
+    Parameters
+    ----------
+    rho : float
+        Candidate AR(1) persistence coefficient.
+    rho_ols : float
+        OLS estimate of rho obtained from the actual data.
+    mu : float
+        Unconditional mean of the AR(1) process.
+    eps_boot : ndarray of shape (Nboot, Nt_eps)
+        Bootstrap residual draws.
+    x_init : float
+        Initial value for each simulated path.
+
+    Returns
+    -------
+    float
+        ``rho_ols - rho_sim_avg``.  Zero when ``rho`` reproduces ``rho_ols``
+        on average.
+    """
     rho_sim_avg = ar1_bootstrap_inner(rho, mu, eps_boot, x_init)
     return rho_ols - rho_sim_avg
 
 def ar1_bootstrap_bias(df, obs_var, Nboot=100000, iterate=False):
-    
+    """
+    Estimate a bias-corrected AR(1) persistence coefficient via bootstrap.
+
+    Runs OLS on the observed series to obtain ``rho_ols``, resamples residuals
+    ``Nboot`` times, and either applies a one-step additive bias correction or
+    iteratively solves for the rho whose simulated OLS average matches
+    ``rho_ols``.
+
+    Parameters
+    ----------
+    df : pandas.DataFrame
+        DataFrame containing the observed series.
+    obs_var : str
+        Column name of the AR(1) variable.
+    Nboot : int, optional
+        Number of bootstrap replications. Default is 100000.
+    iterate : bool, optional
+        If ``True``, use ``scipy.optimize.root_scalar`` for iterative bias
+        correction.  If ``False`` (default), apply a single additive
+        correction: ``rho_corrected = 2 * rho_ols - rho_sim_avg``.
+
+    Returns
+    -------
+    rho : float
+        Bias-corrected AR(1) persistence estimate.
+
+    Notes
+    -----
+    Progress information (``rho_ols``, bias, and ``rho_new``) is printed to
+    stdout during execution.
+    """
     _df = df[[obs_var]].dropna()
     _df['L_' + obs_var] = _df[obs_var].shift()
 
