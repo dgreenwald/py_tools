@@ -40,7 +40,10 @@ class Table:
                 self.hlines = []
 
         if self.n_cols is None:
-            self.n_cols = len(contents[-1])
+            if self.contents:
+                self.n_cols = len(self.contents[-1])
+            else:
+                self.n_cols = 0
 
         # Set alignment
         if self.alignment is None:
@@ -65,7 +68,7 @@ class Table:
 
         if swp:
             table_text += r"""
-%TCIMACRO{\TeXButton{B}{\begin{table}[""" + position + """] \centering}}%
+%TCIMACRO{\TeXButton{B}{\begin{table}[""" + position + r"""] \centering}}%
 %BeginExpansion
 """
 
@@ -156,7 +159,7 @@ class Table:
                 else:
                     table_text += '{}'.format(entry)
             
-            # Bottom strut
+            # Top strut (added to first row and each row after a rule)
             if include_tstrut:
                 table_text += TSTRUT
                 include_tstrut = False
@@ -172,13 +175,11 @@ class Table:
                     table_text += '\\cline{{{0}-{1}}}'.format(start, end)
                 table_text += '\n'
                 include_tstrut = True
-                # table_text += TSTRUT + '%\n'
             elif i_row in self.hlines:
                 if booktabs:
                     table_text += r'\midrule' + '\n'
                 else:
                     table_text += r'\hline' + '\n'
-                # table_text += TSTRUT  + '%\n'
                 include_tstrut = True
 
         return table_text
@@ -210,16 +211,6 @@ class Table:
 
         self.super_header = self.multicolumn_row(text)
 
-    # def append_multicolumn_row(self, text, before=False, is_header=False):
-        # """Add a multicolumn entry spanning the table. 
-        # Placed at the end, unless before=True."""
-
-        # new_row = self.multicolumn_row(text)
-        # if before:
-            # self = shift_down(self, new_row, is_header)
-        # else:
-            # self.contents.append(new_row)
-
 def multicolumn(n_cols, text):
     """Generate multicolumn string"""
     return '\\multicolumn{{{0}}}{{c}}{{{1}}}'.format(n_cols, text)
@@ -247,14 +238,14 @@ def hstack(table_list):
 
     return new_table
 
-def empty_table(n_rows, n_cols, **kwargs):
+def empty_table(n_rows, n_cols, alignment=None, **kwargs):
     """Create an empty table"""
 
     if alignment is None:
         alignment = n_cols * 'c'
 
     contents = [n_cols * [' '] for row in range(n_rows)]
-    return Table(contents, n_cols=n_cols, **kwargs)
+    return Table(contents, n_cols=n_cols, alignment=alignment, **kwargs)
 
 def shift_down(table, new_row, is_header=True):
 
@@ -276,18 +267,11 @@ def join_horizontal(table_list, header_list):
     tables_with_headers = []
     for table, header in zip(table_list, header_list):
         
-        # if skip_line:
-            # new_table = shift_down(table, table.n_cols * [' '])
-        # else:
-            # new_table = table
-
         new_table = table
 
-        # add_header = header is not None and table.n_cols > 1
         add_header = header is not None
 
         if add_header:
-            # new_header = multicolumn(new_table.n_cols, header)
             new_header = new_table.multicolumn_row(header)
         else:
             new_header = [' ']
@@ -302,7 +286,7 @@ def join_horizontal(table_list, header_list):
     n_rows = max([table.n_rows() for table in tables_with_headers])
     
     full_table_list = []
-    for i_table, table in enumerate(tables_with_headers):
+    for i_table, (table, header) in enumerate(zip(tables_with_headers, header_list)):
         full_table_list.append(table)
 
         added_header = header is not None and table.n_cols > 1
@@ -353,24 +337,6 @@ def join_vertical(table_list, header_list):
     return Table(full_contents, n_cols, alignment=alignment, tabu=tabu,
                  clines=full_clines, hlines=full_hlines)
 
-# def output_tabulated(table, headers, filename, floatfmt='4.3f', tablefmt='plain'):
-    # """Write table to file path"""
-    # with open(filename, 'w') as fid:
-        # write_tabulated(table, headers, fid, floatfmt, tablefmt)
-
-    # return None
-
-# def write_tabulated(table, headers, fid=None, floatfmt='4.3f', tablefmt='plain'):
-    # """Write table to file stream or screen"""
-    # tabulated = tabulate(table, headers, floatfmt=floatfmt, tablefmt=tablefmt)
-
-    # if fid is None:
-        # print(tabulated)
-    # else:
-        # fid.write(tabulated)
-
-    # return None
-
 def open_latex(fid):
     fid.write(r"""
 \documentclass[a4paper,12pt]{article}
@@ -406,7 +372,6 @@ def close_latex(fid):
     fid.write('\n' + r'\end{document}')
     return None
 
-# TODO: define wrappers for table so that you can change floatfmt on the fly
 def regression_table(results, var_names=None, vertical=False, tstat=False,
                      cov_type='HC0_se', floatfmt='4.3f', 
                      print_vars=None,
@@ -466,15 +431,16 @@ def to_camel_case(s: str) -> str:
 def write_values_tex(data: dict, path="values.tex", prop_name="g_myvals_prop", 
                      prefix=None, command_str=None, add_prefix_to_command=True):
     """
-    Write a LaTeX file defining key-value pairs accessible as \val{key}.
-    
-    Example output:
-        \ExplSyntaxOn
-        \prop_new:N \g_myvals_prop
-        \prop_gput:Nnn \g_myvals_prop {key} {value}
+    Write a LaTeX file defining key-value pairs accessible as \\val{key}.
+
+    Example output::
+
+        \\ExplSyntaxOn
+        \\prop_new:N \\g_myvals_prop
+        \\prop_gput:Nnn \\g_myvals_prop {key} {value}
         ...
-        \cs_new:Npn \val #1 { \prop_item:Nn \g_myvals_prop {#1} }
-        \ExplSyntaxOff
+        \\cs_new:Npn \\val #1 { \\prop_item:Nn \\g_myvals_prop {#1} }
+        \\ExplSyntaxOff
     """
     if command_str is None:
         if add_prefix_to_command and (prefix is not None):
@@ -499,87 +465,3 @@ def write_values_tex(data: dict, path="values.tex", prop_name="g_myvals_prop",
 
         f.write(f"\\cs_new:Npn \\{command_str} #1 {{ \\prop_item:Nn \\{prop_name} {{#1}} }}\n")
         f.write("\\ExplSyntaxOff\n")
-
-# def write_table(fid, table, caption=None, notes=None, position='h!',
-                # headers=None, alignment=None, booktabs=True, floatfmt='4.3f'):
-
-    # fid.write(r"""
-# \begin{table}""")
-    # fid.write('[{}]'.format(position))
-    # fid.write(r"""
-# \begin{center}
-# \small
-# """)
-
-    # if caption is not None:
-        # fid.write(r'\caption{' + caption + '}\n')
-
-    # write_tabular(fid, table, headers=headers, alignment=alignment, booktabs=booktabs, 
-                  # floatfmt=floatfmt)
-
-    # fid.write(r'\end{center}' + '\n')
-
-    # if notes is not None:
-        # fid.write(r'\footnotesize{' + notes + '}\n')
-
-    # fid.write(r'\end{table}' + '\n\n')
-    
-    # return None
-
-# def write_tabular(fid, contents, headers=None, alignment=None, booktabs=True,
-                  # floatfmt='4.3f'):
-
-    # all_contents = [headers] + contents
-    # # table = Table(contents, headers=headers, alignment=alignment)
-    # table = Table(all_contents, header=True, alignment=alignment)
-    # fid.write(table.text(booktabs, floatfmt))
-    # # table.write(fid, booktabs, floatfmt)
-    # return None
-
-    # """Write table to latex""" 
-    # # Set alignment
-    # n_cols = len(table[0])
-    # if alignment is None:
-        # alignment = 'l' + (n_cols - 1) * 'c'
-    # elif len(alignment) == 1:
-        # alignment = n_cols * alignment
-        
-    # fid.write(r'\begin{tabular}{' + alignment + '}\n')
-
-    # # Top rule
-    # if booktabs:
-        # fid.write(r'\toprule' + '\n')
-    # else:
-        # fid.write(r'\hline \hline' + '\n')
-
-    # # Headers
-    # if headers is not None:
-
-        # fid.write(' & '.join(headers) + r'\\' + '\n')
-        # if booktabs:
-            # fid.write(r'\midrule' + '\n')
-        # else:
-            # fid.write(r'\hline' + '\n')
-
-    # # Body of table
-    # for row in table:
-
-        # assert len(row) == n_cols
-
-        # # fid.write('$' + row[0] + '$')
-        # fid.write(row[0])
-        # for entry in row[1:]:
-            # if isinstance(entry, float):
-                # fid.write('\t& {:{floatfmt}}'.format(entry))
-            # else:
-                # fid.write('\t& {}'.format(entry))
-        # fid.write('\t ' + r'\\' + ' \n')
-
-    # if booktabs:
-        # fid.write(r'\bottomrule' + '\n')
-    # else:
-        # fid.write(r'\hline \hline' + '\n')
-
-    # fid.write(r'\end{tabular}' + '\n')
-
-    # return None

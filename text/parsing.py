@@ -46,7 +46,7 @@ def expand_to_target(text, target=None, depth=1, target_depth=1, left_bracket='(
     if target is None:
         target = right_bracket
         
-    pattern = rf'([{left_bracket}{right_bracket}]|{re.escape(target)})'
+    pattern = rf'({re.escape(left_bracket)}|{re.escape(right_bracket)}|{re.escape(target)})'
         
     bma = bma_search(pattern, text)
     if not bma.matched:
