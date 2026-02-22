@@ -6,7 +6,6 @@ Created on Fri Sep 17 22:28:02 2021
 @author: dan
 """
 
-import patsy
 import numpy as np
 import pandas as pd
 from py_tools import data as dt
@@ -106,6 +105,14 @@ def reghdfe_formula(
             fe_vars.append(fe)
 
     fe_vars = sorted(list(set(fe_vars)))
+
+    try:
+        import patsy
+    except ImportError as e:
+        raise ImportError(
+            "patsy is required for reghdfe_formula. "
+            "Install it with: pip install py_tools[ml]"
+        ) from e
 
     y, X = patsy.dmatrices(formula, df, return_type="dataframe")
 

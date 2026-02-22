@@ -2,10 +2,7 @@ import datetime
 import os
 import pandas as pd
 
-pd.core.common.is_list_like = pd.api.types.is_list_like
-
-from pandas_datareader import data as web  # noqa: E402
-import pickle  # noqa: E402
+import pickle
 
 from . import config  # noqa: E402
 
@@ -55,6 +52,14 @@ def load(
         Time series data indexed by date, with one column per requested
         series (renamed according to ``code_names`` when provided).
     """
+
+    try:
+        from pandas_datareader import data as web
+    except ImportError as e:
+        raise ImportError(
+            "pandas-datareader is required for datasets.fred. "
+            "Install it with: pip install py_tools[datasets]"
+        ) from e
 
     if code_names is None:
         code_names = {}

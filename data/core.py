@@ -1,7 +1,6 @@
 import numpy as np
 import pandas as pd
 import pickle
-import patsy
 
 import statsmodels.api as sm
 import statsmodels.formula.api as smf
@@ -785,6 +784,14 @@ def wls_formula(
     """
     if ix is None:
         ix = np.ones(len(df), dtype=bool)
+
+    try:
+        import patsy
+    except ImportError as e:
+        raise ImportError(
+            "patsy is required for wls_formula. "
+            "Install it with: pip install py_tools[ml]"
+        ) from e
 
     if weight_var is not None:
         assert weights is None

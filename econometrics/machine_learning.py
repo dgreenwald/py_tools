@@ -1,5 +1,11 @@
-from sklearn.model_selection import train_test_split
-from sklearn.ensemble import RandomForestClassifier
+try:
+    from sklearn.model_selection import train_test_split
+    from sklearn.ensemble import RandomForestClassifier
+except ImportError as e:
+    raise ImportError(
+        "scikit-learn is required for econometrics.machine_learning. "
+        "Install it with: pip install py_tools[ml]"
+    ) from e
 
 import pandas as pd
 import numpy as np

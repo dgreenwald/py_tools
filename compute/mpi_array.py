@@ -1,5 +1,12 @@
 import numpy as np
-from mpi4py import MPI
+
+try:
+    from mpi4py import MPI
+except ImportError as e:
+    raise ImportError(
+        "mpi4py is required for compute.mpi_array. "
+        "Install it with: pip install py_tools[mpi]"
+    ) from e
 
 
 def rank():

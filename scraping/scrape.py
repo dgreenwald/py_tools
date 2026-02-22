@@ -1,5 +1,3 @@
-from bs4 import BeautifulSoup
-import requests
 import time
 
 
@@ -19,6 +17,15 @@ def get_soup(url, delay=1e-4):
     BeautifulSoup or None
         Parsed document, or ``None`` when the server returns a non-200 status.
     """
+    try:
+        import requests
+        from bs4 import BeautifulSoup
+    except ImportError as e:
+        raise ImportError(
+            "requests and beautifulsoup4 are required for scraping. "
+            "Install them with: pip install py_tools[scraping]"
+        ) from e
+
     req = requests.get(url)
     time.sleep(delay)
     if req.status_code == 200:
