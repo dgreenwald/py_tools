@@ -7,7 +7,37 @@ default_dir = config.base_dir() + 'fhfa/'
 DATASET_NAME = "fhfa"
 DESCRIPTION = "FHFA house price index dataset loader."
 def load(dataset, all_transactions=True, reimport=False, data_dir=default_dir):
-    
+    """Load FHFA house price index data.
+
+    Parameters
+    ----------
+    dataset : str
+        Geographic level of the index. One of ``'metro'``/``'msa'``,
+        ``'state'``, ``'county'``, or ``'zip3'``.
+    all_transactions : bool, optional
+        If ``True``, load the all-transactions index; if ``False``, load
+        the purchase-only index.  Not all dataset/index combinations are
+        supported (e.g. ``'metro'`` requires ``all_transactions=True``).
+    reimport : bool, optional
+        If ``True``, re-read the raw source file and overwrite any cached
+        pickle.  If ``False``, use the cached pickle when available.
+    data_dir : str, optional
+        Path to the directory containing the FHFA source files.
+
+    Returns
+    -------
+    pandas.DataFrame
+        House price index data with a multi-level index (geographic unit,
+        date) and ``hpi`` (and possibly additional) columns.
+
+    Raises
+    ------
+    Exception
+        When an unsupported combination of ``dataset`` and
+        ``all_transactions`` is requested (e.g. ``dataset='metro'`` with
+        ``all_transactions=False``, or ``dataset='county'`` with
+        ``all_transactions=False``).
+    """
     suffix = dataset
     if all_transactions:
         suffix += '_at'

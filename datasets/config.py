@@ -13,8 +13,19 @@ _DOTENV_LOADED = False
 def _ensure_dotenv_loaded():
     """Load .env once, if python-dotenv is available.
 
-    Search from current working directory upward. Fallback to repository root
-    (parent of the datasets package) if not found during upward search.
+    Search from current working directory upward for a ``.env`` file.
+    Fall back to the repository root (parent of the datasets package) if
+    no ``.env`` file is found during the upward search.  Subsequent calls
+    are no-ops because the result is cached in the module-level
+    ``_DOTENV_LOADED`` flag.
+
+    Parameters
+    ----------
+    None
+
+    Returns
+    -------
+    None
     """
     global _DOTENV_LOADED
     if _DOTENV_LOADED:
@@ -40,17 +51,36 @@ def _ensure_dotenv_loaded():
 
 
 def base_dir():
-    """Return base dataset directory as a string ending with a path separator.
+    """Return the base dataset directory as a string ending with a path separator.
 
-    Priority:
-    1) Explicit environment variable PY_TOOLS_DATA_DIR
-    2) Legacy user-specific HOME/Dropbox fallback
+    Resolves the data root in priority order:
+
+    1. The ``PY_TOOLS_DATA_DIR`` environment variable (set directly or via
+       a ``.env`` file discovered by ``_ensure_dotenv_loaded``).
+    2. A legacy fallback of ``~/Dropbox/data`` for backward compatibility.
+
+    Returns
+    -------
+    str
+        Absolute path to the base dataset directory, always ending with
+        ``os.sep``.
     """
     return str(base_path()) + os.sep
 
 
 def base_path():
-    """Return base dataset directory as a pathlib.Path."""
+    """Return the base dataset directory as a :class:`pathlib.Path`.
+
+    Calls ``_ensure_dotenv_loaded`` to pick up any ``.env`` configuration,
+    then resolves the data root using the same priority order as
+    ``base_dir``: the ``PY_TOOLS_DATA_DIR`` environment variable first,
+    then ``~/Dropbox/data`` as a legacy fallback.
+
+    Returns
+    -------
+    pathlib.Path
+        Absolute path to the base dataset directory.
+    """
     _ensure_dotenv_loaded()
 
     env_dir = os.environ.get("PY_TOOLS_DATA_DIR")
@@ -61,10 +91,40 @@ def base_path():
 
 
 def dataset_dir(stub):
-    """Return a dataset-specific directory as a string ending with separator."""
+    """Return a dataset-specific subdirectory as a string ending with a path separator.
+
+    Appends ``stub`` to the base dataset directory returned by
+    ``base_path`` and converts the result to a string.
+
+    Parameters
+    ----------
+    stub : str
+        Subdirectory name (or relative path) beneath the base dataset
+        directory.
+
+    Returns
+    -------
+    str
+        Absolute path to the dataset subdirectory, always ending with
+        ``os.sep``.
+    """
     return str(dataset_path(stub)) + os.sep
 
 
 def dataset_path(stub):
-    """Return a dataset-specific directory path for a subfolder stub."""
+    """Return a dataset-specific subdirectory as a :class:`pathlib.Path`.
+
+    Appends ``stub`` to the path returned by ``base_path``.
+
+    Parameters
+    ----------
+    stub : str
+        Subdirectory name (or relative path) beneath the base dataset
+        directory.
+
+    Returns
+    -------
+    pathlib.Path
+        Absolute path to the dataset subdirectory.
+    """
     return base_path() / stub

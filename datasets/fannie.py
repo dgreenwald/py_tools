@@ -10,6 +10,32 @@ default_dir = '/data/fannie/'
 DATASET_NAME = "fannie"
 DESCRIPTION = "Fannie Mae mortgage acquisition/performance dataset loader."
 def load(year, q, reimport=False, **kwargs):
+    """Load Fannie Mae acquisition data for a single year/quarter.
+
+    Reads a pipe-delimited text file (``Acquisition_<year>Q<q>.txt``) and
+    caches the result as a pickle.  If a cached pickle already exists and
+    *reimport* is ``False``, the pickle is returned directly.
+
+    Parameters
+    ----------
+    year : int
+        Four-digit origination year of the Fannie Mae data file.
+    q : int
+        Quarter of the data file (1–4).
+    reimport : bool, optional
+        If ``True``, re-read the raw text file even when a cached pickle
+        exists.
+    **kwargs
+        Additional keyword arguments forwarded to
+        :func:`pandas.read_table`.  ``data_dir`` may be passed here to
+        override the default data directory.
+
+    Returns
+    -------
+    pandas.DataFrame or None
+        Acquisition DataFrame for the requested quarter, or ``None`` if the
+        source text file does not exist.
+    """
     data_dir = kwargs.pop('data_dir', default_dir)
 
     pkl_file = data_dir + '/Acquisition_{0}Q{1}.pkl'.format(year, q)
@@ -44,6 +70,68 @@ def hist(df, var_list, yr, q, base_title=None, titlestr=None, filestr=None,
          save_fig_pkl=True, save_hist_pkl=True, print_title=True,
          print_xlabel=True, smallfont=16, vertical_line=True, var_titles=None,
          plot_titles=None, **kwargs):
+    """Plot weighted histograms of loan characteristics for a Fannie Mae quarter.
+
+    For each variable in *var_list* a histogram is produced weighted by
+    ``orig_upb``.  When *out_dir* is provided the figures are saved to disk;
+    otherwise they are shown interactively.
+
+    Parameters
+    ----------
+    df : pandas.DataFrame
+        Fannie Mae acquisition DataFrame containing the variables in
+        *var_list* and an ``orig_upb`` column used for weighting.
+    var_list : list of str
+        Column names to plot (e.g. ``['orig_dti', 'orig_ltv']``).
+    yr : int
+        Year label used in the output file name and plot title.
+    q : int
+        Quarter label (1–4) used in the output file name and plot title.
+    base_title : str, optional
+        Base string prepended to every plot title.  Defaults to
+        ``'Fannie Mae'``.
+    titlestr : str, optional
+        Additional string appended to each plot title after the variable
+        name.
+    filestr : str, optional
+        Extra string inserted into the output file name.
+    prefix : str, optional
+        Prefix for output file names.
+    print_nobs : bool, optional
+        If ``True``, append the number of observations to the plot title.
+    filetype : str, optional
+        File extension / format for saved figures (e.g. ``'png'``,
+        ``'pdf'``).
+    out_dir : str, optional
+        Directory where figures are saved.  If ``None``, figures are
+        displayed interactively.
+    save_fig_pkl : bool, optional
+        If ``True``, pickle the :class:`matplotlib.figure.Figure` object
+        alongside the image file.
+    save_hist_pkl : bool, optional
+        If ``True``, pickle the histogram output tuple alongside the image
+        file.
+    print_title : bool, optional
+        If ``True``, render the title on each figure.
+    print_xlabel : bool, optional
+        If ``True``, render the x-axis label on each figure.
+    smallfont : int, optional
+        Global font size passed to :func:`matplotlib.rcParams.update`.
+    vertical_line : bool, optional
+        If ``True``, draw a vertical reference line on DTI histograms at
+        46 %.
+    var_titles : dict, optional
+        Mapping from column name to a short display label used in titles
+        and fallback x-axis labels.
+    plot_titles : dict, optional
+        Mapping from column name to the x-axis label string.
+    **kwargs
+        Additional keyword arguments forwarded to :func:`matplotlib.pyplot.hist`.
+
+    Returns
+    -------
+    None
+    """
 
     matplotlib.rcParams.update({'font.size' : smallfont})
 

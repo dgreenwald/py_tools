@@ -10,7 +10,33 @@ default_dir = config.base_dir() + 'zillow/'
 DATASET_NAME = "zillow"
 DESCRIPTION = "Zillow housing dataset loader."
 def load(geo, data_dir=default_dir, dataset='Zhvi_AllHomes', reimport=False):
-    
+    """Load Zillow home value data for a geography type.
+
+    Reads the raw CSV for the given geography, reshapes from wide to long
+    format, and merges a FIPS crosswalk (County) or state codes (State) as
+    appropriate.  Results are cached as a pickle file so subsequent calls
+    skip the CSV parse unless ``reimport`` is ``True``.
+
+    Parameters
+    ----------
+    geo : str
+        Geography level to load.  One of ``'State'``, ``'County'``,
+        ``'Zip'``, or ``'Metro'``.  Case-insensitive; capitalised
+        internally.
+    data_dir : str, optional
+        Path to the root Zillow data directory.  Defaults to the
+        package-configured base directory.
+    dataset : str, optional
+        Zillow dataset name (file stem), e.g. ``'Zhvi_AllHomes'``.
+    reimport : bool, optional
+        When ``True``, re-read the CSV and overwrite any existing pickle
+        cache.  Defaults to ``False``.
+
+    Returns
+    -------
+    pandas.DataFrame
+        Long-format DataFrame indexed by geography identifier and date.
+    """
     geo = geo.capitalize()
     
     pattern = re.compile(r'\d\d\d\d-\d\d')
@@ -67,8 +93,25 @@ def load(geo, data_dir=default_dir, dataset='Zhvi_AllHomes', reimport=False):
     return df
 
 def load_county(data_dir=default_dir, dataset='Zhvi_AllHomes'):
+    """Load Zillow county home value data and merge with FIPS crosswalk.
 
-    # df_wide = pd.read_csv(data_dir+'County/County_' + dataset + '.csv')
+    Reads the county-level wide CSV, melts it to long format, converts the
+    date column, and joins the Zillow county-FIPS crosswalk so the result
+    is indexed by ``(FIPS, date)``.
+
+    Parameters
+    ----------
+    data_dir : str, optional
+        Path to the root Zillow data directory.  Defaults to the
+        package-configured base directory.
+    dataset : str, optional
+        Zillow dataset name (file stem), e.g. ``'Zhvi_AllHomes'``.
+
+    Returns
+    -------
+    pandas.DataFrame
+        Long-format DataFrame indexed by ``(FIPS, date)``.
+    """
     df_wide = load_csv(data_dir=data_dir, dataset=dataset, geo='County')
 #    cw = pd.read_csv(data_dir+'CountyCrossWalk_Zillow2.csv')
     cw = load_crosswalk(data_dir=data_dir)
@@ -84,7 +127,25 @@ def load_county(data_dir=default_dir, dataset='Zhvi_AllHomes'):
     return df_long_cw.set_index(['FIPS', 'date'])
 
 def load_state(data_dir=default_dir, dataset='Zhvi_AllHomes'):
-    
+    """Load Zillow state home value data and merge with state codes.
+
+    Reads the state-level wide CSV, melts it to long format, converts the
+    date column, and merges standard state abbreviation codes on the region
+    name.
+
+    Parameters
+    ----------
+    data_dir : str, optional
+        Path to the root Zillow data directory.  Defaults to the
+        package-configured base directory.
+    dataset : str, optional
+        Zillow dataset name (file stem), e.g. ``'Zhvi_AllHomes'``.
+
+    Returns
+    -------
+    pandas.DataFrame
+        Long-format DataFrame with state abbreviation and date columns.
+    """
     df_wide = load_csv(data_dir=data_dir, dataset=dataset, geo='State')
     df_long = pd.melt(df_wide, id_vars=['RegionName'], value_vars=df_wide.columns[3:])
     
@@ -104,11 +165,44 @@ def load_state(data_dir=default_dir, dataset='Zhvi_AllHomes'):
 #    df_long = pd.melt(df_wide, id_vars=)
 
 def load_crosswalk(data_dir=default_dir):
-    
+    """Load the Zillow county-FIPS crosswalk CSV.
+
+    Parameters
+    ----------
+    data_dir : str, optional
+        Path to the root Zillow data directory.  Defaults to the
+        package-configured base directory.
+
+    Returns
+    -------
+    pandas.DataFrame
+        Crosswalk table mapping Zillow ``CountyRegionID_Zillow`` to FIPS
+        codes and related county identifiers.
+    """
     return pd.read_csv(data_dir+'CountyCrossWalk_Zillow2.csv')
 
 def load_csv(data_dir=default_dir, dataset='Zhvi_AllHomes', geo='State'):
+    """Read the raw Zillow CSV file for a given geography.
 
+    Constructs the file path as ``<data_dir>/<geo>/<geo>_<dataset>.csv``
+    and reads it with Latin-1 encoding.
+
+    Parameters
+    ----------
+    data_dir : str, optional
+        Path to the root Zillow data directory.  Defaults to the
+        package-configured base directory.
+    dataset : str, optional
+        Zillow dataset name (file stem), e.g. ``'Zhvi_AllHomes'``.
+    geo : str, optional
+        Geography level subdirectory name, e.g. ``'State'``, ``'County'``,
+        ``'Zip'``, or ``'Metro'``.
+
+    Returns
+    -------
+    pandas.DataFrame
+        Raw wide-format DataFrame as read from the CSV file.
+    """
     df = pd.read_csv(data_dir+geo+'/'+geo+'_'+dataset+'.csv',
                      encoding='latin1')
 

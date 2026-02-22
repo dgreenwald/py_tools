@@ -10,7 +10,35 @@ idx = pd.IndexSlice
 DATASET_NAME = "ita"
 DESCRIPTION = "BEA International Transactions Accounts (ITA) dataset loader."
 def load(table, data_dir=default_dir+'/ita/', quarterly=True, sa=True):
-    
+    """Load BEA International Transactions Accounts (ITA) data from CSV.
+
+    Reads the BEA ITA CSV file for the specified table, reshapes the data,
+    filters by frequency and seasonal-adjustment status, constructs a date
+    index, and converts all value columns to numeric.
+
+    Parameters
+    ----------
+    table : str
+        BEA ITA table to load.  Supported values are ``'4.1'`` (primary
+        income receipts and payments) and ``'4.2'`` (direct investment income
+        detail).
+    data_dir : str, optional
+        Directory containing the ``Ita_T{table}.csv`` source files.  Defaults
+        to ``config.base_dir() + '/ita/'``.
+    quarterly : bool, optional
+        When ``True`` (default), return seasonally- or non-seasonally-adjusted
+        quarterly observations.  When ``False``, return annual observations.
+    sa : bool, optional
+        When ``True`` (default), return seasonally adjusted data.  When
+        ``False``, return not-seasonally-adjusted data.  Only relevant when
+        ``quarterly=True``.
+
+    Returns
+    -------
+    pandas.DataFrame
+        ITA data indexed by date, with one column per series in the requested
+        table.
+    """
     df = pd.read_csv(data_dir + 'Ita_T' + table + '.csv', skiprows=4, 
                      header=None, encoding='latin1')
     

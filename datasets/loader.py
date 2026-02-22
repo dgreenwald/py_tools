@@ -15,7 +15,36 @@ from py_tools.datasets import fred, nipa, origins, fof
 from . import config
 
 def load(dataset_list, reimport=False, no_prefix=True, master_dirs={}, **kwargs):
+    """Load and merge multiple named datasets from pickle cache.
 
+    For each dataset name in ``dataset_list``, checks for a cached pickle file
+    and returns the cached result unless ``reimport`` is ``True``.  Columns are
+    prefixed with the upper-cased dataset name (unless ``no_prefix`` suppresses
+    this for single-column datasets).  All datasets are outer-merged on their
+    index.
+
+    Parameters
+    ----------
+    dataset_list : list of str
+        Names of datasets to load and merge.
+    reimport : bool, optional
+        If ``True``, re-download/recompute each dataset even if a pickle cache
+        already exists.
+    no_prefix : bool, optional
+        If ``True``, skip the column-name prefix for datasets that return only
+        a single column.
+    master_dirs : dict, optional
+        Override directory paths.  Recognised keys are ``'base'`` and
+        ``'pkl'``.
+    **kwargs
+        Additional keyword arguments forwarded to the underlying dataset
+        loaders.
+
+    Returns
+    -------
+    pandas.DataFrame
+        Outer-merged DataFrame containing all requested datasets.
+    """
     dirs = master_dirs.copy()
     if 'base' not in dirs:
         dirs['base'] = config.base_dir()
@@ -49,7 +78,32 @@ def load(dataset_list, reimport=False, no_prefix=True, master_dirs={}, **kwargs)
     return df
 
 def load_dataset(dataset, master_dirs={}, **kwargs):
+    """Load a single named dataset by dispatching to the appropriate module loader.
 
+    Parameters
+    ----------
+    dataset : str
+        Name of the dataset to load.  Supported values include ``'stockw'``,
+        ``'cay'``, ``'cay_current'``, ``'cay_source'``, ``'bls_ls'``,
+        ``'fernald'``, ``'tb3ms'``, ``'uc'``, ``'crsp'``, ``'payouts'``,
+        ``'fof'``, ``'fof_csv'``, ``'fred'``, ``'fred_m'``, ``'nipa_*'``,
+        ``'shiller'``, and others.
+    master_dirs : dict, optional
+        Override directory paths.  Recognised keys are ``'base'`` and
+        ``'pkl'``.
+    **kwargs
+        Additional keyword arguments forwarded to the underlying loader.
+
+    Returns
+    -------
+    pandas.DataFrame
+        DataFrame containing the requested dataset.
+
+    Raises
+    ------
+    Exception
+        If ``dataset`` is not a recognised dataset name.
+    """
     dirs = master_dirs.copy()
     if 'base' not in dirs:
         dirs['base'] = config.base_dir()
@@ -358,7 +412,25 @@ def load_dataset(dataset, master_dirs={}, **kwargs):
 #     return df
 
 def get_suffix(dataset, **kwargs):
+    """Return the cache filename suffix for a given dataset.
 
+    For NIPA datasets the suffix encodes the vintage string; for all other
+    datasets an empty string is returned.
+
+    Parameters
+    ----------
+    dataset : str
+        Name of the dataset.
+    **kwargs
+        Optional keyword arguments.  For NIPA datasets, ``nipa_vintage``
+        (str, default ``'1604'``) controls the vintage suffix.
+
+    Returns
+    -------
+    str
+        Suffix string (prefixed with ``'_'`` when non-empty) to append to the
+        pickle cache filename.
+    """
     if dataset[:4] == 'nipa':
 
         nipa_vintage = kwargs.get('nipa_vintage', '1604')
