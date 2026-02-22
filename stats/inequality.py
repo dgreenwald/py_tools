@@ -11,7 +11,28 @@ from scipy import integrate
 from . import core as stats
 
 def compute_gini(df, var, wvar=None):
+    """Compute the Gini coefficient and Lorenz curve for a variable.
 
+    Parameters
+    ----------
+    df : pandas.DataFrame
+        Input data frame containing the variable of interest.
+    var : str
+        Name of the column in ``df`` whose inequality is to be measured.
+    wvar : str, optional
+        Name of the column in ``df`` containing observation weights.  If
+        ``None`` (default), equal weights are assumed (unit counts).
+
+    Returns
+    -------
+    gini_coeff : float
+        Gini coefficient in ``[0, 1]``.  A value of 0 indicates perfect
+        equality; 1 indicates maximal inequality.
+    c_weight : numpy.ndarray
+        Cumulative population shares (x-axis of the Lorenz curve).
+    c_shares : numpy.ndarray
+        Cumulative income/wealth shares (y-axis of the Lorenz curve).
+    """
     if wvar is None:
         df_by_var = df.groupby(var)[var].count()
     else:
@@ -34,7 +55,28 @@ def compute_gini(df, var, wvar=None):
     return gini_coeff, c_weight, c_shares
 
 def get_top_shares(df, var, shares=[10], wvar=None):
-    
+    """Compute top-share statistics for one or more percentile thresholds.
+
+    Parameters
+    ----------
+    df : pandas.DataFrame
+        Input data frame.
+    var : str
+        Name of the column in ``df`` for which top shares are computed.
+    shares : array_like, optional
+        Percentile thresholds (as percentages) defining the top groups.
+        For example, ``[10, 1]`` returns the top-10 % and top-1 % shares.
+        Defaults to ``[10]``.
+    wvar : str, optional
+        Name of the column in ``df`` containing observation weights.  If
+        ``None`` (default), equal weights are assumed.
+
+    Returns
+    -------
+    list of float
+        Top-share fractions (in ``[0, 1]``) corresponding to each threshold
+        in ``shares``, in the same order.
+    """
     shares = np.atleast_1d(shares)
     top_shares = []
     
