@@ -12,11 +12,42 @@ default_dir = config.base_dir() + 'fred/'
 # data_dir = '/home/dan/Dropbox/data/fred/'
 DATASET_NAME = "fred"
 DESCRIPTION = "FRED macroeconomic time series dataset loader."
-def load(codes=None, code_names={}, 
+def load(codes=None, code_names={},
          start=datetime.datetime(1900, 1, 1),
          end = datetime.datetime.today(),
          reimport=False, data_dir=default_dir):
-    """Load data from FRED, will replace codes with names if code_names is passed as a dict"""
+    """Load time series data from FRED.
+
+    Downloaded series are cached as individual pickle files so that
+    subsequent calls with ``reimport=False`` skip the network request.
+    Column names are replaced with friendlier labels when ``code_names``
+    is provided.
+
+    Parameters
+    ----------
+    codes : list of str or None, optional
+        FRED series codes to download (e.g. ``['GDPC1', 'UNRATE']``).
+        If ``None``, the keys of ``code_names`` are used.
+    code_names : dict, optional
+        Mapping from FRED series codes to desired output column names
+        (e.g. ``{'GDPC1': 'gdp', 'UNRATE': 'unemployment'}``).
+    start : datetime.datetime, optional
+        Start date for the requested data range.
+    end : datetime.datetime, optional
+        End date for the requested data range.
+    reimport : bool, optional
+        If ``True``, re-download all requested series from FRED and
+        overwrite any cached pickles.  If ``False``, only download series
+        that are not already cached.
+    data_dir : str, optional
+        Path to the directory used for caching downloaded series.
+
+    Returns
+    -------
+    pandas.DataFrame
+        Time series data indexed by date, with one column per requested
+        series (renamed according to ``code_names`` when provided).
+    """
 
     if codes is None:
         codes = list(code_names.keys())

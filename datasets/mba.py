@@ -7,7 +7,22 @@ default_dir = config.base_dir() + 'datastream/'
 DATASET_NAME = "mba"
 DESCRIPTION = "Mortgage Bankers Association (MBA) dataset loader."
 def load(data_dir=default_dir):
-    
+    """Load MBA mortgage applications data from Excel.
+
+    Reads ``refi_nomacro.xlsx`` from ``data_dir``, renames columns to
+    descriptive names, and sets a weekly date index starting 1990-01-01.
+
+    Parameters
+    ----------
+    data_dir : str, optional
+        Path to the directory containing ``refi_nomacro.xlsx``.
+
+    Returns
+    -------
+    pandas.DataFrame
+        DataFrame of MBA mortgage application indices and percentages with a
+        weekly ``DatetimeIndex``.
+    """
     col_names = {
         'Code': 'date',
         'USMACRA': 'conv_apps_ix_sa_refi',
