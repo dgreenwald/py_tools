@@ -5,6 +5,18 @@ from scipy.sparse import csr_matrix
 from py_tools import econ
 
 def make_2d(x):
+    """Ensure an array is at least 2-dimensional.
+
+    Parameters
+    ----------
+    x : np.ndarray
+        Input array.
+
+    Returns
+    -------
+    x : np.ndarray
+        Array with at least 2 dimensions; if 1-D, a new axis is prepended.
+    """
 
     if len(x.shape) < 2:
         x = x[np.newaxis, :]
@@ -12,9 +24,59 @@ def make_2d(x):
     return x
 
 class HiddenMarkov:
+    """Hidden Markov model with forward filtering and backward smoothing.
+
+    Parameters
+    ----------
+    P : np.ndarray, shape (Nx, Nx)
+        Transition probability matrix where P[i, j] is the probability of
+        transitioning from state i to state j.
+    log_err_density : callable
+        Function that returns log measurement error densities given observed
+        values and a time index.
+    y_vals : np.ndarray
+        Observed data values, shape (Nt,) or (Nt, Ny).
+    sparse : bool, optional
+        If True, use a sparse representation of the transition matrix.
+        Default is False.
+    tol : float, optional
+        Threshold below which transition probabilities are set to zero when
+        building the sparse matrix. Default is 1e-8.
+
+    Attributes
+    ----------
+    Nx : int
+        Number of hidden states.
+    Nt : int
+        Number of time periods.
+    Ny : int
+        Number of observable variables.
+    px_filt : np.ndarray, shape (Nt, Nx)
+        Filtered state probabilities.
+    px_pred : np.ndarray, shape (Nt, Nx)
+        Predicted state probabilities.
+    px_smooth : np.ndarray, shape (Nt, Nx)
+        Smoothed state probabilities (set after calling smooth()).
+    L : float
+        Log-likelihood (set after calling filter()).
+    """
 
     def __init__(self, P, log_err_density, y_vals, sparse=False, tol=1e-8):
-        """Initialize parameters of the HM model"""
+        """Initialize parameters of the hidden Markov model.
+
+        Parameters
+        ----------
+        P : np.ndarray, shape (Nx, Nx)
+            Transition probability matrix.
+        log_err_density : callable
+            Log measurement error density function.
+        y_vals : np.ndarray
+            Observed data values, shape (Nt,) or (Nt, Ny).
+        sparse : bool, optional
+            If True, use sparse transition matrix. Default is False.
+        tol : float, optional
+            Sparsity threshold. Default is 1e-8.
+        """
 
         self.P = P
         
@@ -37,19 +99,28 @@ class HiddenMarkov:
         self.log_p_err = np.zeros((self.Nt, self.Nx))
             
     def set_px_init(self, px_init):
-        """Setter function for initial distribution"""
+        """Set the initial state probability distribution.
+
+        Parameters
+        ----------
+        px_init : np.ndarray, shape (Nx,)
+            Initial distribution over hidden states.
+        """
 
         self.px_init = px_init
         return None
 
     def init_stationary(self):
-        """Set initial distribution to stationary distribution"""
+        """Set the initial distribution to the stationary distribution of P."""
 
         self.px_init = np.squeeze(econ.ergodic_dist(self.P))
         return None
 
     def filter(self):
-        """Filter data"""
+        """Run the forward filter to compute filtered state probabilities.
+
+        Computes px_filt, px_pred, and the log-likelihood L.
+        """
 
         self.L = 0.0
         self.px_filt = np.zeros((self.Nt, self.Nx))
@@ -72,6 +143,11 @@ class HiddenMarkov:
         return None
 
     def smooth(self):
+        """Run the backward smoother to compute smoothed state probabilities.
+
+        Requires filter() to have been called first.
+        Computes px_smooth.
+        """
 
         self.px_smooth = np.zeros((self.Nt, self.Nx))
 
@@ -87,16 +163,47 @@ class HiddenMarkov:
         return None
 
     def smoothed_vals(self, grid):
+        """Compute expected values of grid points under smoothed state probabilities.
+
+        Parameters
+        ----------
+        grid : np.ndarray
+            Grid of values indexed by hidden state.
+
+        Returns
+        -------
+        vals : np.ndarray
+            Expected values, shape (Nt, Nvars).
+        """
 
         grid_2d = make_2d(grid.copy())
         return np.dot(self.px_smooth, grid_2d.T)
     
     def filtered_vals(self, grid):
+        """Compute expected values of grid points under filtered state probabilities.
+
+        Parameters
+        ----------
+        grid : np.ndarray
+            Grid of values indexed by hidden state.
+
+        Returns
+        -------
+        vals : np.ndarray
+            Expected values, shape (Nt, Nvars).
+        """
 
         grid_2d = make_2d(grid.copy())
         return np.dot(self.px_filt, grid_2d.T)
 
     def sample(self, Nsim):
+        """Draw state path samples using backward simulation.
+
+        Parameters
+        ----------
+        Nsim : int
+            Number of simulations to draw.
+        """
 
         self.Nsim = Nsim
         self.ix_sample = np.zeros((self.Nt, self.Nsim), dtype=int) 
@@ -117,6 +224,18 @@ class HiddenMarkov:
         return None
 
     def sampled_vals(self, grid):
+        """Compute grid values at sampled state indices.
+
+        Parameters
+        ----------
+        grid : np.ndarray
+            Grid of values indexed by hidden state.
+
+        Returns
+        -------
+        vals : np.ndarray, shape (Nt, Nvars, Nsim)
+            Grid values for each simulated path.
+        """
 
         grid_2d = make_2d(grid.copy())
 
@@ -129,6 +248,20 @@ class HiddenMarkov:
         return vals
 
     def smoothed_quantiles(self, grid, q):
+        """Compute quantiles of a grid variable under the smoothed distribution.
+
+        Parameters
+        ----------
+        grid : np.ndarray
+            Grid of values indexed by hidden state.
+        q : array-like
+            Quantile levels to compute, each in [0, 1].
+
+        Returns
+        -------
+        vals : np.ndarray, shape (len(q), Nvars, Nt)
+            Quantile values at each time period.
+        """
 
         grid_2d = make_2d(grid.copy())
         Nvars = grid_2d.shape[0]

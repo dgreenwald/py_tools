@@ -10,11 +10,46 @@ import statsmodels.tsa.arima.model as arima
 import py_tools.data as dt
 
 def panel_resampler(df, time_var, freq):
+    """Resample a single panel group to a target frequency.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        DataFrame with a MultiIndex; time_var must be one of the index levels.
+    time_var : str
+        Name of the time index level to use for resampling.
+    freq : str
+        Pandas frequency string (e.g., 'QS', 'MS').
+
+    Returns
+    -------
+    df_resampled : pd.DataFrame
+        Resampled DataFrame indexed by time_var at the given frequency.
+    """
 
     to_drop = [name for name in df.index.names if name != time_var]
     return df.reset_index().drop(columns=to_drop).set_index(time_var).asfreq(freq)
 
 def to_panel(df, panel_vars, time_var, freq):
+    """Convert a flat DataFrame to a panel and resample to a target frequency.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Input DataFrame with panel and time information.
+    panel_vars : str or list of str
+        Names of the panel identifier variable(s).
+    time_var : str
+        Name of the time variable.
+    freq : str
+        Target frequency for resampling.
+
+    Returns
+    -------
+    df_panel : pd.DataFrame
+        MultiIndex DataFrame with panel variables and time as the index,
+        resampled to freq.
+    """
 
     if isinstance(panel_vars, str):
         panel_vars = [panel_vars]
@@ -25,14 +60,65 @@ def to_panel(df, panel_vars, time_var, freq):
     return df.set_index(panel_vars + [time_var]).groupby(panel_vars).apply(panel_resampler, time_var, freq)
 
 def panel_shift(df, panel_vars, periods=1):
+    """Shift a panel DataFrame by a given number of periods within each group.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Panel DataFrame.
+    panel_vars : str or list of str
+        Grouping variable(s) defining the panel structure.
+    periods : int, optional
+        Number of periods to shift (positive = lag, negative = lead).
+        Default is 1.
+
+    Returns
+    -------
+    df_shifted : pd.DataFrame
+        Shifted DataFrame with the same index as df.
+    """
 
     return df.groupby(panel_vars).shift(periods=periods)
 
 def merge_date(df1, df2, how='outer', **kwargs):
+    """Merge two DataFrames on their date indices.
+
+    Parameters
+    ----------
+    df1 : pd.DataFrame
+        Left DataFrame.
+    df2 : pd.DataFrame
+        Right DataFrame.
+    how : str, optional
+        Type of merge ('inner', 'outer', 'left', 'right'). Default is 'outer'.
+    **kwargs
+        Additional keyword arguments passed to pd.merge.
+
+    Returns
+    -------
+    df_merged : pd.DataFrame
+        Merged DataFrame indexed by the shared date index.
+    """
 
     return pd.merge(df1, df2, left_index=True, right_index=True, how=how, **kwargs)
 
 def merge_date_many(df_list, how='outer', **kwargs):
+    """Merge a list of DataFrames on their date indices.
+
+    Parameters
+    ----------
+    df_list : list of pd.DataFrame
+        List of DataFrames to merge sequentially.
+    how : str, optional
+        Type of merge. Default is 'outer'.
+    **kwargs
+        Additional keyword arguments passed to pd.merge.
+
+    Returns
+    -------
+    df_merged : pd.DataFrame
+        Merged DataFrame.
+    """
 
     df = df_list[0]
     for ii in range(1, len(df_list)):
@@ -42,33 +128,148 @@ def merge_date_many(df_list, how='outer', **kwargs):
     return df
 
 def get_date_index(startdate, periods, freq='QS'):
+    """Create a DatetimeIndex of a given length and frequency.
+
+    Parameters
+    ----------
+    startdate : str or datetime-like
+        Start date.
+    periods : int
+        Number of periods.
+    freq : str, optional
+        Pandas frequency string. Default is 'QS'.
+
+    Returns
+    -------
+    idx : pd.DatetimeIndex
+        Date range of length periods starting at startdate.
+    """
     return pd.date_range(startdate, periods=periods, freq=freq)
 
 def date_index(df, startdate, freq='QS'):
+    """Assign a DatetimeIndex to a DataFrame in-place.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        DataFrame to reindex.
+    startdate : str or datetime-like
+        Start date for the new index.
+    freq : str, optional
+        Pandas frequency string. Default is 'QS'.
+
+    Returns
+    -------
+    df : pd.DataFrame
+        DataFrame with updated DatetimeIndex.
+    """
     df.set_index(get_date_index(startdate, len(df), freq=freq), inplace=True)
     return df
 
 def quarter_index(df, yr, q):
+    """Assign a quarterly DatetimeIndex starting at a given year and quarter.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        DataFrame to reindex.
+    yr : int or str
+        Starting year.
+    q : int or str
+        Starting quarter (1-4).
+
+    Returns
+    -------
+    df : pd.DataFrame
+        DataFrame with updated DatetimeIndex.
+    """
     mon = 3 * (int(q) - 1) + 1
     return month_index(df, yr, mon)
 
 def month_index(df, yr, mon):
+    """Assign a monthly DatetimeIndex starting at a given year and month.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        DataFrame to reindex.
+    yr : int or str
+        Starting year.
+    mon : int or str
+        Starting month (1-12).
+
+    Returns
+    -------
+    df : pd.DataFrame
+        DataFrame with updated DatetimeIndex.
+    """
     return date_index(df, '{0}/1/{1}'.format(mon, yr))
 
 def date_from_year(year):
-    """Converts series of years into series of dates"""
+    """Convert a Series of years to a DatetimeIndex at January 1st.
+
+    Parameters
+    ----------
+    year : pd.Series of int or str
+        Series of year values.
+
+    Returns
+    -------
+    dates : pd.DatetimeIndex
+        Corresponding January 1st dates; NaT on conversion failure.
+    """
     date_str = year.astype(str) + '-01-01'
     return pd.to_datetime(date_str, errors='coerce')
 
 def date_from_qtr(yr, q):
+    """Convert arrays of year and quarter to a DatetimeIndex.
+
+    Parameters
+    ----------
+    yr : array-like of int
+        Year values.
+    q : array-like of int
+        Quarter values (1-4).
+
+    Returns
+    -------
+    dates : pd.DatetimeIndex
+        Corresponding first-month-of-quarter dates.
+    """
     mon = 3 * (q - 1) + 1
     return date_from_month(yr, mon)
 
 def date_from_month(yr, mon):
+    """Convert arrays of year and month to a DatetimeIndex.
+
+    Parameters
+    ----------
+    yr : array-like of int
+        Year values.
+    mon : array-like of int
+        Month values (1-12).
+
+    Returns
+    -------
+    dates : pd.DatetimeIndex
+        Corresponding first-day-of-month dates.
+    """
     date = yr.astype(str) + '-' + mon.astype(str) + '-01'
     return pd.to_datetime(date, errors='coerce')
 
 def date_from_q_string(s):
+    """Convert a Series of year-quarter strings to a DatetimeIndex.
+
+    Parameters
+    ----------
+    s : pd.Series of str
+        Quarter strings in 'YYYYQN' format (e.g., '2020Q1').
+
+    Returns
+    -------
+    dates : pd.DatetimeIndex
+        Corresponding first-month-of-quarter dates.
+    """
     
     s = s.astype(str)
     codes, uniq = pd.factorize(s, sort=False)      # uniques only once
@@ -82,6 +283,23 @@ def date_from_q_string(s):
     return dates
 
 def resample(df, methods_vars, freq='QS'):
+    """Resample a DataFrame using different aggregation methods per variable group.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Input DataFrame with a DatetimeIndex.
+    methods_vars : dict
+        Mapping from aggregation method name (e.g., 'mean', 'sum', 'last')
+        to a list of column names to aggregate with that method.
+    freq : str, optional
+        Target frequency. Default is 'QS'.
+
+    Returns
+    -------
+    df_resamp : pd.DataFrame
+        Resampled DataFrame.
+    """
     df_resamp = None
 
     for method, var_list in methods_vars.items():
@@ -99,38 +317,36 @@ def resample(df, methods_vars, freq='QS'):
 
 def deflate(df, var_list, index='cpi', log=False, diff=False, per_capita=False, 
             reimport=False, **kwargs):
-    """Deflates series by price indexes
-    
-    Inputs:
+    """Deflate a set of series by a price or population index.
 
-        df: pandas dataframe containing data
+    Parameters
+    ----------
+    df : pd.DataFrame
+        DataFrame containing the data.
+    var_list : list of str
+        Variables to deflate.
+    index : {'cpi', 'pce', 'pop'}, optional
+        Price (or population) index to use. Default is 'cpi'.
+    log : bool, optional
+        Set to True if the variable is already in log levels; the function
+        will subtract the log price index rather than dividing. Default is False.
+    diff : bool, optional
+        Set to True if the variable is already in differences; the function
+        will subtract differenced log prices. Default is False.
+    per_capita : bool, optional
+        If True, also deflate by population. Default is False.
+    reimport : bool, optional
+        If True, re-import raw price data instead of using cached files.
+        Default is False.
+    **kwargs
+        Additional keyword arguments passed to the dataset loader.
 
-        var_list: list of variables to be deflated
-
-        index: price index to use, one of
-
-            cpi: CPI deflator
-            pce: PCE deflator
-            pop: population (to put in per-capita terms)
-
-        log: set to True if the variable is ALREADY in logs rather than levels
-            (this will not take logs)
-
-        diff: set to True if the variable is ALREADY in differences 
-            (this will not take differences)
-
-        per_capita: set to True if you ALSO want to put the variable in per-capita terms
-            (unlike "log" and "diff" this WILL adjust the series)
-
-        reimport: set to True if you want to re-import the raw data instead of using the
-            saved pickle files
-
-    Outputs:
-
-        df: dataframe now including deflated series
-
-        new_var_list: names of deflated variables
-    
+    Returns
+    -------
+    df : pd.DataFrame
+        DataFrame with deflated series appended.
+    new_var_list : list of str
+        Names of the newly created deflated variables.
     """
 
     from py_tools.datasets.loader import load
@@ -191,6 +407,24 @@ def deflate(df, var_list, index='cpi', log=False, diff=False, per_capita=False,
     return (df, new_var_list)
 
 def add_lags(df, var, n_lags, init_lag=1):
+    """Create lag columns of a variable and add them to a DataFrame.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        DataFrame to add lags to (modified in-place).
+    var : str
+        Name of the variable to lag.
+    n_lags : int
+        Number of lags to add.
+    init_lag : int, optional
+        Starting lag order. Default is 1.
+
+    Returns
+    -------
+    lag_list : list of str
+        Names of the newly created lag columns.
+    """
 
     lag_list = []
     for lag in range(init_lag, n_lags + init_lag):
@@ -199,6 +433,27 @@ def add_lags(df, var, n_lags, init_lag=1):
     return lag_list
 
 def transform(df, var_list, lag=0, diff=0, other=None):
+    """Apply transformations (lag, difference, or function) to variables.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        DataFrame to transform (modified in-place).
+    var_list : list of str
+        Variables to transform.
+    lag : int, optional
+        Lag order (positive = lag, negative = lead). Default is 0.
+    diff : int, optional
+        Differencing order. Default is 0 (no differencing).
+    other : str, optional
+        Name of a NumPy function to apply before lagging/differencing.
+        Default is None.
+
+    Returns
+    -------
+    new_var_list : list of str
+        Names of the transformed variables added to df.
+    """
 
     new_var_list = []
     for var in var_list:
@@ -241,10 +496,54 @@ def transform(df, var_list, lag=0, diff=0, other=None):
     return new_var_list
 
 def long_horizon_contemp(df, lhs, rhs, horizon, **kwargs):
+    """Contemporaneous long-horizon regression (not yet implemented).
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Data DataFrame.
+    lhs : str
+        Left-hand side variable name.
+    rhs : list of str
+        Right-hand side variable names.
+    horizon : int
+        Forecast horizon.
+    **kwargs
+        Additional keyword arguments.
+
+    Raises
+    ------
+    Exception
+        Always raised; method not yet implemented.
+    """
 
     raise Exception
 
 def long_horizon_predictive(df_in, lhs, rhs, horizon, norm_lhs=False, **kwargs):
+    """Run a predictive long-horizon regression.
+
+    The dependent variable is the sum of the next horizon values of lhs.
+
+    Parameters
+    ----------
+    df_in : pd.DataFrame
+        Input DataFrame.
+    lhs : str
+        Left-hand side variable name.
+    rhs : list of str
+        Right-hand side variable names.
+    horizon : int
+        Forecast horizon (number of periods to sum).
+    norm_lhs : bool, optional
+        If True, normalize the summed LHS by dividing by horizon. Default is False.
+    **kwargs
+        Additional keyword arguments passed to dt.regression.
+
+    Returns
+    -------
+    fr : FullResults
+        Regression results object.
+    """
 
     df = df_in[[lhs] + rhs].copy()
     lhs_long = '{0}_{1}_Per_Diff'.format(lhs, horizon)
@@ -260,6 +559,30 @@ def long_horizon_predictive(df_in, lhs, rhs, horizon, norm_lhs=False, **kwargs):
 
 def MA(df, lhs_var, rhs_vars, init_lag=1, default_lags=16, 
        lags_by_var={}, **kwargs):
+    """Run a distributed lag (moving average) regression.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        DataFrame containing the data.
+    lhs_var : str
+        Left-hand side variable name.
+    rhs_vars : list of str
+        Right-hand side variable names.
+    init_lag : int, optional
+        Starting lag order. Default is 1.
+    default_lags : int, optional
+        Default number of lags for each RHS variable. Default is 16.
+    lags_by_var : dict, optional
+        Mapping from variable name to number of lags (overrides default_lags).
+    **kwargs
+        Additional keyword arguments passed to dt.regression.
+
+    Returns
+    -------
+    fr : FullResults
+        Regression results object.
+    """
 
     lhs = lhs_var
 
@@ -276,6 +599,30 @@ def MA(df, lhs_var, rhs_vars, init_lag=1, default_lags=16,
     return dt.regression(df, lhs, rhs, ix=ix, **kwargs)
 
 def ARMA(df, var, p, q, freq='QS', trend='c', display=False):
+    """Estimate an ARMA(p, q) model.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        DataFrame containing the series.
+    var : str
+        Name of the variable to model.
+    p : int
+        AR order.
+    q : int
+        MA order.
+    freq : str, optional
+        Pandas frequency string. Default is 'QS'.
+    trend : str, optional
+        Trend specification passed to statsmodels ARIMA. Default is 'c'.
+    display : bool, optional
+        If True, print the model summary. Default is False.
+
+    Returns
+    -------
+    fr : FullResults
+        Regression results object wrapping the fitted ARIMA model.
+    """
     
     ix = pd.notnull(df[var])
     series = df.loc[ix, var]
@@ -286,6 +633,26 @@ def ARMA(df, var, p, q, freq='QS', trend='c', display=False):
     return dt.FullResults(res, ix=ix, Xs=None, zs=None)
 
 def arma_regression(series, p, q, freq='QS', ix=None):
+    """Estimate an ARMA(p, q) model by two-stage OLS.
+
+    Parameters
+    ----------
+    series : pd.Series
+        Time series to model.
+    p : int
+        AR order.
+    q : int
+        MA order.
+    freq : str, optional
+        Pandas frequency string. Default is 'QS'.
+    ix : np.ndarray of bool, optional
+        Sample selection index. Default is all observations.
+
+    Returns
+    -------
+    fr : FullResults
+        Regression results from the second-stage OLS.
+    """
     
     if ix is None:
         ix = np.ones(len(series), dtype=bool)
@@ -308,7 +675,24 @@ def arma_regression(series, p, q, freq='QS', ix=None):
     return fr
 
 def VAR(df_in, var_list, n_var_lags=1, use_const=True):
-    """Estimate VAR using OLS"""
+    """Estimate a VAR using OLS.
+
+    Parameters
+    ----------
+    df_in : pd.DataFrame
+        Input DataFrame (copied internally).
+    var_list : list of str
+        Variable names to include in the VAR.
+    n_var_lags : int, optional
+        Number of lags. Default is 1.
+    use_const : bool, optional
+        Include a constant term. Default is True.
+
+    Returns
+    -------
+    fr : FullResults
+        Multivariate OLS results object.
+    """
 
     df = df_in.copy()
 
@@ -328,14 +712,56 @@ def VAR(df_in, var_list, n_var_lags=1, use_const=True):
     return dt.mv_ols(df, lhs, rhs)
 
 class VECMResults(dt.FullResults):
-    """VECM results object"""
+    """VECM estimation results.
+
+    Extends FullResults with the estimated cointegrating vector.
+
+    Parameters
+    ----------
+    fr : FullResults
+        OLS results from the VECM regression.
+    alp : np.ndarray
+        Cointegrating vector (normalized so the LHS coefficient is 1).
+
+    Attributes
+    ----------
+    alp : np.ndarray
+        Cointegrating vector.
+    """
 
     def __init__(self, fr, alp):
+        """Initialize VECMResults.
+
+        Parameters
+        ----------
+        fr : FullResults
+            OLS results from the VECM regression.
+        alp : np.ndarray
+            Cointegrating vector.
+        """
         dt.FullResults.__init__(self, fr.results, fr.ix, fr.Xs, fr.zs)
         self.alp = alp
 
 def VECM(df, var_list, n_var_lags=1, n_dls_lags=8):
-    """Estimate VECM using DLS"""
+    """Estimate a VECM using dynamic least squares (DLS).
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        DataFrame containing the variables.
+    var_list : list of str
+        Ordered variable names; the first variable is the LHS of the
+        cointegrating relationship.
+    n_var_lags : int, optional
+        Number of VAR lags in the VECM. Default is 1.
+    n_dls_lags : int, optional
+        Number of leads/lags for DLS cointegration estimation. Default is 8.
+
+    Returns
+    -------
+    vr : VECMResults
+        VECM estimation results.
+    """
 
     # LHS variables
     lhs = transform(df, var_list, diff=1)
@@ -360,6 +786,22 @@ def VECM(df, var_list, n_var_lags=1, n_dls_lags=8):
     return VECMResults(dt.mv_ols(df, lhs, rhs), alp)
 
 def VECM_companion_form(vr, H=None):
+    """Convert VECM results to companion form.
+
+    Parameters
+    ----------
+    vr : VECMResults
+        VECM results object.
+    H : np.ndarray, optional
+        Impact matrix (n_var x n_shock). If None, C is returned as None.
+
+    Returns
+    -------
+    Phi : np.ndarray
+        Companion-form transition matrix.
+    C : np.ndarray or None
+        Companion-form impact matrix, or None if H is None.
+    """
 
     if len(vr.alp.shape) == 1:
         n_coint = 1
@@ -390,6 +832,22 @@ def VECM_companion_form(vr, H=None):
     return (Phi, C)
 
 def VECM_irfs(vr, H, nt):
+    """Compute cumulative impulse responses from a VECM.
+
+    Parameters
+    ----------
+    vr : VECMResults
+        VECM results object.
+    H : np.ndarray, shape (n_var, n_shock)
+        Impact matrix.
+    nt : int
+        Number of IRF periods.
+
+    Returns
+    -------
+    irfs : np.ndarray, shape (n_coint, n_shock, nt)
+        Cumulative impulse response functions.
+    """
 
     # Update to companion form
     Phi, C = VECM_companion_form(vr, H)
@@ -409,16 +867,93 @@ def VECM_irfs(vr, H, nt):
     return np.cumsum(irfs[:ny, :, :], axis=2)
 
 class LongHorizonMA:
-    """Long Horizon Moving Average Regression"""
+    """Long-horizon moving average regression (not yet implemented).
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        DataFrame containing the data.
+    lhs_var : str
+        Left-hand side variable name.
+    rhs_var : str
+        Right-hand side variable name.
+    horizon : int
+        Forecast horizon.
+    n_lags : int, optional
+        Number of MA lags. Default is 16.
+    """
 
     def __init__(self, df, lhs_var, rhs_var, horizon, n_lags=16):
+        """Initialize LongHorizonMA (not yet implemented).
+
+        Parameters
+        ----------
+        df : pd.DataFrame
+            DataFrame containing the data.
+        lhs_var : str
+            Left-hand side variable name.
+        rhs_var : str
+            Right-hand side variable name.
+        horizon : int
+            Forecast horizon.
+        n_lags : int, optional
+            Number of MA lags. Default is 16.
+
+        Raises
+        ------
+        Exception
+            Always raised; not yet implemented.
+        """
 
         raise Exception
 
 class LongHorizonVAR:
-    """Long Horizon VAR Regression"""
+    """Long-horizon VAR-based regression.
+
+    Computes long-horizon predictive and contemporaneous regression coefficients
+    and R-squared values using the analytical VAR covariance structure.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Input DataFrame.
+    lhs_var : str
+        Left-hand side variable name.
+    rhs_vars : list of str
+        Right-hand side variable names.
+    horizon : int
+        Long-horizon window (number of periods).
+    n_var_lags : int, optional
+        Number of VAR lags. Default is 1.
+
+    Attributes
+    ----------
+    A : np.ndarray
+        Companion-form VAR coefficient matrix.
+    Q : np.ndarray
+        Companion-form residual covariance matrix.
+    C : list of np.ndarray
+        Autocovariance matrices C[j] = A^j @ C[0].
+    Vk : np.ndarray
+        Long-horizon variance-covariance matrix.
+    """
 
     def __init__(self, df, lhs_var, rhs_vars, horizon, n_var_lags=1):
+        """Initialize the long-horizon VAR.
+
+        Parameters
+        ----------
+        df : pd.DataFrame
+            Input DataFrame.
+        lhs_var : str
+            Left-hand side variable name.
+        rhs_vars : list of str
+            Right-hand side variable names.
+        horizon : int
+            Long-horizon window.
+        n_var_lags : int, optional
+            Number of VAR lags. Default is 1.
+        """
 
         self.lhs_var = lhs_var
         self.rhs_vars = rhs_vars
@@ -456,6 +991,15 @@ class LongHorizonVAR:
         self.lhs_ix = 0
 
     def predictive_reg(self):
+        """Compute long-horizon predictive regression coefficients and R-squared.
+
+        Returns
+        -------
+        bet_lh : np.ndarray, shape (n_rhs,)
+            Long-horizon predictive regression coefficients.
+        R2 : np.ndarray, shape (n_rhs,)
+            R-squared values for each predictor.
+        """
 
         # Compute covariance of current with future sum
         C_sum = np.zeros(self.C[0].shape)
@@ -481,6 +1025,20 @@ class LongHorizonVAR:
         return (bet_lh, R2)
 
     def contemp_reg(self, display=False):
+        """Compute long-horizon contemporaneous regression coefficients and R-squared.
+
+        Parameters
+        ----------
+        display : bool, optional
+            If True, print a formatted results table. Default is False.
+
+        Returns
+        -------
+        bet_lh : np.ndarray, shape (n_rhs,)
+            Long-horizon regression coefficients.
+        R2 : float
+            Overall R-squared.
+        """
 
         # covariance terms
         var_y = self.Vk[0, 0]
@@ -516,6 +1074,23 @@ class LongHorizonVAR:
         return (bet_lh, R2)
 
     def orthogonal_contemp_reg(self, display=False):
+        """Compute long-horizon regression with orthogonalized regressors.
+
+        Uses a sequential Gram-Schmidt procedure to orthogonalize RHS variables,
+        yielding individual R-squared contributions.
+
+        Parameters
+        ----------
+        display : bool, optional
+            If True, print a formatted results table. Default is False.
+
+        Returns
+        -------
+        bet_lh : np.ndarray, shape (n_rhs,)
+            Coefficients on each orthogonalized regressor.
+        R2 : np.ndarray, shape (n_rhs,)
+            R-squared contribution of each orthogonalized regressor.
+        """
 
         bet_lh = np.zeros(self.n_rhs)
         R2 = np.zeros(self.n_rhs)
@@ -568,7 +1143,20 @@ class LongHorizonVAR:
         return (bet_lh, R2)
 
 def orthogonalize_errors(u):
-    """Cholesky decomposition"""
+    """Orthogonalize reduced-form residuals via Cholesky decomposition.
+
+    Parameters
+    ----------
+    u : np.ndarray, shape (Nt, Ny)
+        Reduced-form residuals.
+
+    Returns
+    -------
+    e : np.ndarray, shape (Nt, Ny)
+        Orthogonalized residuals.
+    H : np.ndarray, shape (Ny, Ny)
+        Lower-triangular Cholesky factor of the residual covariance.
+    """
     Sig = np.dot(u.T, u) / u.shape[0]
     H = np.linalg.cholesky(Sig)
     e = (np.linalg.solve(H, u.T)).T
@@ -576,6 +1164,28 @@ def orthogonalize_errors(u):
 
 # Estimate cointegrating relationship using DLS
 def run_dls(df, lhs_var, rhs_vars, n_lags=8, display=False):
+    """Estimate a cointegrating relationship using dynamic least squares (DLS).
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        DataFrame containing the variables.
+    lhs_var : str
+        Left-hand side (normalizing) variable.
+    rhs_vars : list of str
+        Right-hand side cointegrating variables.
+    n_lags : int, optional
+        Number of leads and lags to include. Default is 8.
+    display : bool, optional
+        If True, print regression summary. Default is False.
+
+    Returns
+    -------
+    coint_vec : np.ndarray
+        Cointegrating vector (normalized so the LHS coefficient is 1).
+    const : float
+        Estimated constant term.
+    """
 
     n_rhs = len(rhs_vars)
     rhs = ['const'] + rhs_vars
@@ -595,7 +1205,28 @@ def run_dls(df, lhs_var, rhs_vars, n_lags=8, display=False):
     return (coint_vec, const)
 
 def lagged_reg(df_in, lhs, rhs_list, n_lags, use_const=True, copy_df=True):
-    """Regression of lhs on 1 through n_lags lags of rhs_list."""
+    """Regress lhs on 1 through n_lags lags of each variable in rhs_list.
+
+    Parameters
+    ----------
+    df_in : pd.DataFrame
+        Input DataFrame.
+    lhs : list of str or str
+        Left-hand side variable(s).
+    rhs_list : list of str
+        Right-hand side variables to lag.
+    n_lags : int
+        Number of lags to include.
+    use_const : bool, optional
+        Include a constant term. Default is True.
+    copy_df : bool, optional
+        Copy the DataFrame before adding lags. Default is True.
+
+    Returns
+    -------
+    fr : FullResults
+        Multivariate OLS regression results.
+    """
 
     if copy_df:
         df = df_in.copy()
@@ -613,8 +1244,30 @@ def lagged_reg(df_in, lhs, rhs_list, n_lags, use_const=True, copy_df=True):
     return dt.mv_ols(df, lhs, rhs)
 
 def detrend_hamilton(df_full, varlist, p=4, h=8):
-    """Apply Hamilton's recommended detrending procedure (instead of HP filter)
-    Returns a dataframe including detrended variables with suffix '_detrend'
+    """Apply Hamilton's detrending procedure.
+
+    Regresses each variable on its own lags h through h+p-1, using the
+    residual as the cyclical component.
+
+    Parameters
+    ----------
+    df_full : pd.DataFrame
+        DataFrame containing the variables to detrend.
+    varlist : list of str
+        Variable names to detrend.
+    p : int, optional
+        Number of lags in the projection. Default is 4.
+    h : int, optional
+        Minimum lag distance. Default is 8.
+
+    Returns
+    -------
+    df_full : pd.DataFrame
+        DataFrame with '_detrend' and '_trend' suffix columns added.
+    varlist_detrended : list of str
+        Names of the detrended variables.
+    fr_list : list of FullResults
+        Regression results for each variable.
     """
 
     fr_list = []
@@ -641,11 +1294,25 @@ def detrend_hamilton(df_full, varlist, p=4, h=8):
     return df_full, varlist_detrended, fr_list
 
 def detrend_time(df, varlist, time_var=None, suffix='detrend_time'):
-    """Remove a linear time trend from the variables in var_list.  
+    """Remove a linear time trend from each variable in varlist.
 
-    Returns (df_full, varlist_detrend), where df_full is a dataframe including
-    detrended variables with suffix '_detrend', and varlist_detrend is the list
-    of detrended variables.
+    Parameters
+    ----------
+    df : pd.DataFrame
+        DataFrame containing the variables.
+    varlist : list of str
+        Variable names to detrend.
+    time_var : str, optional
+        Name of the time variable column. If None, a 'TIME' column is created.
+    suffix : str, optional
+        Suffix appended to detrended variable names. Default is 'detrend_time'.
+
+    Returns
+    -------
+    df : pd.DataFrame
+        DataFrame with detrended series appended.
+    varlist_detrend : list of str
+        Names of the detrended variables.
     """
 
     if time_var is None:
@@ -663,6 +1330,24 @@ def detrend_time(df, varlist, time_var=None, suffix='detrend_time'):
     return df, varlist_detrend
 
 def get_time_trend(df, var, time_var=None):
+    """Extract the linear time trend and cycle from a series.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        DataFrame containing the variable.
+    var : str
+        Variable name.
+    time_var : str, optional
+        Name of the time column. If None, a 'TIME' column is created.
+
+    Returns
+    -------
+    trend : pd.Series
+        Fitted trend values.
+    cycle : pd.Series
+        Residual (cycle) values.
+    """
 
     if time_var is None:
         assert 'TIME' not in df
@@ -680,6 +1365,22 @@ def get_time_trend(df, var, time_var=None):
     return trend, cycle
 
 def autocorrelations(df_in, var, lags=20):
+    """Compute autocorrelations of a variable.
+
+    Parameters
+    ----------
+    df_in : pd.DataFrame
+        DataFrame containing the variable.
+    var : str
+        Variable name.
+    lags : int, optional
+        Maximum lag order. Default is 20.
+
+    Returns
+    -------
+    table : np.ndarray, shape (lags+1, 2)
+        Array with lag values in column 0 and correlations in column 1.
+    """
 
     df = df_in[[var]].copy()
     var_copy = var + '_COPY'
@@ -690,9 +1391,32 @@ def autocorrelations(df_in, var, lags=20):
 def lead_lag_correlations(df_in, var1, var2, lags=None,
                           max_leads=8, max_lags=8, make_plot=False,
                           **kwargs):
-    """Compute the correlation between var1 and leads/lags of var2.  
-    Setting make_plot to True will make two-axis plot under lag yielding 
-    highest magnitude
+    """Compute correlations between var1 and leads/lags of var2.
+
+    Parameters
+    ----------
+    df_in : pd.DataFrame
+        DataFrame containing the variables.
+    var1 : str
+        First variable name.
+    var2 : str
+        Second variable name.
+    lags : range or list, optional
+        Explicit lag values to compute. If None, uses max_leads and max_lags.
+    max_leads : int, optional
+        Maximum lead (negative lag) to include. Default is 8.
+    max_lags : int, optional
+        Maximum lag to include. Default is 8.
+    make_plot : bool, optional
+        If True, produce a two-axis plot at the highest-correlation lag.
+        Default is False.
+    **kwargs
+        Additional keyword arguments passed to the plot function.
+
+    Returns
+    -------
+    table : np.ndarray, shape (n_lags, 2)
+        Array with lag values in column 0 and correlations in column 1.
     """
 
     from py_tools.plot import two_axis
@@ -726,6 +1450,22 @@ def lead_lag_correlations(df_in, var1, var2, lags=None,
     return table 
 
 def fit_ar1(df_in, var, **kwargs):
+    """Fit an AR(1) model to a variable.
+
+    Parameters
+    ----------
+    df_in : pd.DataFrame
+        DataFrame containing the variable.
+    var : str
+        Variable name.
+    **kwargs
+        Additional keyword arguments passed to dt.regression.
+
+    Returns
+    -------
+    fr : FullResults
+        Regression results.
+    """
 
     df = df_in[[var]].copy()
     df['L_' + var] = df[var].shift()
@@ -733,6 +1473,28 @@ def fit_ar1(df_in, var, **kwargs):
     return dt.regression(df, var, ['L_' + var], **kwargs)
 
 def rolling_forecast(df_in, lhs, rhs=None, use_const=True, **kwargs):
+    """Produce real-time rolling forecasts using expanding-window OLS.
+
+    Parameters
+    ----------
+    df_in : pd.DataFrame
+        Input DataFrame.
+    lhs : list of str
+        Left-hand side variable names.
+    rhs : list of str, optional
+        Right-hand side variable names. Default is no additional regressors.
+    use_const : bool, optional
+        Include a constant term. Default is True.
+    **kwargs
+        Additional keyword arguments passed to rolling_forecast_internal.
+
+    Returns
+    -------
+    forecast : np.ndarray, shape (Nt, Ny)
+        Rolling forecasts.
+    ix : np.ndarray of bool
+        Sample selection index.
+    """
 
     if rhs is None: rhs = []
 
@@ -750,7 +1512,23 @@ def rolling_forecast(df_in, lhs, rhs=None, use_const=True, **kwargs):
     return rolling_forecast_internal(y, X, **kwargs), ix
 
 def rolling_forecast_internal(y, X, t_min=None):
-    """y should be Nt x Ny, X should be Nt x Nx"""
+    """Compute rolling forecasts using expanding-window OLS.
+
+    Parameters
+    ----------
+    y : np.ndarray, shape (Nt, Ny)
+        Dependent variable matrix.
+    X : np.ndarray, shape (Nt, Nx)
+        Regressor matrix.
+    t_min : int, optional
+        Minimum number of observations before forecasting begins.
+        Default is Nx + 2.
+
+    Returns
+    -------
+    forecast : np.ndarray, shape (Nt, Ny)
+        One-step-ahead forecasts; NaN for the initial burn-in periods.
+    """
 
     if len(y.shape) == 1: y = y[:, np.newaxis]
     if len(X.shape) == 1: X = X[:, np.newaxis]
@@ -782,6 +1560,32 @@ def rolling_forecast_internal(y, X, t_min=None):
 
 def local_projection(df_in, y_var, shock_var, controls=None, periods=16,
                      shock_lags=2, **kwargs):
+    """Estimate impulse responses via Jordà local projections.
+
+    Parameters
+    ----------
+    df_in : pd.DataFrame
+        Input DataFrame.
+    y_var : str
+        Response variable name.
+    shock_var : str
+        Shock (impulse) variable name.
+    controls : list of str, optional
+        Additional control variable names. Default is None (no controls).
+    periods : int, optional
+        Number of forward periods to project. Default is 16.
+    shock_lags : int, optional
+        Number of lags of the shock to include as controls. Default is 2.
+    **kwargs
+        Additional keyword arguments passed to dt.regression.
+
+    Returns
+    -------
+    coeffs : np.ndarray, shape (periods+1,)
+        Impulse response coefficients at each horizon.
+    se : np.ndarray, shape (periods+1,)
+        Newey-West standard errors.
+    """
 
     if controls is None: controls = []
     
@@ -812,17 +1616,38 @@ def local_projection(df_in, y_var, shock_var, controls=None, periods=16,
 
 def add_lags_by_group(df, x_var, date_var, lag_list, group_id=None, group_vars=None, freq='Q', 
                 lag_str='lag', lead_str='lead', leads=False, zero_type=None):
-    """Add lags of a variable by group.
-    
-    Args:
-        df: pandas dataframe, should contain relevant series
-        var: string, name of series to lag
-        lag_list: list-like, use negative numbers for leads
-        grouped: pandas groupby object, for pre-grouping if data is multiindexed
-        group_levels: list-like, does grouping if not already grouped for multiindex
-    
-    Returns:
-        df: pandas dataframe, now containing leads and lags.
+    """Add lags (and optionally leads) of a variable within panel groups.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        DataFrame containing the relevant series.
+    x_var : str
+        Name of the variable to lag.
+    date_var : str
+        Name of the date variable column.
+    lag_list : list of int
+        Lag orders to compute (negative values treated as leads if leads=True).
+    group_id : str, optional
+        Column name identifying each panel unit. Used directly if provided.
+    group_vars : list of str, optional
+        Variables to group by if group_id is not provided.
+    freq : str, optional
+        Pandas frequency string for resampling. Default is 'Q'.
+    lag_str : str, optional
+        Prefix used for lagged variable names. Default is 'lag'.
+    lead_str : str, optional
+        Prefix used for lead variable names. Default is 'lead'.
+    leads : bool, optional
+        If True, negate lag_list values so they are treated as leads.
+        Default is False.
+    zero_type : {None, 'lag', 'lead'}, optional
+        Controls naming when lag == 0. Default is None (uses x_var name).
+
+    Returns
+    -------
+    df : pd.DataFrame
+        DataFrame with lagged/lead columns appended.
     """
 
     assert (group_id is not None) or (group_vars is not None)
@@ -866,6 +1691,22 @@ def add_lags_by_group(df, x_var, date_var, lag_list, group_id=None, group_vars=N
     return df
 
 def lowpass_filter(series, freq_ub, nlags=4):
+    """Apply a symmetric low-pass filter to a time series.
+
+    Parameters
+    ----------
+    series : pd.Series or np.ndarray
+        Input time series.
+    freq_ub : float
+        Upper cutoff frequency (in radians per period).
+    nlags : int, optional
+        One-sided number of lags in the filter kernel. Default is 4.
+
+    Returns
+    -------
+    filtered : pd.Series or np.ndarray
+        Low-pass filtered series.
+    """
 
     b0 = freq_ub / np.pi
     filtered = b0 * series
@@ -880,6 +1721,30 @@ def lowpass_filter(series, freq_ub, nlags=4):
             
 def bandpass_filter(series, period_lb=None, period_ub=None, 
                     freq_lb=None, freq_ub=None, nlags=4):
+    """Apply a symmetric band-pass filter to a time series.
+
+    Accepts either period or frequency bounds (not both for the same bound).
+
+    Parameters
+    ----------
+    series : pd.Series or np.ndarray
+        Input time series.
+    period_lb : float, optional
+        Lower period bound (sets upper frequency cutoff).
+    period_ub : float, optional
+        Upper period bound (sets lower frequency cutoff).
+    freq_lb : float, optional
+        Lower frequency cutoff (radians per period).
+    freq_ub : float, optional
+        Upper frequency cutoff (radians per period).
+    nlags : int, optional
+        One-sided number of filter lags. Default is 4.
+
+    Returns
+    -------
+    filtered : pd.Series or np.ndarray
+        Band-pass filtered series.
+    """
     
     if period_lb is not None:
         assert freq_ub is None
@@ -905,6 +1770,24 @@ def bandpass_filter(series, period_lb=None, period_ub=None,
     return filtered
 
 def bandpass_filter_christiano(series, period_lb, period_ub, detrend=False):
+    """Apply the Christiano-Fitzgerald band-pass filter.
+
+    Parameters
+    ----------
+    series : np.ndarray, shape (Nt,)
+        Input time series.
+    period_lb : float
+        Lower period bound.
+    period_ub : float or None
+        Upper period bound. If None, a low-pass filter is applied.
+    detrend : bool, optional
+        If True, remove the deterministic linear trend first. Default is False.
+
+    Returns
+    -------
+    series_new : np.ndarray, shape (Nt,)
+        Band-pass filtered series.
+    """
     
     # assert period_lb > 1
     
@@ -941,17 +1824,19 @@ def bandpass_filter_christiano(series, period_lb, period_ub, detrend=False):
     return series_new
 
 def chow_lin_V_default(a, N):
-    """Compute the default V matrix for the Chow-Lin method assuming an AR(1)
-    correlation structure
+    """Compute the AR(1) error covariance matrix for the Chow-Lin method.
 
-    Parameters:
+    Parameters
+    ----------
+    a : float
+        Autocorrelation parameter.
+    N : int
+        Number of observations in the high-frequency series.
 
-        a: the correlation parameter
-        N: the number of observations in the X series
-
-    Returns:
-
-        V: the N x N matrix
+    Returns
+    -------
+    V : np.ndarray, shape (N, N)
+        AR(1) covariance matrix with V[i, j] = a^|i-j|.
     """
     
     V = np.zeros((N, N))
@@ -961,21 +1846,30 @@ def chow_lin_V_default(a, N):
     return V
 
 def chow_lin_inner(Y, Z, B, a, Vfcn=chow_lin_V_default):
-    """Perform the inner loop computations of the Chow-Lin method.
+    """Perform the inner GLS step of the Chow-Lin interpolation.
 
-    Parameters:
+    Parameters
+    ----------
+    Y : np.ndarray, shape (Nt_coarse,)
+        Target series at coarse frequency.
+    Z : np.ndarray, shape (Nt_fine, k)
+        Proxy series at fine frequency.
+    B : np.ndarray, shape (Nt_fine, Nt_coarse)
+        Aggregation matrix relating fine to coarse observations.
+    a : float
+        Autocorrelation parameter for the error structure.
+    Vfcn : callable, optional
+        Function computing the error covariance matrix given (a, N).
+        Default is chow_lin_V_default.
 
-        Y: the Nt_coarse x 1 target series with limited availability
-        Z: the Nt_fine x k proxy series
-        B: the Nt_fine x Nt_coarse matrix relating Y and X
-        a: the correlation parameter
-        Vfcn: a function for computing the error matrix V given the correlation parameter a
-
-    Returns:
-
-        bet_hat: the estimated coefficients of the Chow-Lin regression 
-        X_hat: the approximated series for X
-        u_hat: the residuals of the Chow-Lin regression
+    Returns
+    -------
+    bet_hat : np.ndarray, shape (k,)
+        Estimated regression coefficients.
+    X_hat : np.ndarray, shape (Nt_fine,)
+        Interpolated high-frequency series.
+    u_hat : np.ndarray, shape (Nt_fine,)
+        Estimated high-frequency residuals.
     """
     
     N = Z.shape[0]
@@ -999,21 +1893,29 @@ def chow_lin_inner(Y, Z, B, a, Vfcn=chow_lin_V_default):
     return bet_hat, X_hat, u_hat
 
 def chow_lin(Y, Z, B, Vfcn=chow_lin_V_default, a0=0.9, tol=1e-4):
-    """Use the Chow-Lin method to approximate the target series X using a
-    coarser series Y and a proxy series Z. 
-        
-    Parameters:
+    """Interpolate a coarse series to high frequency using the Chow-Lin method.
 
-        Y: the Nt_coarse x 1 target series with limited availability
-        Z: the Nt_fine x k proxy series
-        B: the Nx_fine x Nt_coarse matrix relating Y and X
-        Vfcn: a function for computing the error matrix V given the correlation parameter a
-        a0: a scalar guess for the correlation parameter
-        tol: the scalar tolerance for the iterative process to converge
-        
-    Returns:
-        
-        X_hat: the approximated series for X
+    Iterates the GLS inner step until the autocorrelation parameter converges.
+
+    Parameters
+    ----------
+    Y : np.ndarray, shape (Nt_coarse,)
+        Target series at coarse frequency.
+    Z : np.ndarray, shape (Nt_fine, k)
+        Proxy series at fine frequency.
+    B : np.ndarray, shape (Nt_fine, Nt_coarse)
+        Aggregation matrix relating fine to coarse observations.
+    Vfcn : callable, optional
+        Function computing the error covariance matrix. Default is chow_lin_V_default.
+    a0 : float, optional
+        Initial guess for the autocorrelation parameter. Default is 0.9.
+    tol : float, optional
+        Convergence tolerance for the autocorrelation parameter. Default is 1e-4.
+
+    Returns
+    -------
+    X_hat : np.ndarray, shape (Nt_fine,)
+        Interpolated high-frequency series.
     """
     
     a = a0
@@ -1034,6 +1936,22 @@ def chow_lin(Y, Z, B, Vfcn=chow_lin_V_default, a0=0.9, tol=1e-4):
     return X_hat
 
 def interpolate_to_high_frequency(z, freq=4, A=None):
+    """Interpolate a low-frequency series to high frequency using spline smoothing.
+
+    Parameters
+    ----------
+    z : np.ndarray, shape (K,)
+        Low-frequency series.
+    freq : int, optional
+        Number of high-frequency periods per low-frequency period. Default is 4.
+    A : np.ndarray, shape (K, N), optional
+        Aggregation matrix. If None, assumes averaging over freq periods.
+
+    Returns
+    -------
+    x_star : np.ndarray, shape (K * freq,)
+        Interpolated high-frequency series.
+    """
 
     freq_inv = 1.0 / freq   
 
