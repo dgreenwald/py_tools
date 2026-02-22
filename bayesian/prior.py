@@ -1,11 +1,12 @@
 import numpy as np
-from scipy import stats as st, optimize as opt
+from scipy import stats as st
 
 BETA = 1
 GAMMA = 2
 INV_GAMMA = 3
 NORM = 4
 TRUNC_NORM = 5
+
 
 def get_prior(prior_type, mean=None, sd=None):
     """Return a scipy frozen distribution for a named prior type.
@@ -39,11 +40,11 @@ def get_prior(prior_type, mean=None, sd=None):
     """
 
     prior_num_dict = {
-        'beta' : BETA,
-        'gamma' : GAMMA,
-        'inv_gamma' : INV_GAMMA,
-        'norm' : NORM,
-        'trunc_norm' : TRUNC_NORM,
+        "beta": BETA,
+        "gamma": GAMMA,
+        "inv_gamma": INV_GAMMA,
+        "norm": NORM,
+        "trunc_norm": TRUNC_NORM,
     }
 
     if prior_type is None:
@@ -56,7 +57,9 @@ def get_prior(prior_type, mean=None, sd=None):
         prior_num = prior_num_dict[prior_type]
     else:
         raise TypeError(
-            "prior_type must be None, int, or str; got {}".format(type(prior_type).__name__)
+            "prior_type must be None, int, or str; got {}".format(
+                type(prior_type).__name__
+            )
         )
 
     if mean is None or sd is None:
@@ -69,11 +72,11 @@ def get_prior(prior_type, mean=None, sd=None):
         bet = (1.0 - mean) * alp / mean
         return st.beta(alp, bet)
     elif prior_num == GAMMA:
-        the = (sd ** 2) / mean
+        the = (sd**2) / mean
         k = mean / the
         return st.gamma(k, scale=the)
     elif prior_num == INV_GAMMA:
-        alp = 2 + ((mean / sd) ** 2)  
+        alp = 2 + ((mean / sd) ** 2)
         bet = mean * (alp - 1)
         return st.invgamma(alp, scale=bet)
     elif prior_num == NORM:
@@ -84,6 +87,7 @@ def get_prior(prior_type, mean=None, sd=None):
         return st.truncnorm(a, b, mean, sd)
     else:
         raise RuntimeError("Unexpected prior code")
+
 
 class Prior:
     """Container for a collection of independent Bayesian prior distributions.
@@ -127,9 +131,9 @@ class Prior:
 
         # Add parameter name
         if name is None:
-            name = 'param{:d}'.format(len(self.dists))
+            name = "param{:d}".format(len(self.dists))
         self.names.append(name)
-        
+
         if this_prior is not None:
             self.non_flat_names.append(name)
 
@@ -151,7 +155,9 @@ class Prior:
             Sum of ``logpdf`` values across all non-flat components, or
             ``0.0`` if every component is flat.
         """
-        logpdf_list = [dist.logpdf(val) for dist, val in zip(self.dists, vals) if dist is not None]
+        logpdf_list = [
+            dist.logpdf(val) for dist, val in zip(self.dists, vals) if dist is not None
+        ]
         if logpdf_list:
             return np.sum(logpdf_list)
         else:

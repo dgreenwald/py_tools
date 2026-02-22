@@ -10,8 +10,8 @@ def read_coefficients(file_stem=None, file_b=None, file_V=None, to_numpy=False):
     if file_V is None:
         file_V = file_stem + '_V.txt'
 
-    b = pd.read_csv(file_b, sep='\s+').reset_index().drop(columns='index')
-    V = pd.read_csv(file_V, sep='\s+')
+    b = pd.read_csv(file_b, sep=r'\s+').reset_index().drop(columns='index')
+    V = pd.read_csv(file_V, sep=r'\s+')
     
     se_data = np.sqrt(np.diag(V.values))
     se = pd.DataFrame(data=se_data[np.newaxis, :], columns=V.columns)

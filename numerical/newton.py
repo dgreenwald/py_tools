@@ -59,9 +59,12 @@ def root(fun, x0, args=None, kwargs=None, grad=None, tol=1e-8,
          gradient_kwargs=None, max_iterations=50, max_backstep_iterations=10,
          verbose=True):
 
-    if args is None: args = ()
-    if kwargs is None: kwargs = {}
-    if gradient_kwargs is None: gradient_kwargs = {}
+    if args is None:
+        args = ()
+    if kwargs is None:
+        kwargs = {}
+    if gradient_kwargs is None:
+        gradient_kwargs = {}
     
     # Initialization
     x = np.array(x0).copy()
