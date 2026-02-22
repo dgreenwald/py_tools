@@ -8,7 +8,26 @@ data_dir = default_dir
 DATASET_NAME = "state_income"
 DESCRIPTION = "U.S. state income dataset loader."
 def load(data_dir=default_dir, reimport=False):
+    """Load state annual per-capita income data from BEA CSV in long format.
 
+    Reads the BEA state annual income CSV, merges with state FIPS codes,
+    and reshapes to a long-format DataFrame with columns ``state_abbr``,
+    ``date``, and ``pc_income``. Results are cached as a pickle file.
+
+    Parameters
+    ----------
+    data_dir : str, optional
+        Path to the directory containing the BEA CSV and pickle cache.
+    reimport : bool, optional
+        If ``True``, re-read from the source CSV even if a cached pickle
+        exists.
+
+    Returns
+    -------
+    pandas.DataFrame
+        Long-format DataFrame with columns ``state_abbr``, ``date``, and
+        ``pc_income``.
+    """
     pkl_file = data_dir + 'state_annual_income_long.pkl'
 
     if reimport or (not os.path.exists(pkl_file)):
@@ -35,7 +54,26 @@ def load(data_dir=default_dir, reimport=False):
     return si_long
 
 def load_fred(data_dir=default_dir, reimport=False):
-    
+    """Load state per-capita income series from FRED, reshaped to long format.
+
+    Fetches per-capita personal income series for all U.S. states (excluding
+    territories) from FRED via the ``fred`` dataset loader, then reshapes the
+    wide DataFrame to a long-format multi-index DataFrame indexed by
+    ``(state, date)``. Results are cached as a pickle file.
+
+    Parameters
+    ----------
+    data_dir : str, optional
+        Path to the directory used for the pickle cache.
+    reimport : bool, optional
+        If ``True``, re-fetch from FRED even if a cached pickle exists.
+
+    Returns
+    -------
+    pandas.DataFrame
+        Long-format DataFrame with a MultiIndex of ``(state, date)`` and a
+        single column ``pc_income``.
+    """
     pkl_file = data_dir + 'state_pc_income_fred.pkl'
     
     if reimport or (not os.path.exists(pkl_file)):
@@ -63,7 +101,30 @@ def load_fred(data_dir=default_dir, reimport=False):
     return df
 
 def load_median(data_dir=default_dir, reimport=False, fred_reimport=True):
-    
+    """Load state median household income from FRED.
+
+    Fetches the FRED median household income series (``MEHOINUS<STATE>A646N``)
+    for all U.S. states (excluding territories), reshapes to a long-format
+    multi-index DataFrame indexed by ``(state, date)``, and caches the result
+    as a pickle file.
+
+    Parameters
+    ----------
+    data_dir : str, optional
+        Path to the directory used for the pickle cache.
+    reimport : bool, optional
+        If ``True``, regenerate the pickle from FRED data even if a cached
+        pickle exists.
+    fred_reimport : bool, optional
+        If ``True``, re-fetch the underlying FRED series even if a local FRED
+        cache exists. Passed directly to the ``fred`` loader.
+
+    Returns
+    -------
+    pandas.DataFrame
+        Long-format DataFrame with a MultiIndex of ``(state, date)`` and a
+        single column ``median_income``.
+    """
     pkl_file = data_dir + 'state_median_income.pkl'
     
     if reimport or (not os.path.exists(pkl_file)):

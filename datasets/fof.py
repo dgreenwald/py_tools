@@ -7,10 +7,45 @@ default_dir = config.base_dir() + 'fof/'
 # data_dir = '/home/dan/Dropbox/data/fof/'
 DATASET_NAME = "fof"
 DESCRIPTION = "Federal Reserve Financial Accounts (FoF) dataset loader."
-def load(dataset, usecols=None, data_dir=default_dir, vintage='2003', 
+def load(dataset, usecols=None, data_dir=default_dir, vintage='2003',
          named_only=False, fof_vintage=None, update_names=False):
-    """Load pre-packaged set of variables"""
-    
+    """Load a pre-packaged set of Flow of Funds variables.
+
+    Parameters
+    ----------
+    dataset : str
+        Name of the pre-defined variable set to load.  One of
+        ``'corporate'``, ``'household'``, ``'financial'``, or ``'banks'``.
+    usecols : list of str or None, optional
+        Subset of variable names to return.  If ``None``, all variables in
+        the chosen ``dataset`` are returned.
+    data_dir : str, optional
+        Path to the directory containing the FoF CSV files.
+    vintage : str, optional
+        Two-digit year + two-digit month string identifying the data
+        release vintage (e.g. ``'2003'`` for March 2020).
+    named_only : bool, optional
+        If ``True``, drop any columns that were not explicitly named in the
+        pre-defined variable index (i.e. drop raw FoF series codes).
+    fof_vintage : str or None, optional
+        Deprecated alias for ``vintage``.  If provided, a deprecation
+        warning is printed and this value is used in place of ``vintage``.
+    update_names : bool, optional
+        If ``True``, rename columns from raw FoF series codes to
+        human-readable names using the data dictionary.
+
+    Returns
+    -------
+    pandas.DataFrame
+        Wide-format quarterly time series indexed by date, with one column
+        per requested variable.
+
+    Raises
+    ------
+    Exception
+        When ``dataset`` is not one of the supported values.
+    """
+
     if fof_vintage is not None:
         print("Change to keyword vintage")
         vintage = fof_vintage
@@ -190,8 +225,42 @@ def load_table(table, data_dir=default_dir, vintage='2207', fof_vintage=None,
                update_names=False, annual=False,
                add_flow_labels=False,
                **kwargs):
-    """Load single table"""
-    
+    """Load a single Flow of Funds table by its FoF table code.
+
+    Parameters
+    ----------
+    table : str
+        FoF table code to load (e.g. ``'b103'``, ``'f101'``, ``'l108'``).
+    data_dir : str, optional
+        Path to the directory containing the FoF CSV files.
+    vintage : str, optional
+        Four-character string identifying the data release vintage in
+        ``YYMM`` format (e.g. ``'2207'`` for July 2022).
+    fof_vintage : str or None, optional
+        Deprecated alias for ``vintage``.  If provided, a deprecation
+        warning is printed and this value is used in place of ``vintage``.
+    update_names : bool, optional
+        If ``True``, rename raw FoF series code columns to human-readable
+        names using the corresponding data dictionary file.
+    annual : bool, optional
+        If ``True``, treat the date column as an annual series.  Tables
+        whose code starts with ``'s'`` are automatically treated as annual.
+    add_flow_labels : bool, optional
+        If ``True`` and ``update_names`` is also ``True``, append a suffix
+        (``'_flow'``, ``'_level'``, etc.) to column names based on the
+        FoF series-code prefix.
+    **kwargs
+        Additional keyword arguments passed to :func:`pandas.read_csv` via
+        :func:`load_table` (e.g. ``usecols``).
+
+    Returns
+    -------
+    pandas.DataFrame
+        Time series data for the requested table, indexed by date, with
+        one column per FoF series code (or human-readable name when
+        ``update_names=True``).
+    """
+
     if fof_vintage is not None:
         print("Change to keyword vintage")
         vintage = fof_vintage
@@ -261,7 +330,25 @@ def load_table(table, data_dir=default_dir, vintage='2207', fof_vintage=None,
     return df
 
 def load_fred(**kwargs):
-    
+    """Load household Flow of Funds data from FRED.
+
+    .. deprecated::
+        Use :func:`load` with ``dataset='household'`` instead.
+
+    Parameters
+    ----------
+    **kwargs
+        Keyword arguments forwarded to :func:`py_tools.datasets.fred.load`
+        (e.g. ``start``, ``end``, ``reimport``).
+
+    Returns
+    -------
+    pandas.DataFrame
+        Quarterly household balance-sheet data with columns including
+        ``debt``, ``value``, ``income``, ``gross_income``,
+        ``housing_services``, and ``price_rent``, indexed by date.
+    """
+
     print("Deprecated, update to use fof.load()")
     
     var_titles = {
@@ -279,7 +366,24 @@ def load_fred(**kwargs):
     return df
 
 def load_prn(data_dir=default_dir):
-    
+    """Load Flow of Funds household data from legacy PRN files.
+
+    .. deprecated::
+        Use :func:`load` with ``dataset='household'`` instead.
+
+    Parameters
+    ----------
+    data_dir : str, optional
+        Path to the directory containing the FoF PRN files.
+
+    Returns
+    -------
+    pandas.DataFrame
+        Quarterly household balance-sheet data with columns ``debt``,
+        ``value``, ``income``, and ``gross_income``, indexed by date
+        starting from 1951-10-01.
+    """
+
     print("Deprecated, update to use fof.load()")
     
     value_var = 'LM155035015.Q'
@@ -312,8 +416,24 @@ def load_prn(data_dir=default_dir):
     return df
 
 def load_csv(data_dir=default_dir):
-    """Load from CSV files"""
-    
+    """Load Flow of Funds household data from a legacy CSV export.
+
+    .. deprecated::
+        Use :func:`load` with ``dataset='household'`` instead.
+
+    Parameters
+    ----------
+    data_dir : str, optional
+        Path to the directory containing the FoF CSV export file
+        (``csv/fof.csv``).
+
+    Returns
+    -------
+    pandas.DataFrame
+        Quarterly household balance-sheet data with columns ``income``,
+        ``debt``, and ``value``, indexed by date starting from 1951-10-01.
+    """
+
     print("Deprecated, update to use fof.load()")
 
     infile = data_dir + 'csv/fof.csv'

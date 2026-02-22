@@ -11,13 +11,29 @@ DESCRIPTION = "IRS tax statistics dataset loader."
 def load(data_dir=None, **kwargs):
     """Load IRS dataset variants through a single entrypoint.
 
-    Supported variants via `dataset`:
-    - `county` (default)
-    - `zip`
-    - `zip3_from_county`
-    - `zip3_from_zip`
-    - `county_year` (requires `year`)
-    - `zip_year` (requires `year`)
+    Dispatches to the appropriate loader based on the ``dataset`` keyword
+    argument.  Supported variants are ``county`` (default), ``zip``,
+    ``zip3_from_county``, ``zip3_from_zip``, ``county_year`` (requires
+    ``year``), and ``zip_year`` (requires ``year``).
+
+    Parameters
+    ----------
+    data_dir : str, optional
+        Root directory for IRS data files.  When provided it is forwarded
+        to the underlying loader as ``data_dir``.
+    **kwargs
+        Additional keyword arguments passed to the underlying loader.
+        The special key ``dataset`` selects which loader to call.
+
+    Returns
+    -------
+    pandas.DataFrame
+        DataFrame returned by the selected loader.
+
+    Raises
+    ------
+    ValueError
+        If ``dataset`` is not one of the supported variant strings.
     """
     if data_dir is not None:
         kwargs.setdefault('data_dir', data_dir)
@@ -39,7 +55,19 @@ def load(data_dir=None, **kwargs):
 
 
 def double_list(these_items):
+    """Create a flat list of ``['n_item', 'item']`` pairs for each item.
 
+    Parameters
+    ----------
+    these_items : list of str
+        Base names to expand into count/value pairs.
+
+    Returns
+    -------
+    list
+        Flat list alternating ``'n_<item>'`` and ``'<item>'`` for every
+        entry in ``these_items``.
+    """
     names = []
     for item in these_items:
         names += ['n_' + item, item]
@@ -47,7 +75,19 @@ def double_list(these_items):
     return names
 
 def triple_list(these_items):
+    """Create a flat list of ``['n_item', 'agi_item', 'item']`` triples for each item.
 
+    Parameters
+    ----------
+    these_items : list of str
+        Base names to expand into count/AGI/value triples.
+
+    Returns
+    -------
+    list
+        Flat list of ``'n_<item>'``, ``'agi_<item>'``, and ``'<item>'``
+        for every entry in ``these_items``.
+    """
     names = []
     for item in these_items:
         names += ['n_' + item, 'agi_' + item, item]
@@ -55,7 +95,21 @@ def triple_list(these_items):
     return names
 
 def compute_fips(df_t):
+    """Compute a 5-digit FIPS code from ``statefips`` and ``countyfips`` columns.
 
+    Coerces both columns to numeric, drops rows where either is NaN or
+    non-positive, then sets ``fips = countyfips + 1000 * statefips``.
+
+    Parameters
+    ----------
+    df_t : pandas.DataFrame
+        DataFrame containing ``statefips`` and ``countyfips`` columns.
+
+    Returns
+    -------
+    pandas.DataFrame
+        Filtered copy of ``df_t`` with a new integer ``fips`` column.
+    """
     df_t['countyfips'] = pd.to_numeric(df_t['countyfips'], errors='coerce')
     df_t['statefips'] = pd.to_numeric(df_t['statefips'], errors='coerce')
 
@@ -71,7 +125,23 @@ def compute_fips(df_t):
     return df_t
 
 def load_state_county_year(filename, skiprows, target_cols):
-    
+    """Read a single state/county Excel file, trimming to ``target_cols`` columns.
+
+    Parameters
+    ----------
+    filename : str
+        Path to the Excel file to read.
+    skiprows : int
+        Number of rows to skip at the top of the sheet before the header.
+    target_cols : int
+        Maximum number of columns to retain; extra columns are dropped.
+
+    Returns
+    -------
+    pandas.DataFrame
+        Raw DataFrame with integer column indices and at most ``target_cols``
+        columns.
+    """
     # print(filename)
     df_state = pd.read_excel(filename, skiprows=skiprows, header=None)
     
@@ -83,7 +153,27 @@ def load_state_county_year(filename, skiprows, target_cols):
     return df_state
 
 def load_county_year(year, data_dir=default_dir, reimport=False):
+    """Load or import IRS county-level data for a single year, caching as parquet.
 
+    If the parquet cache exists and ``reimport`` is ``False``, the cached
+    file is returned directly.  Otherwise the raw source is imported and
+    written to ``<data_dir>/county/irs_county_<year>.parquet``.
+
+    Parameters
+    ----------
+    year : int
+        Tax year to load.
+    data_dir : str, optional
+        Root directory for IRS data files.
+    reimport : bool, optional
+        When ``True``, re-import from source even if the parquet cache
+        already exists.
+
+    Returns
+    -------
+    pandas.DataFrame
+        County-level IRS data for the requested year.
+    """
     parquet_file = data_dir + 'county/irs_county_{:d}.parquet'.format(year)
     if reimport or not os.path.exists(parquet_file):
         
@@ -116,7 +206,31 @@ def load_county_year(year, data_dir=default_dir, reimport=False):
     return df_t
 
 def import_geo_year_from_2011(year, geo, data_dir=default_dir):
+    """Import IRS geographic data for years >= 2011 from CSV source files.
 
+    Reads the raw CSV, renames columns to a standardised schema, filters to
+    rows with at least one return, groups by geography, and attaches a
+    ``date`` column.
+
+    Parameters
+    ----------
+    year : int
+        Tax year to import (should be >= 2011).
+    geo : str
+        Geographic level to load; ``'county'`` or ``'zip'``.
+    data_dir : str, optional
+        Root directory for IRS data files.
+
+    Returns
+    -------
+    pandas.DataFrame
+        Aggregated IRS data for the requested year and geography.
+
+    Raises
+    ------
+    Exception
+        If ``geo`` is not ``'county'`` or ``'zip'``.
+    """
     if geo == 'county':
         file_stub = 'incyallagi'
         group_var = 'fips'
@@ -203,7 +317,21 @@ def import_geo_year_from_2011(year, geo, data_dir=default_dir):
     return df_t
 
 def import_county_year_2010(year, data_dir=default_dir):
+    """Import IRS county-level data for tax year 2010 from an Excel file.
 
+    Parameters
+    ----------
+    year : int
+        Tax year; expected to be ``2010``.
+    data_dir : str, optional
+        Root directory for IRS data files.
+
+    Returns
+    -------
+    pandas.DataFrame
+        County-level IRS data for 2010 with a ``fips`` column and a
+        ``date`` column set to ``'2010-01-01'``.
+    """
     year_dir = data_dir + 'county/' + str(year) + 'CountyIncome/'
 
     names = [
@@ -233,7 +361,25 @@ def import_county_year_2010(year, data_dir=default_dir):
     return df_t
 
 def import_county_year_to_2009(year, data_dir=default_dir):
+    """Import IRS county-level data for tax years <= 2009 from Excel files.
 
+    Concatenates all per-state Excel files found in the year's directory,
+    assigns column names, computes the FIPS code, and attaches a ``date``
+    column.
+
+    Parameters
+    ----------
+    year : int
+        Tax year to import (should be <= 2009).
+    data_dir : str, optional
+        Root directory for IRS data files.
+
+    Returns
+    -------
+    pandas.DataFrame
+        County-level IRS data for the requested year with a ``fips`` column
+        and a ``date`` column.
+    """
     year_dir = data_dir + 'county/' + str(year) + 'CountyIncome/'
 
     names = ['DROP', 'statefips', 'countyfips', 'county_name', 'n_returns',
@@ -266,7 +412,29 @@ def import_county_year_to_2009(year, data_dir=default_dir):
     return df_t
 
 def load_county(data_dir=default_dir, reimport=False, reimport_year=False):
+    """Load all years (1989-2016) of IRS county data, concatenating and caching as parquet.
 
+    If the parquet cache exists and ``reimport`` is ``False``, the cached
+    file is returned directly.  Otherwise all per-year files are loaded (or
+    re-imported when ``reimport_year`` is ``True``) and written to
+    ``<data_dir>/county/irs_county.parquet``.
+
+    Parameters
+    ----------
+    data_dir : str, optional
+        Root directory for IRS data files.
+    reimport : bool, optional
+        When ``True``, rebuild the combined dataset from per-year files even
+        if the combined parquet cache already exists.
+    reimport_year : bool, optional
+        When ``True``, re-import each individual year from its raw source
+        even if the per-year parquet cache already exists.
+
+    Returns
+    -------
+    pandas.DataFrame
+        Panel of county-level IRS data indexed by ``(fips, date)``.
+    """
     parquet_file = data_dir + 'county/irs_county.parquet'
     if reimport or not os.path.exists(parquet_file):
 
@@ -282,7 +450,22 @@ def load_county(data_dir=default_dir, reimport=False, reimport_year=False):
     return df
 
 def load_state_zip_year(filename, year):
+    """Read one state ZIP-code Excel file and filter to valid 5-digit ZIP rows.
 
+    Parameters
+    ----------
+    filename : str
+        Path to the state-level ZIP Excel file.
+    year : int
+        Tax year; controls the number of header rows to skip and the column
+        layout used for filtering.
+
+    Returns
+    -------
+    pandas.DataFrame
+        Rows corresponding to valid 5-digit ZIP codes with integer column
+        indices.
+    """
     print(filename)
     if year in [1998, 2001, 2002]:
        skiprows = 8
@@ -334,7 +517,30 @@ def load_state_zip_year(filename, year):
     return df
 
 def import_zip_year_to_2010(year, data_dir=default_dir):
+    """Import IRS ZIP-code data for tax years <= 2010 from Excel files.
 
+    Concatenates all per-state Excel files for the given year, assigns
+    column names appropriate for that year's layout, coerces values to
+    numeric, and attaches a ``date`` column.
+
+    Parameters
+    ----------
+    year : int
+        Tax year to import (should be <= 2010).
+    data_dir : str, optional
+        Root directory for IRS data files.
+
+    Returns
+    -------
+    pandas.DataFrame
+        ZIP-level IRS data for the requested year.
+
+    Raises
+    ------
+    Exception
+        If ``year`` is not one of the recognised years with a defined column
+        layout.
+    """
     year_dir = data_dir + 'zip/' + str(year)
     if year in [2004, 2005, 2006]:
         year_dir += 'ZipCode/'
@@ -435,7 +641,33 @@ def import_zip_year_to_2010(year, data_dir=default_dir):
     return df_t
 
 def load_zip_year(year, data_dir=default_dir, reimport=False):
+    """Load or import IRS ZIP-code data for a single year, caching as parquet.
 
+    If the parquet cache exists and ``reimport`` is ``False``, the cached
+    file is returned directly.  Otherwise the raw source is imported,
+    filtered to valid ZIP codes (501–99950), deduplicated by grouping, and
+    written to ``<data_dir>/zip/irs_zip_<year>.parquet``.
+
+    Parameters
+    ----------
+    year : int
+        Tax year to load (must be <= 2016).
+    data_dir : str, optional
+        Root directory for IRS data files.
+    reimport : bool, optional
+        When ``True``, re-import from source even if the parquet cache
+        already exists.
+
+    Returns
+    -------
+    pandas.DataFrame
+        ZIP-level IRS data for the requested year.
+
+    Raises
+    ------
+    Exception
+        If ``year`` is greater than 2016.
+    """
     parquet_file = data_dir + 'zip/irs_zip_{:d}.parquet'.format(year)
     if reimport or not os.path.exists(parquet_file):
         
@@ -475,7 +707,30 @@ def load_zip_year(year, data_dir=default_dir, reimport=False):
     return df_t
 
 def load_zip(data_dir=default_dir, reimport=False, reimport_year=False):
+    """Load all available years of IRS ZIP-code data, concatenating and caching as parquet.
 
+    Available years are 1998, 2001, 2002, and 2004-2016.  If the parquet
+    cache exists and ``reimport`` is ``False``, the cached file is returned
+    directly.  Otherwise all per-year files are loaded (or re-imported when
+    ``reimport_year`` is ``True``) and written to
+    ``<data_dir>/zip/irs_zip.parquet``.
+
+    Parameters
+    ----------
+    data_dir : str, optional
+        Root directory for IRS data files.
+    reimport : bool, optional
+        When ``True``, rebuild the combined dataset from per-year files even
+        if the combined parquet cache already exists.
+    reimport_year : bool, optional
+        When ``True``, re-import each individual year from its raw source
+        even if the per-year parquet cache already exists.
+
+    Returns
+    -------
+    pandas.DataFrame
+        Panel of ZIP-level IRS data indexed by ``(zip, date)``.
+    """
     zip_years = [1998, 2001, 2002] + list(range(2004, 2017))
 
     parquet_file = data_dir + 'zip/irs_zip.parquet'
@@ -494,6 +749,32 @@ def load_zip(data_dir=default_dir, reimport=False, reimport_year=False):
 
 def load_zip3_from_county(data_dir=default_dir, reimport=False, county_kwargs={},
                           crosswalk_kwargs={}):
+    """Aggregate IRS county data to 3-digit ZIP level using a county-to-ZIP crosswalk.
+
+    Merges county-level IRS data with a county-to-ZIP3 crosswalk, scales
+    each variable by the crosswalk allocation factor, and sums within each
+    ``(zip3, date)`` group.  The result is cached as
+    ``<data_dir>/zip/irs_zip3_from_county.parquet``.
+
+    Parameters
+    ----------
+    data_dir : str, optional
+        Root directory for IRS data files.
+    reimport : bool, optional
+        When ``True``, rebuild the aggregated dataset even if the parquet
+        cache already exists.
+    county_kwargs : dict, optional
+        Extra keyword arguments forwarded to :func:`load_county`.
+    crosswalk_kwargs : dict, optional
+        Extra keyword arguments forwarded to
+        ``crosswalk.county_to_zip``.
+
+    Returns
+    -------
+    pandas.DataFrame
+        IRS data aggregated to the 3-digit ZIP level, indexed by
+        ``(zip3, date)``.
+    """
     
     parquet_file = data_dir + 'zip/irs_zip3_from_county.parquet'
     if reimport or not os.path.exists(parquet_file):
@@ -523,6 +804,28 @@ def load_zip3_from_county(data_dir=default_dir, reimport=False, county_kwargs={}
     return df
 
 def load_zip3_from_zip(data_dir=default_dir, reimport=False, zip_kwargs={}):
+    """Aggregate IRS ZIP-code data to 3-digit ZIP level.
+
+    Loads full ZIP-level data via :func:`load_zip`, derives the 3-digit ZIP
+    prefix, and sums within each ``(zip3, date)`` group.  The result is
+    cached as ``<data_dir>/zip/irs_zip3_from_zip.parquet``.
+
+    Parameters
+    ----------
+    data_dir : str, optional
+        Root directory for IRS data files.
+    reimport : bool, optional
+        When ``True``, rebuild the aggregated dataset even if the parquet
+        cache already exists.
+    zip_kwargs : dict, optional
+        Extra keyword arguments forwarded to :func:`load_zip`.
+
+    Returns
+    -------
+    pandas.DataFrame
+        IRS data aggregated to the 3-digit ZIP level, indexed by
+        ``(zip3, date)``.
+    """
     
     parquet_file = data_dir + 'zip/irs_zip3_from_zip.parquet'
     if reimport or not os.path.exists(parquet_file):

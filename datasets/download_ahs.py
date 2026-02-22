@@ -5,6 +5,21 @@ import zipfile
 from py_tools.in_out import core as in_out
 
 def download_if_exists(url, filename):
+    """Attempt to download a URL to a local file.
+
+    Parameters
+    ----------
+    url : str
+        URL of the resource to download.
+    filename : str
+        Local file path where the downloaded content will be saved.
+
+    Returns
+    -------
+    bool
+        ``True`` if the download succeeded, ``False`` if an
+        :class:`urllib.error.HTTPError` was raised.
+    """
 
     # status = urllib.request.urlopen(url).getcode()
     # if status == 200:

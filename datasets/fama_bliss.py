@@ -7,6 +7,24 @@ default_dir = config.base_dir() + 'fama_bliss/'
 DATASET_NAME = "fama_bliss"
 DESCRIPTION = "Fama-Bliss bond yield dataset loader."
 def load(data_dir=default_dir):
+    """Load Fama-Bliss bond price data and compute log prices and yields.
+
+    Reads ``fbdata.csv`` from *data_dir*, pivots by maturity term (1–5 years),
+    resamples to monthly frequency, and computes log prices and continuously
+    compounded yields for each maturity.
+
+    Parameters
+    ----------
+    data_dir : str, optional
+        Directory containing the ``fbdata.csv`` file.
+
+    Returns
+    -------
+    pandas.DataFrame
+        Monthly DataFrame with columns ``P1``–``P5`` (raw prices),
+        ``p1``–``p5`` (log prices), and ``y1``–``y5`` (yields), indexed
+        by date.
+    """
 
     infile = data_dir + 'fbdata.csv'
     df = pd.read_csv(infile)

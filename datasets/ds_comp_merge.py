@@ -39,7 +39,22 @@ from time import time
 ################################################################################
 
 def read_single_chunk(file, keep_cols=None, chunksize=10000):
-    
+    """Read only the first chunk from a SAS file.
+
+    Parameters
+    ----------
+    file : str
+        Path to the SAS file to read.
+    keep_cols : list or None, optional
+        Columns to retain from the chunk. If None, all columns are kept.
+    chunksize : int, optional
+        Number of rows per chunk. Default is 10000.
+
+    Returns
+    -------
+    pandas.DataFrame
+        The first chunk of the SAS file, restricted to ``keep_cols`` if provided.
+    """
     print("NOTE: NOT LOADING FULL FILE")
     reader = pd.read_sas(file, chunksize=chunksize)
     for df in reader:
@@ -51,20 +66,71 @@ def read_single_chunk(file, keep_cols=None, chunksize=10000):
     return df
 
 def read_by_chunk(file, keep_cols, chunksize=10000):
-    
+    """Read all chunks from a SAS file and concatenate, filtering to keep_cols.
+
+    Parameters
+    ----------
+    file : str
+        Path to the SAS file to read.
+    keep_cols : list
+        Columns to retain from each chunk.
+    chunksize : int, optional
+        Number of rows per chunk. Default is 10000.
+
+    Returns
+    -------
+    pandas.DataFrame
+        Concatenated DataFrame of all chunks restricted to ``keep_cols``.
+    """
     reader = pd.read_sas(file, chunksize=chunksize)
     return pd.concat([chunk[pd.Index.intersection(chunk.columns, keep_cols)] 
                             for chunk in reader])
     
 def keep_ds_companies_only(df, companies, keep_cols):
+    """Clean df, filter rows to companies, and keep only keep_cols columns.
 
+    Parameters
+    ----------
+    df : pandas.DataFrame
+        Input DataFrame to filter.
+    companies : array-like
+        Company IDs (gvkey values) to retain.
+    keep_cols : list
+        Column names to keep after filtering.
+
+    Returns
+    -------
+    pandas.DataFrame
+        Filtered DataFrame containing only rows matching ``companies`` and
+        columns intersecting ``keep_cols``.
+    """
     df = clean(df)
     cols = pd.Index.intersection(df.columns, keep_cols)
     ix = df['gvkey'].isin(companies)
     return df.loc[ix, cols].copy()
     
 def read_ds_companies_only(file, companies, keep_cols, filetype,chunksize=10000):
-    
+    """Read a file in chunks, filtering to DealScan companies.
+
+    Parameters
+    ----------
+    file : str
+        Path to the file to read.
+    companies : array-like
+        Company IDs (gvkey values) to retain.
+    keep_cols : list
+        Column names to keep after filtering.
+    filetype : str
+        File format; either ``'csv'`` or ``'sas'``.
+    chunksize : int, optional
+        Number of rows per chunk. Default is 10000.
+
+    Returns
+    -------
+    pandas.DataFrame or None
+        Concatenated and filtered DataFrame, or ``None`` if ``filetype`` is
+        not recognised.
+    """
     if filetype=='csv':
         reader = pd.read_csv(file, chunksize=chunksize)
         return pd.concat([keep_ds_companies_only(chunk, companies, keep_cols)
@@ -78,7 +144,23 @@ def read_ds_companies_only(file, companies, keep_cols, filetype,chunksize=10000)
         return
     
 def clean(df):
-    
+    """Convert ID columns to int64 and drop the comment column if present.
+
+    Converts ``PackageID``, ``BorrowerCompanyID``, and ``gvkey`` columns to
+    ``numpy.int64`` when they exist, and drops the ``comment`` column if
+    present.
+
+    Parameters
+    ----------
+    df : pandas.DataFrame
+        DataFrame to clean in place.
+
+    Returns
+    -------
+    pandas.DataFrame
+        The cleaned DataFrame with updated dtypes and the comment column
+        removed.
+    """
     for var in ['PackageID', 'BorrowerCompanyID', 'gvkey']:
         if var in df:
             df[var] = df[var].astype(np.int64)
@@ -91,6 +173,26 @@ def clean(df):
 
 
 def ratio(data, numerator, denominator, name):
+    """Compute a ratio and store it in data[name], handling zero denominators.
+
+    Where ``denominator`` is zero, ``data[name]`` is set to 666. Elsewhere,
+    ``data[name]`` is set to ``numerator / denominator``.
+
+    Parameters
+    ----------
+    data : pandas.DataFrame
+        DataFrame in which the result column is stored.
+    numerator : pandas.Series
+        Series used as the numerator of the ratio.
+    denominator : pandas.Series
+        Series used as the denominator of the ratio.
+    name : str
+        Column name under which the result is stored in ``data``.
+
+    Returns
+    -------
+    None
+    """
     #Find where denomintor is zero
     ix_denom= denominator==0
     data.loc[ix_denom, name] = 666
@@ -101,6 +203,17 @@ def ratio(data, numerator, denominator, name):
 
 
 def toc(start):
+    """Print elapsed time since start.
+
+    Parameters
+    ----------
+    start : float
+        Start time as returned by ``time.time()``.
+
+    Returns
+    -------
+    None
+    """
     end = time()
     print("Time elapsed: {:3.2g}s".format(end - start))
     return None
@@ -108,6 +221,25 @@ def toc(start):
 
 
 def annualize(varlist, file, group):
+    """Create annualized variables (4× quarterly) as new columns in file.
+
+    For each variable in ``varlist``, a new column ``<var>_ann`` is added to
+    ``file`` containing four times the current-period value sourced from
+    ``group``.
+
+    Parameters
+    ----------
+    varlist : list of str
+        Names of the quarterly variables to annualize.
+    file : pandas.DataFrame
+        DataFrame in which the new annualized columns are stored.
+    group : pandas GroupBy
+        GroupBy object constructed from ``file``, used to apply the shift.
+
+    Returns
+    -------
+    None
+    """
     for var in varlist:
         file[var+'_ann']=4*group[var].shift(0)
     return 
@@ -115,6 +247,44 @@ def annualize(varlist, file, group):
 
 def merge_compustat(keep_cols, annualize_vars, file, data_dir, companies, 
                     ds_linked, covenant_list, datetime, reload_compustat=False):
+    """Load and merge Compustat quarterly/annual data with DealScan covenant data.
+
+    Reads Compustat data (quarterly or annual) from disk—using a cached
+    Feather file when available—cleans it, creates lagged and annualized
+    variables, then merges it with ``ds_linked`` to produce a company-date
+    level dataset aligned with covenant observations.
+
+    Parameters
+    ----------
+    keep_cols : list
+        Column names to retain from the Compustat source file.
+    annualize_vars : list
+        Variable names to pass to :func:`annualize` for quarterly annualization.
+    file : str
+        Compustat frequency to load; either ``'quarterly'`` or ``'annual'``.
+    data_dir : str
+        Base directory containing Compustat and DealScan data files.
+    companies : array-like
+        gvkey values identifying the DealScan companies to retain.
+    ds_linked : pandas.DataFrame
+        DealScan data already linked to Compustat gvkeys, including
+        ``MinStartDate`` and ``MaxEndDate`` columns.
+    covenant_list : array-like
+        Covenant names whose threshold and count columns are present in
+        ``ds_linked``.
+    datetime : int
+        If ``1``, convert the ``datadate`` column from SAS date integers to
+        ``pandas.Timestamp``.
+    reload_compustat : bool, optional
+        If ``True``, re-read the source files and overwrite the cached Feather
+        file. Default is ``False``.
+
+    Returns
+    -------
+    pandas.DataFrame or None
+        Merged Compustat–DealScan DataFrame, or ``None`` if ``file`` is not
+        ``'quarterly'`` or ``'annual'``.
+    """
     chunksize = 10000
     print("Loading compustat data, {} observations at a time...".format(chunksize))
     start = time()
@@ -227,6 +397,25 @@ def merge_compustat(keep_cols, annualize_vars, file, data_dir, companies,
     return (comp_ds)
 
 def distance_to_covenant(covname, data):
+    """Compute signed distance to a covenant threshold.
+
+    For ``Min.*`` covenants, distance is ``compustat_value - threshold``
+    (positive means compliant). For ``Max.*`` covenants, distance is
+    ``threshold - compustat_value`` (positive means compliant). The result is
+    stored in ``data[covname + ' distance']``.
+
+    Parameters
+    ----------
+    covname : str
+        Covenant name, expected to start with ``'Min'`` or ``'Max'``.
+    data : pandas.DataFrame
+        DataFrame containing ``<covname>`` and ``<covname>_compustat`` columns.
+        The result column is added in place.
+
+    Returns
+    -------
+    None
+    """
     if covname.startswith("Min"):
         data[covname+' distance']=data[covname+'_compustat']-data[covname]
     elif covname.startswith("Max"):
@@ -234,6 +423,26 @@ def distance_to_covenant(covname, data):
     return
 
 def percent_violations(group, cov):
+    """Compute the fraction of periods violating a covenant within a group.
+
+    A period is considered a violation when ``<cov> distance`` is strictly
+    negative.
+
+    Parameters
+    ----------
+    group : pandas.DataFrame
+        A single group from a GroupBy operation, containing a
+        ``<cov> distance`` column.
+    cov : str
+        Covenant name used to construct the distance column name
+        (``cov + ' distance'``).
+
+    Returns
+    -------
+    float or numpy.nan
+        Fraction of periods with a violation, or ``numpy.nan`` if the group
+        contains no observations.
+    """
     nv=group[cov+' distance']>=0
     v=group[cov+' distance']<0
     if (sum(v)+sum(nv))>0:
@@ -244,6 +453,26 @@ def percent_violations(group, cov):
 
 #create new dataset which drops all companies that violate a covenant in the first year of that covenant
 def filter_companies(g, covenants):
+    """Return True if a company never violates any covenant in its first year.
+
+    Inspects the ``'init distance <cov>'`` column for each covenant; a value
+    below zero indicates a violation. Returns ``True`` only when no violations
+    are found across all covenants.
+
+    Parameters
+    ----------
+    g : pandas.DataFrame
+        A single group from a GroupBy operation, containing
+        ``'init distance <cov>'`` columns for each covenant.
+    covenants : list of str
+        Covenant names to check.
+
+    Returns
+    -------
+    bool
+        ``True`` if the company has zero violations in the first year across
+        all covenants; ``False`` otherwise.
+    """
     max_violations=0
     for cov in covenants:
         if g['init distance '+cov].min()<0:
@@ -251,6 +480,28 @@ def filter_companies(g, covenants):
     return (max_violations==0)
 
 def clean_companies(covenants, data):
+    """Compute covenant distances and remove companies violating any covenant in year one.
+
+    For each covenant, calls :func:`distance_to_covenant` to populate the
+    distance column, identifies the initial covenant observation per company,
+    computes the initial-year distance ratio, then uses
+    :func:`filter_companies` to drop companies that violated any covenant
+    during their first year.
+
+    Parameters
+    ----------
+    covenants : list of str
+        Covenant names to process and check for first-year violations.
+    data : pandas.DataFrame
+        DataFrame containing covenant threshold and Compustat value columns
+        for each covenant in ``covenants``.
+
+    Returns
+    -------
+    pandas.DataFrame
+        Subset of ``data`` retaining only companies that pass the first-year
+        violation filter.
+    """
     #compute distance to covenant measure where distance<1 is a violation. 
     for cov in covenants:
         distance_to_covenant(cov, data)
@@ -281,6 +532,44 @@ def clean_companies(covenants, data):
 
 
 def final_merge(data_dir, datetime, avars, qvars, annualizevars, interp_list, changevars, reload_compustat=False):
+    """Run the full pipeline merging DealScan covenant data with Compustat data.
+
+    Loads the DealScan financial covenant file, constructs package-level
+    covenant summaries, merges in the DealScan–Compustat linking table, then
+    calls :func:`merge_compustat` for both quarterly and annual Compustat
+    frequencies. Annual data are interpolated to quarterly frequency before
+    being merged with the quarterly dataset. Covenant distance measures and
+    change variables are computed, and companies violating covenants in their
+    first year are removed via :func:`clean_companies`.
+
+    Parameters
+    ----------
+    data_dir : str
+        Base directory containing DealScan, Compustat, and linking-table files.
+    datetime : int
+        If ``1``, convert ``datadate`` columns from SAS date integers to
+        ``pandas.Timestamp``.
+    avars : list
+        Column names to retain from the annual Compustat file.
+    qvars : list
+        Column names to retain from the quarterly Compustat file.
+    annualizevars : list
+        Quarterly variable names to annualize (passed to :func:`annualize`).
+    interp_list : list
+        Annual variable names to linearly interpolate to quarterly frequency.
+    changevars : list
+        Variable names for which first-difference (change) columns are created.
+    reload_compustat : bool, optional
+        If ``True``, re-read Compustat source files and overwrite cached
+        Feather files. Default is ``False``.
+
+    Returns
+    -------
+    tuple of (pandas.DataFrame, pandas.DataFrame)
+        ``(final_comp_ds_q, comp_ds_q)`` where ``final_comp_ds_q`` is the
+        cleaned dataset with first-year violators removed and ``comp_ds_q``
+        is the full merged quarterly dataset before that filter is applied.
+    """
     
     # Read in file
     print("Loading dealscan data...")

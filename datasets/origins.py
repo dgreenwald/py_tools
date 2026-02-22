@@ -20,6 +20,32 @@ defaults = {
 DATASET_NAME = "origins"
 DESCRIPTION = "Legacy origins/source datasets loader (stock wealth and predictability inputs)."
 def load(dataset, master_dirs={}, **kwargs):
+    """Load a named origins dataset.
+
+    Parameters
+    ----------
+    dataset : str
+        Name of the dataset to load. Supported values include
+        ``'stockw'``, ``'crsp'``, ``'crsp_q'``, ``'cay'``,
+        ``'cay_current'``, ``'cay_source'``, ``'bls_ls'``,
+        ``'fernald'``, ``'tb3ms'``, and ``'uc'``.
+    master_dirs : dict, optional
+        Directory overrides keyed by sub-dataset name (e.g., ``'gll'``,
+        ``'gll_pred'``, ``'cay_source'``).
+    **kwargs
+        Additional keyword arguments forwarded to dataset-specific
+        loading logic (e.g., ``stockw_vintage``, ``cay_source_vintage``).
+
+    Returns
+    -------
+    pandas.DataFrame
+        Loaded dataset with a ``DatetimeIndex``.
+
+    Raises
+    ------
+    Exception
+        When ``dataset='cay_source'`` (directory update required).
+    """
 
     dirs = master_dirs.copy()
     for var, val in defaults.items():

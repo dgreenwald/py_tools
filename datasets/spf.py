@@ -9,7 +9,29 @@ idx = pd.IndexSlice
 DATASET_NAME = "spf"
 DESCRIPTION = "Survey of Professional Forecasters (SPF) dataset loader."
 def load(table, data_dir=default_dir+'/spf/', reimport=False):
-    
+    """Load SPF mean forecast level for a single variable from CSV.
+
+    Reads the Philadelphia Fed SPF mean-level CSV file for the specified
+    variable, constructs a quarterly date index, and caches the result as
+    a pickle file.
+
+    Parameters
+    ----------
+    table : str
+        Variable name to load (e.g. ``'RGDP'``). Used to locate the file
+        ``Mean_<TABLE>_Level.csv`` and to select the output column.
+    data_dir : str, optional
+        Path to the directory containing the SPF CSV files.
+    reimport : bool, optional
+        If ``True``, re-read from the source CSV even if a cached pickle
+        exists.
+
+    Returns
+    -------
+    pandas.DataFrame
+        Quarterly date-indexed DataFrame with a single column named after
+        ``table`` (uppercased).
+    """
     filebase = data_dir + 'Mean_' + table.upper() + '_Level'
     pkl_file = filebase + '.pkl'
     
@@ -26,7 +48,32 @@ def load(table, data_dir=default_dir+'/spf/', reimport=False):
     return df
 
 def load_master(table, data_dir=default_dir + '/spf/', reimport=False, growth=False):
-    
+    """Load SPF forecasts for a table from the master Excel file.
+
+    Reads the specified sheet from the SPF master mean-level or mean-growth
+    Excel workbook, constructs a quarterly date index, and caches the result
+    as a pickle file.
+
+    Parameters
+    ----------
+    table : str
+        Sheet name in the master Excel file corresponding to the variable
+        or forecast horizon to load.
+    data_dir : str, optional
+        Path to the directory containing the SPF master Excel file.
+    reimport : bool, optional
+        If ``True``, re-read from the source Excel file even if a cached
+        pickle exists.
+    growth : bool, optional
+        If ``True``, read from ``meanGrowth.xlsx``; if ``False`` (default),
+        read from ``meanLevel.xlsx``.
+
+    Returns
+    -------
+    pandas.DataFrame
+        Quarterly date-indexed DataFrame of SPF forecast columns for the
+        requested table.
+    """
     if growth:
         base_name = 'meanGrowth'
     else:

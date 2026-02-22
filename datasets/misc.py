@@ -10,9 +10,34 @@ from . import config
 default_dir = config.base_dir()
 DATASET_NAME = "misc"
 DESCRIPTION = "Miscellaneous one-off research datasets loader."
-def load(dataset, user='DAN', master_dirs={}, reimport=False, 
+def load(dataset, user='DAN', master_dirs={}, reimport=False,
          save_pickle=True, **kwargs):
-    
+    """Load a one-off miscellaneous dataset from pickle cache.
+
+    Returns a cached pickle when available; otherwise calls
+    :func:`load_from_source` to read the raw file and saves the result to
+    disk.
+
+    Parameters
+    ----------
+    dataset : str
+        Name of the one-off dataset to load.
+    user : str, optional
+        User identifier (currently unused, reserved for multi-user setups).
+    master_dirs : dict, optional
+        Override directory paths.  Recognised key is ``'base'``.
+    reimport : bool, optional
+        If ``True``, ignore any existing pickle and re-read from source.
+    save_pickle : bool, optional
+        If ``True``, save the freshly loaded DataFrame to a pickle file.
+    **kwargs
+        Additional keyword arguments forwarded to :func:`load_from_source`.
+
+    Returns
+    -------
+    pandas.DataFrame
+        DataFrame containing the requested miscellaneous dataset.
+    """
     default_dir = config.base_dir()
     dirs = master_dirs.copy()
     if 'base' not in dirs:
@@ -32,7 +57,40 @@ def load(dataset, user='DAN', master_dirs={}, reimport=False,
     return df
 
 def load_from_source(dataset, data_dir, **kwargs):
-    """Load data from one-off file"""
+    """Load data from a one-off raw file.
+
+    Dispatches to the appropriate file-reading logic based on ``dataset`` and
+    returns the resulting DataFrame.
+
+    Parameters
+    ----------
+    dataset : str
+        Name of the one-off dataset.  Supported values include
+        ``'bls_labor_share'``, ``'canada_fof'``,
+        ``'canada_inflation_expectations'``, ``'canada_rates'``,
+        ``'cieslak'``, ``'cleveland_fed'``, ``'crsp_bianchi'``,
+        ``'dlm_price_rent'``, ``'direct_investment_income'``, ``'fhfa'``,
+        ``'gertler_karadi'``, ``'gsw'``, ``'gz'``, ``'fernald'``,
+        ``'martin_svix'``, ``'martin_epbound'``, ``'ns_mp_shocks'``,
+        ``'nber_dates'``, ``'price_rent'``, ``'ssa_life_expectancy'``,
+        ``'shiller'``, ``'state_codes'``, ``'vrp'``, and ``'welch_goyal'``.
+    data_dir : str
+        Path to the directory containing the raw source file(s).
+    **kwargs
+        Additional keyword arguments used by specific loaders (e.g.
+        ``sa`` for ``'direct_investment_income'``, ``frequency`` for
+        ``'welch_goyal'``).
+
+    Returns
+    -------
+    pandas.DataFrame
+        DataFrame containing the requested dataset.
+
+    Raises
+    ------
+    Exception
+        If ``dataset`` is not a recognised dataset name.
+    """
 
     if dataset == 'bls_labor_share':
 

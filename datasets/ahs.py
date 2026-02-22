@@ -7,7 +7,37 @@ DATASET_NAME = "ahs"
 DESCRIPTION = "American Housing Survey (AHS) dataset loader."
 def load(year, reimport=False, raw_dir='/data/ahs/', data_dir=default_dir,
          **kwargs):
+    """Load American Housing Survey (AHS) microdata for a given survey year.
 
+    Reads household and mortgage CSV files from ``raw_dir``, merges them on
+    the ``control`` identifier, retains a standard set of mortgage/income
+    variables, and caches the result as a pickle file under ``data_dir``.
+    Subsequent calls with the same ``year`` return the cached pickle unless
+    ``reimport=True`` is specified.
+
+    Parameters
+    ----------
+    year : int
+        AHS survey year (e.g. ``1985``, ``2013``).
+    reimport : bool, optional
+        If ``True``, re-read and re-process the raw CSV files even when a
+        cached pickle already exists.  Default is ``False``.
+    raw_dir : str, optional
+        Root directory containing year-specific AHS subdirectories.
+        Default is ``'/data/ahs/'``.
+    data_dir : str, optional
+        Directory used to read/write the processed pickle cache.
+        Default is the package-level ``default_dir``.
+    **kwargs
+        Additional keyword arguments forwarded to :func:`pandas.read_csv`
+        when reading the raw CSV files.
+
+    Returns
+    -------
+    pandas.DataFrame
+        DataFrame containing the merged household (and, where applicable,
+        mortgage and weight) records with a standard subset of AHS variables.
+    """
     year_str = str(year)
     year_dir = raw_dir + year_str + '/'
     short_year = year_str[-2:]

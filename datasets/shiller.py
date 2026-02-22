@@ -15,7 +15,34 @@ default_dir = config.base_dir()
 DATASET_NAME = "shiller"
 DESCRIPTION = "Shiller long-run asset price and valuation dataset loader."
 def load(vintage='2310', user='DAN', master_dirs={}, freq='Q'):
-    
+    """Load Shiller long-run equity price/yield data from Excel.
+
+    Reads the Shiller IE data Excel file for the specified vintage, selects
+    relevant columns, and optionally resamples from monthly to quarterly
+    frequency.
+
+    Parameters
+    ----------
+    vintage : str, optional
+        Date code identifying the data vintage (e.g. ``'2310'`` for October
+        2023).
+    user : str, optional
+        User identifier used for directory resolution (currently unused
+        internally but reserved for future multi-user path logic).
+    master_dirs : dict, optional
+        Override directory paths. If ``'base'`` key is absent, the default
+        base directory from config is used.
+    freq : str, optional
+        Output frequency. ``'M'`` returns monthly data; ``'Q'`` (default)
+        resamples to quarterly frequency, summing dividends/earnings and
+        taking period-end values for prices/CAPE.
+
+    Returns
+    -------
+    pandas.DataFrame
+        Time-indexed DataFrame of Shiller equity price, dividend, earnings,
+        CPI, GS10, and CAPE series at the requested frequency.
+    """
     default_dir = config.base_dir()
     dirs = master_dirs.copy()
     if 'base' not in dirs:

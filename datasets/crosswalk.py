@@ -7,7 +7,35 @@ default_dir = config.base_dir() + 'crosswalk/'
 data_dir = default_dir
 
 def county_to_zip(year=2000, zip_level=5, data_dir=default_dir, reimport=False):
+    """Build a county-to-ZIP crosswalk with population weights.
 
+    Reads a raw CSV crosswalk for the given year, optionally truncates ZIP
+    codes to fewer digits, and computes within-county population-share
+    weights so that each county's weights sum to 1.  Results are cached as
+    a pickle file and reused on subsequent calls unless ``reimport`` is
+    ``True``.
+
+    Parameters
+    ----------
+    year : int, optional
+        Reference year of the crosswalk file.  Defaults to 2000.
+    zip_level : int, optional
+        Number of ZIP-code digits to retain (1–5).  When less than 5 the
+        ZIP codes are truncated and population weights are re-aggregated.
+        Defaults to 5.
+    data_dir : str, optional
+        Directory containing crosswalk CSV and pickle files.  Defaults to
+        the package-level ``default_dir``.
+    reimport : bool, optional
+        If ``True``, re-read the raw CSV even if a cached pickle exists.
+        Defaults to ``False``.
+
+    Returns
+    -------
+    pandas.DataFrame
+        Crosswalk with columns ``fips``, ``zip`` (or ``zip<N>`` for
+        truncated codes), and ``factor`` (population-share weight).
+    """
     assert zip_level in [1, 2, 3, 4, 5]
 
     pkl_file = data_dir + 'county_to_zip{0:d}_{1:d}.pkl'.format(zip_level, year)
@@ -40,7 +68,29 @@ def county_to_zip(year=2000, zip_level=5, data_dir=default_dir, reimport=False):
     return df
 
 def county_to_zip_hud(data_dir=default_dir, reimport=True):
-    
+    """Load the HUD COUNTY_ZIP Excel file as a county-to-ZIP crosswalk.
+
+    Reads ``COUNTY_ZIP_122021.xlsx`` from ``data_dir``, caches the result
+    as a Parquet file for faster subsequent loads, and returns the
+    DataFrame.  When ``reimport`` is ``True`` (the default) the Excel file
+    is always re-read; otherwise the cached Parquet file is used if it
+    exists.
+
+    Parameters
+    ----------
+    data_dir : str, optional
+        Directory containing the HUD Excel and Parquet files.  Defaults to
+        the package-level ``default_dir``.
+    reimport : bool, optional
+        If ``True``, re-read the raw Excel file even if a cached Parquet
+        file exists.  Defaults to ``True``.
+
+    Returns
+    -------
+    pandas.DataFrame
+        HUD county-to-ZIP crosswalk with all columns from the source Excel
+        file.
+    """
     parquet_file = data_dir + 'county_to_zip_hud.parquet'
     if reimport or (not os.path.exists(parquet_file)):
         df = pd.read_excel(data_dir + 'COUNTY_ZIP_122021.xlsx')
@@ -51,7 +101,29 @@ def county_to_zip_hud(data_dir=default_dir, reimport=True):
     return df
 
 def zip_to_county_hud(data_dir=default_dir, reimport=True):
-    
+    """Load the HUD ZIP_COUNTY Excel file as a ZIP-to-county crosswalk.
+
+    Reads ``ZIP_COUNTY_122021.xlsx`` from ``data_dir``, caches the result
+    as a Parquet file for faster subsequent loads, and returns the
+    DataFrame.  When ``reimport`` is ``True`` (the default) the Excel file
+    is always re-read; otherwise the cached Parquet file is used if it
+    exists.
+
+    Parameters
+    ----------
+    data_dir : str, optional
+        Directory containing the HUD Excel and Parquet files.  Defaults to
+        the package-level ``default_dir``.
+    reimport : bool, optional
+        If ``True``, re-read the raw Excel file even if a cached Parquet
+        file exists.  Defaults to ``True``.
+
+    Returns
+    -------
+    pandas.DataFrame
+        HUD ZIP-to-county crosswalk with all columns from the source Excel
+        file.
+    """
     parquet_file = data_dir + 'zip_to_county_hud.parquet'
     if reimport or (not os.path.exists(parquet_file)):
         df = pd.read_excel(data_dir + 'ZIP_COUNTY_122021.xlsx')

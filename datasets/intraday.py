@@ -17,7 +17,38 @@ data_dir = default_dir
 DATASET_NAME = "intraday"
 DESCRIPTION = "Intraday monetary policy shock dataset loader."
 def load(data_dir=default_dir, reimport=False, data_vintage=2019):
-    
+    """Load intraday monetary policy shock data resampled to monthly frequency.
+
+    Reads shock data from an Excel file, computes timing-adjusted versions of
+    each shock based on how far into the month the FOMC meeting occurred, then
+    resamples to monthly frequency by combining the current-month remainder
+    with the previous month's carry-over.  Results are cached as a pickle file
+    so subsequent calls skip the Excel import unless ``reimport=True``.
+
+    Parameters
+    ----------
+    data_dir : str, optional
+        Directory containing the source Excel file and the pickle cache.
+        Defaults to the configured intraday data directory.
+    reimport : bool, optional
+        When ``True``, re-read the Excel file and overwrite the pickle cache
+        even if a cached file already exists.  Defaults to ``False``.
+    data_vintage : int, optional
+        Vintage of the dataset to load.  ``2019`` reads ``tight.xls``; ``2012``
+        reads ``tight_June2012.xls``.  Any other value raises an exception.
+        Defaults to ``2019``.
+
+    Returns
+    -------
+    pandas.DataFrame
+        Monthly time series of monetary policy shocks with a
+        ``pandas.DatetimeIndex`` at month-start frequency.
+
+    Raises
+    ------
+    Exception
+        When ``data_vintage`` is not ``2019`` or ``2012``.
+    """
     pkl_file = data_dir + 'intraday_{:d}.pkl'.format(data_vintage)
     
     if reimport or (not os.path.exists(pkl_file)):

@@ -6,13 +6,60 @@ import os
 from zipfile import ZipFile
 
 def cat(num):
+    """Return a list of integers from 1 to num inclusive.
+
+    Parameters
+    ----------
+    num : int
+        Upper bound of the range (inclusive).
+
+    Returns
+    -------
+    list
+        List of integers ``[1, 2, ..., num]``.
+    """
     return list(range(1, num+1))
 
 def to_float(df, var):
+    """Convert a DataFrame column to float64 using pd.to_numeric.
+
+    Parameters
+    ----------
+    df : pandas.DataFrame
+        DataFrame containing the column to convert.
+    var : str
+        Name of the column to convert.
+
+    Returns
+    -------
+    pandas.DataFrame
+        DataFrame with column ``var`` cast to ``float64``; non-numeric
+        values are coerced to ``NaN``.
+    """
     df[var] = pd.to_numeric(df[var], errors='coerce').astype(np.float64)
     return df
 
 def load_data(yr, q, dataset, **kwargs):
+    """Load acquisition data for a given year/quarter, dispatching by dataset.
+
+    Parameters
+    ----------
+    yr : int
+        Origination year.
+    q : int
+        Origination quarter (1–4).
+    dataset : str
+        Data source to load; ``'fannie'`` or ``'freddie'``.
+    **kwargs
+        Additional keyword arguments forwarded to the underlying loader.
+
+    Returns
+    -------
+    pandas.DataFrame or None
+        Loaded acquisition data with standard numeric columns coerced to
+        numeric types, or ``None`` if the requested file does not exist or
+        an invalid ``dataset`` is supplied.
+    """
     if dataset == 'fannie':
         df = load_fannie(yr, q, **kwargs)
     elif dataset == 'freddie':
@@ -32,6 +79,26 @@ def load_data(yr, q, dataset, **kwargs):
 
 # def load_fannie(yr, q, use_pickle=True, reimport=False, **kwargs):
 def load_fannie(yr, q, **kwargs):
+    """Load a Fannie Mae acquisition text file for a given year and quarter.
+
+    Reads the pipe-delimited acquisition file located at
+    ``/nobackup1/dlg/fannie/Acquisition_{yr}Q{q}.txt``.
+
+    Parameters
+    ----------
+    yr : int
+        Origination year.
+    q : int
+        Origination quarter (1–4).
+    **kwargs
+        Additional keyword arguments forwarded to ``pandas.read_table``.
+
+    Returns
+    -------
+    pandas.DataFrame or None
+        Acquisition data with 25 standard columns, or ``None`` if the
+        file does not exist.
+    """
 
     data_dir = '/nobackup1/dlg/fannie/'
     # pkl_file = data_dir + 'Acquisition_{0}Q{1}.pkl'.format(yr, q)
@@ -62,6 +129,26 @@ def load_fannie(yr, q, **kwargs):
         # return pd.read_pickle(pkl_file)
 
 def load_freddie(yr, q, **kwargs):
+    """Load a Freddie Mac acquisition zip file for a given year and quarter.
+
+    Reads the pipe-delimited acquisition file from the zip archive located
+    at ``/nobackup1/dlg/freddie/data/historical_data1_Q{q}{yr}.zip``.
+
+    Parameters
+    ----------
+    yr : int
+        Origination year.
+    q : int
+        Origination quarter (1–4).
+    **kwargs
+        Additional keyword arguments forwarded to ``pandas.read_table``.
+
+    Returns
+    -------
+    pandas.DataFrame or None
+        Acquisition data with 25 standard columns, or ``None`` if the
+        zip file does not exist.
+    """
 
     data_dir = '/nobackup1/dlg/freddie/data'
 
@@ -85,6 +172,27 @@ def load_freddie(yr, q, **kwargs):
         return None
 
 def load_hmda_raw(yr, nrows=None, usecols=None):
+    """Load raw HMDA data from a fixed-width or CSV file.
+
+    Reads the Home Mortgage Disclosure Act LAR file for the given year
+    from ``/nobackup1/dlg/hmda/ultimate/``.  Files before 2004 and from
+    2004–2013 use fixed-width format; files from 2014 onward use CSV
+    format.  All pre-2014 paths expect a ``.zip?download=true`` suffix.
+
+    Parameters
+    ----------
+    yr : int
+        HMDA filing year.
+    nrows : int or None, optional
+        Maximum number of rows to read.  Reads all rows when ``None``.
+    usecols : list or None, optional
+        Subset of column names to return.  Returns all columns when ``None``.
+
+    Returns
+    -------
+    pandas.DataFrame
+        Raw HMDA LAR records for the requested year.
+    """
 
     data_dir = '/nobackup1/dlg/hmda/ultimate/'
 
@@ -184,6 +292,30 @@ def load_hmda_raw(yr, nrows=None, usecols=None):
     return df
 
 def store_hmda(yr, nrows=None, usecols=None, reimport=False, chunksize=500000):
+    """Read raw HMDA data in chunks and persist it to an HDF5 store.
+
+    Reads the HMDA LAR file for the given year in chunks, drops
+    demographic and identifier columns, coerces remaining columns to
+    ``float64``, and appends each chunk to the key ``hmda_{yr}`` in the
+    HDF5 store at ``/nobackup1/dlg/hmda/save/hmda.hd5``.
+
+    Parameters
+    ----------
+    yr : int
+        HMDA filing year.
+    nrows : int or None, optional
+        Maximum number of rows to read from the source file.
+    usecols : list or None, optional
+        Subset of column names to read from the source file.
+    reimport : bool, optional
+        Reserved for future use; currently unused.
+    chunksize : int, optional
+        Number of rows per chunk passed to the pandas reader.
+
+    Returns
+    -------
+    None
+    """
 
     data_dir = '/nobackup1/dlg/hmda/ultimate/'
     save_dir = '/nobackup1/dlg/hmda/save/'
@@ -360,6 +492,26 @@ def store_hmda(yr, nrows=None, usecols=None, reimport=False, chunksize=500000):
     return None
 
 def load_hmda(yr, query=None, columns=None):
+    """Load HMDA data for a given year from the HDF5 store.
+
+    Opens the HDF5 store at ``/nobackup1/dlg/hmda/save/hmda.hd5`` and
+    reads the key ``hmda_{yr}``, optionally filtering rows and columns.
+
+    Parameters
+    ----------
+    yr : int
+        HMDA filing year.
+    query : str or None, optional
+        PyTables query string used to filter rows (e.g.
+        ``"loan_type == 1"``).  Returns all rows when ``None``.
+    columns : list or None, optional
+        List of column names to return.  Returns all columns when ``None``.
+
+    Returns
+    -------
+    pandas.DataFrame
+        HMDA records for the requested year.
+    """
 
     save_dir = '/nobackup1/dlg/hmda/save/'
 
@@ -377,6 +529,31 @@ def load_hmda(yr, query=None, columns=None):
     return df
 
 def load_black_knight(yr, suffix=None):
+    """Load Black Knight data for a given year from an HDF5 store.
+
+    .. note::
+        This function is a placeholder and is not yet implemented.
+        It immediately raises ``Exception`` on every call.
+
+    Parameters
+    ----------
+    yr : int
+        Data year used to construct the HDF5 key ``yr_{yr}``.
+    suffix : str or None, optional
+        Optional suffix appended to the store filename
+        (``black_knight_{suffix}.hd5``).  A leading underscore is added
+        automatically if absent.
+
+    Returns
+    -------
+    None
+        This function never returns normally.
+
+    Raises
+    ------
+    Exception
+        Always raised; function body is not implemented.
+    """
 
     raise Exception
 

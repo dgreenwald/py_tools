@@ -8,7 +8,22 @@ DESCRIPTION = "Home Mortgage Disclosure Act (HMDA) dataset loader."
 def load(data_dir=None, **kwargs):
     """Load HMDA data from the local HDF store.
 
-    Backward-compatible wrapper around `load_hmda`; expects `yr` in kwargs.
+    Backward-compatible wrapper around ``load_hmda``; expects ``yr`` in
+    ``kwargs``.
+
+    Parameters
+    ----------
+    data_dir : str, optional
+        Path to the directory containing the HDF store.  When provided it is
+        forwarded as the ``data_dir`` keyword argument to ``load_hmda``.
+    **kwargs
+        Additional keyword arguments passed directly to ``load_hmda``.
+        Must include ``yr`` (int) – the HMDA survey year to load.
+
+    Returns
+    -------
+    pandas.DataFrame
+        HMDA loan-application records for the requested year.
     """
     if data_dir is not None:
         kwargs.setdefault('data_dir', data_dir)
@@ -18,13 +33,70 @@ def load(data_dir=None, **kwargs):
 
 
 def cat(num):
+    """Return a list of integers from 1 to num inclusive.
+
+    Parameters
+    ----------
+    num : int
+        Upper bound of the integer range (inclusive).
+
+    Returns
+    -------
+    list
+        ``[1, 2, ..., num]``.
+    """
     return list(range(1, num+1))
 
 def to_float(df, var):
+    """Convert a DataFrame column to float64 in-place.
+
+    Non-numeric values are coerced to ``NaN``.
+
+    Parameters
+    ----------
+    df : pandas.DataFrame
+        DataFrame whose column will be converted.
+    var : str
+        Name of the column to convert.
+
+    Returns
+    -------
+    pandas.DataFrame
+        The same ``df`` with ``df[var]`` cast to ``numpy.float64``.
+    """
     df[var] = pd.to_numeric(df[var], errors='coerce').astype(np.float64)
     return df
 
 def load_chunk(df, drop_columns=None, obj_columns=None, categories=None):
+    """Process one chunk of HMDA data by dropping, casting, or categorising columns.
+
+    For each column in ``df``:
+
+    * columns in ``drop_columns`` are removed;
+    * columns in ``obj_columns`` are cast to ``object`` dtype;
+    * columns present as keys in ``categories`` are converted to
+      ``pandas.Categorical`` with the supplied category list;
+    * all remaining columns are converted to ``float64`` via :func:`to_float`.
+
+    Parameters
+    ----------
+    df : pandas.DataFrame
+        A single chunk of raw HMDA data.
+    drop_columns : list, optional
+        Column names to drop entirely.  Defaults to an empty list.
+    obj_columns : list, optional
+        Column names to cast to ``object`` dtype.  Defaults to an empty list.
+    categories : dict, optional
+        Mapping of column name to list of valid category values.  Columns
+        present in this mapping are converted to ``pandas.Categorical``.
+        Defaults to an empty dict.
+
+    Returns
+    -------
+    pandas.DataFrame
+        The processed chunk with columns dropped, recast, or categorised as
+        specified.
+    """
     if drop_columns is None:
         drop_columns = []
     if obj_columns is None:
@@ -46,7 +118,41 @@ def load_chunk(df, drop_columns=None, obj_columns=None, categories=None):
 
 def store(yr, data_dir=default_dir, save_dir=default_dir, nrows=None,
           usecols=None, reimport=False, chunksize=500000):
+    """Read a raw HMDA fixed-width file in chunks and persist it to HDF5.
 
+    The compressed fixed-width file for ``yr`` is read with
+    ``pandas.read_fwf`` in chunks of ``chunksize`` rows.  Each chunk is
+    processed by :func:`load_chunk` (columns dropped, cast, or categorised)
+    and appended to the HDF5 store under the key ``hmda_{yr}``.
+
+    Parameters
+    ----------
+    yr : int
+        HMDA survey year.  Controls both the source filename and the HDF5
+        key used for storage.
+    data_dir : str, optional
+        Directory that contains the raw compressed fixed-width source files.
+        Defaults to the configured HMDA data directory.
+    save_dir : str, optional
+        Directory where the HDF5 store (``hmda.hd5``) will be written.
+        Defaults to the configured HMDA data directory.
+    nrows : int, optional
+        Maximum number of rows to read from the source file.  ``None`` reads
+        all rows.
+    usecols : list, optional
+        Subset of column names to read from the source file.  ``None`` reads
+        all columns.
+    reimport : bool, optional
+        Currently unused; reserved for future use to force re-ingestion even
+        when the store key already exists.
+    chunksize : int, optional
+        Number of rows per chunk passed to ``pandas.read_fwf``.  Defaults to
+        500 000.
+
+    Returns
+    -------
+    None
+    """
     store_file = save_dir + 'hmda.hd5'
     key = 'hmda_{}'.format(yr)
     store = pd.HDFStore(store_file)
@@ -161,7 +267,35 @@ def store(yr, data_dir=default_dir, save_dir=default_dir, nrows=None,
 
 def load_hmda(yr, data_dir=default_dir, save_dir=default_dir, query=None,
               columns=None):
+    """Load HMDA data for a given year from the local HDF5 store.
 
+    Opens the HDF5 store at ``save_dir/hmda.hd5``, selects the table stored
+    under the key ``hmda_{yr}``, and returns the result as a DataFrame,
+    optionally filtered by a query expression and/or a subset of columns.
+
+    Parameters
+    ----------
+    yr : int
+        HMDA survey year to load (e.g. ``2010``).
+    data_dir : str, optional
+        Directory containing the raw source files (not used during loading,
+        but kept for API consistency with :func:`store`).  Defaults to the
+        configured HMDA data directory.
+    save_dir : str, optional
+        Directory containing the HDF5 store (``hmda.hd5``).  Defaults to the
+        configured HMDA data directory.
+    query : str, optional
+        PyTables query string passed to ``HDFStore.select`` for row filtering
+        (e.g. ``"state_code == 6"``).  ``None`` returns all rows.
+    columns : list, optional
+        List of column names to return.  ``None`` returns all columns.
+
+    Returns
+    -------
+    pandas.DataFrame
+        HMDA loan-application records for the requested year, filtered
+        according to ``query`` and ``columns``.
+    """
     store_file = save_dir + 'hmda.hd5'
     key = 'hmda_{}'.format(yr)
     store = pd.HDFStore(store_file)
