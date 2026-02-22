@@ -32,9 +32,6 @@ def collapse_quantile(df, by_list, weight_var=None, var_list=None, q=0.5, **kwar
     
     df_out = df.groupby(by_list).apply(get_weighted_quantile_inner, var_list, weight_var, q, **kwargs)
 
-    #df_out = df_out.reset_index().drop(columns=['level_1']).set_index(by_list)
-    # PD: does not necessarily called level_1
-    # TODO: probably a more robust way to do this
     col_name = 'level_{}'.format(len(by_list))
     df_out = df_out.reset_index().drop(columns=col_name).set_index(by_list)
 
@@ -199,21 +196,15 @@ class Collapser:
         if by_list is None: by_list = []
         
         singleton = (not by_list)
-        if singleton:
-            dfc_old = self.dfc.copy()
-            dfc_old['TEMP'] = 0
-            by_list = ['TEMP']
-        else:
-            dfc_old = self.dfc
-        
+
         if method == 'mean':
-            dfc_new = dfc_old.groupby(by_list).sum()
+            if singleton:
+                dfc_new = pd.DataFrame([self.dfc.sum()])
+            else:
+                dfc_new = self.dfc.groupby(by_list).sum()
         elif method == 'median':
             raise Exception
             # dfc_new = dfc_old.groupby(by_list).agg(st.weighted_quantile, )
-            
-        if singleton:
-            dfc_new = dfc_new.reset_index().drop(columns=['TEMP'])
             
         if inplace:
             self.dfc = dfc_new

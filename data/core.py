@@ -32,10 +32,6 @@ def absorb(df, groups, value_var, weight_var=None, restore_mean=True, tol=1e-12,
     x -- a Pandas Series containing the demeaned variable
     """
 
-    # Check that internal variables are not in the dataframe
-    # for var in ['_weight', '_x', '_x_weight']:
-        # assert var not in df
-
     Ng = len(groups)
 
     var_list = [value_var]
@@ -52,7 +48,6 @@ def absorb(df, groups, value_var, weight_var=None, restore_mean=True, tol=1e-12,
 
     # Set a default weight variable if none is specified
     if weight_var is None:
-        # assert '_weight' not in _df
         _df['_weight'] = 1.0
     else:
         _df['_weight'] = _df[weight_var].copy()
@@ -90,23 +85,12 @@ def absorb(df, groups, value_var, weight_var=None, restore_mean=True, tol=1e-12,
     count = 0
     while err > tol:
         
-        if False:
-            
-            for ii, group in enumerate(groups):
-                fe_var = fe_list[ii]
-                _df['_temp'] = _df['_res_weight'] + _df[fe_var + '_weight']
-                _df[fe_var] = gbfe_list[ii]['_temp'].transform('sum') / sum_weight_list[ii]
-                
-            _df['_res_weight'] = _df['_x_weight'] - np.nansum(_df[fe_list], axis=1)
-            
-        else:
-            
-            for ii, group in enumerate(groups):
-                fe_var = fe_list[ii]
-                _df['_res_weight'] += _df[fe_var + '_weight']
-                _df[fe_var] = gbfe_list[ii]['_res_weight'].transform('sum') / sum_weight_list[ii]
-                _df[fe_var + '_weight'] = _df[fe_var] * _df['_weight']
-                _df['_res_weight'] -= _df[fe_var + '_weight']
+        for ii, group in enumerate(groups):
+            fe_var = fe_list[ii]
+            _df['_res_weight'] += _df[fe_var + '_weight']
+            _df[fe_var] = gbfe_list[ii]['_res_weight'].transform('sum') / sum_weight_list[ii]
+            _df[fe_var + '_weight'] = _df[fe_var] * _df['_weight']
+            _df['_res_weight'] -= _df[fe_var + '_weight']
                 
         err = get_err()
         count += 1
@@ -222,9 +206,6 @@ def winsorize(df_in, var_list, wvar=None, p_val=0.98):
 
 def add_bin_dummies(df, var_list, n_bins):
 
-    print("NEED TO TEST")
-    raise Exception
-
     cutoffs = np.linspace(0.0, 1.0, n_bins+1)
     dummy_list = []
 
@@ -295,7 +276,6 @@ def match_sample(X, how='inner', ix=None):
 
 def match_xy(X, z, how='inner', ix=None):
 
-    # TODO: should change so that originals not modified
     if len(z.shape) == 1:
         z = z[:, np.newaxis]
         
@@ -403,7 +383,7 @@ def wls_formula(df, formula, weight_var=None, weights=None, ix=None, nw_lags=0,
         
     if weight_var is not None:
         assert weights is None
-        weights = df.loc[ix, weight_var]
+        weights = df.loc[ix, weight_var].copy()
 
     weights /= np.sum(weights)
     
@@ -462,8 +442,8 @@ def sm_regression(df, lhs, rhs, match='inner', ix=None, nw_lags=0, display=False
     if 'const' in rhs and 'const' not in df:
         df['const'] = 1.0
 
-    X = df.ix[:, rhs].values
-    z = df.ix[:, lhs].values
+    X = df.loc[:, rhs].values
+    z = df.loc[:, lhs].values
 
     ix, Xs, zs = match_xy(X, z, how=match, ix=ix)
 
@@ -614,12 +594,13 @@ def least_sq(X, z):
 
 def to_pickle(x, path):
 
-    pickle.dump(x, open(path, "wb"))
-    return None
+    with open(path, "wb") as f:
+        pickle.dump(x, f)
 
 def read_pickle(path):
 
-    return pickle.load(open(path, "rb"))
+    with open(path, "rb") as f:
+        return pickle.load(f)
 
 def demean_separate(df, var_list, group_list, **kwargs):
     """This function demeans by each variable one at at a time"""
@@ -693,7 +674,7 @@ def sum_regression_params(positions, *args, **kwargs):
     
     """
 
-    e_vec = np.zeros(len(params))
+    e_vec = np.zeros(len(positions))
     e_vec[positions] = 1.0
 
     return weight_regression_params(e_vec, *args, **kwargs)
