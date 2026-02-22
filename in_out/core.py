@@ -21,8 +21,9 @@ def reshape_eigen(filename, shape, dtype='float64'):
         n_cols = struct.unpack('i', fid.read(4))[0]
 
         if (n_rows * n_cols) != np.prod(shape):
-            print("reshape_eigen: shape does not match size of file")
-            raise Exception
+            raise ValueError(
+                f"reshape_eigen: shape {shape} does not match file size {n_rows * n_cols}"
+            )
 
         return np.fromfile(fid, dtype=dtype).reshape(shape)
 
@@ -50,13 +51,6 @@ def load_pickle(filename):
 def make_dir(path):
     if not os.path.exists(path):
         os.makedirs(path)
-    return None
-
-def write_text(string, filename):
-    
-    with open(filename, 'w') as fid:
-        fid.write(string)
-        
     return None
 
 def write_numeric(val, filename, precision='4.3f'):
