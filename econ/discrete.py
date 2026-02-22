@@ -5,12 +5,10 @@ Created on Sat Mar  5 07:09:18 2016
 @author: dan
 """
 
-# import matplotlib.pyplot as plt
 import numpy as np
 import scipy.sparse as sp
 
 import py_tools.econ as ec
-from py_tools.utilities import tic, toc
 
 def to_2d(x):
     
@@ -92,14 +90,10 @@ class DiscreteModel:
         self.x_grid = x_grid
         self.z_grid = z_grid
         self.Pz = drop_low_probs(Pz, tol=P_tol)
-        # self.sparse = sparse
 
         # Sizes
         self.Nx, self.kx = self.x_grid.shape
         self.Nz, self.kz = self.z_grid.shape
-        
-        # self.z_states = np.repeat(np.arange(self.Nz), self.Nx)
-        # self.x_states = np.tile(np.arange(self.Nx), self.Nz)
         
         # Sparse identity  matrix
         self.Ixz = sp.eye(self.Nx * self.Nz)
@@ -114,9 +108,6 @@ class DiscreteModel:
         # Discounted transition probs for combined states
         self.bP1 = np.kron(self.bP, np.ones((self.Nx, 1)))
 
-        # Initializations
-        # self.v_list = self.Nz * [np.zeros((self.Nx, 1))]
-        
         if index_list is None:
             self.index_list = self.Nz * [np.arange(self.Nx).astype(int)]
         else:
@@ -125,9 +116,6 @@ class DiscreteModel:
         # Check for nans
         opt_flow = self.get_opt_flow()
         assert np.all(np.isfinite(opt_flow))
-        
-        # self.flow_mat = np.concatenate([flow_i[np.newaxis, :, :] for flow_i in self.flow_list], axis=0)
-        # self.index_mat = np.concatenate([index[np.newaxis, :] for index in self.index_list], axis=0)
         
     def get_opt_flow(self):
         
@@ -145,14 +133,8 @@ class DiscreteModel:
         done = False
 
         R = np.vstack(self.flow_list)
-        indices = np.vstack(self.index_list)
-        
-        # Temp code
-        self.Pzs = sp.csr_matrix(self.Pz)
-        self.bPs = sp.csr_matrix(self.bP)
-        self.bP1s = sp.kron(self.bPs, np.ones((self.Nx, 1)))
-        
-        # end
+        indices = np.concatenate(self.index_list)
+
 
         while not done:
             
@@ -163,24 +145,8 @@ class DiscreteModel:
             # Howard improvement step
             opt_flow = self.get_opt_flow()
             
-            # print("Dense:")
-            # start = tic()
-            # bP_trans = self.get_P_trans(discount=True, sparse=self.sparse)
-            # v = np.linalg.solve((np.eye(self.Nx * self.Nz) - bP_trans), opt_flow)
-            # toc(start)
-            
-            # Sparse version
-            print("Sparse:")
-            start = tic()
             bP_trans_sparse = self.get_P_trans(discount=True, sparse=True)
             v = sp.linalg.spsolve(self.Ixz - bP_trans_sparse, opt_flow)
-            toc(start)
-            
-            # print("Sparse2:")
-            # start = tic()
-            # bP_trans_sparse = self.get_P_trans(discount=True, sparse=True)
-            # vs = sp.linalg.spsolve(self.Ixz - bP_trans_sparse, opt_flow)
-            # toc(start)
             
             # Update step
             V = v.reshape((self.Nz, self.Nx))
@@ -188,8 +154,6 @@ class DiscreteModel:
             Q = R + W
             indices, v = ec.update_value(Q)
             self.index_list = np.split(indices, self.Nz)
-            
-            # toc(start)
             
             done = np.all(indices_old == indices)
             
@@ -228,20 +192,14 @@ class DiscreteModel:
     
     def compute_stationary_dist(self, tol=1e-6):
         
-        # transition_list = [ec.get_transition(index) for index in self.index_list]
-        # P_trans = np.vstack([np.kron(self.Pz[ii, :], transition_list[ii]) for ii in range(self.Nz)])
-        
         P_trans = self.get_P_trans(discount=False, sparse=True)
         vals, vecs = sp.linalg.eigs(P_trans.T)
         
         assert np.abs(np.real(vals[0]) - 1.0) < tol
-        # ix = np.argmax(np.abs(vals))
         
         self.pi_star = np.real(vecs[:, 0])
         self.pi_star = self.pi_star / np.sum(self.pi_star)
-        # self.pi_star = vecs[:, 0] / np.sum(vecs[:, 0])
         
-        # check = P_trans.T @ self.pi_star
         return None
 
     def sim(self, Nsim, ix0=0, iz0=0):

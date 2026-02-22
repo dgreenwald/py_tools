@@ -42,19 +42,19 @@ class KleinObj:
         T22 = np.asmatrix(T[self.n_pre:, self.n_pre:])
 
         G_xc = Z11 * np.linalg.inv(Z12)
-        H_xc = Z11 * (np.solve(S11, T11)) * np.linalg.inv(Z11)
+        H_xc = Z11 * (np.linalg.solve(S11, T11)) * np.linalg.inv(Z11)
 
         self.G_x = np.real(G_xc)
         self.H_x = np.real(H_xc)
 
-        PhiST = np.kron(Phi.T, S22) - np.kron(np.eye(self.n_exog), T22)
-        q2C = (Q2 * C).flatten(order='F')
-        M = np.solve(PhiST, q2C).reshape((self.n_uns, self.n_exog), order='F')
+        PhiST = np.kron(self.Phi.T, S22) - np.kron(np.eye(self.n_exog), T22)
+        q2C = (Q2 * self.C).flatten(order='F')
+        M = np.linalg.solve(PhiST, q2C).reshape((self.n_uns, self.n_exog), order='F')
 
-        N = (Z22 - Z21 * np.solve(Z11, Z12)) * M
-        L = (-Z11 * np.solve(S11, T11) * np.solve(Z11, Z12) * M 
-             + Z11 * np.solve(S11, T12 * M - S12 * M * Phi + Q1 - C)
-             + Z12 * M * Phi)
+        N = (Z22 - Z21 * np.linalg.solve(Z11, Z12)) * M
+        L = (-Z11 * np.linalg.solve(S11, T11) * np.linalg.solve(Z11, Z12) * M 
+             + Z11 * np.linalg.solve(S11, T12 * M - S12 * M * self.Phi + Q1 - self.C)
+             + Z12 * M * self.Phi)
 
         self.G_f = np.real(N)
         self.H_f = np.real(L)
