@@ -35,10 +35,6 @@ scraping = [
     "lxml>=4.9",
 ]
 nlp = ["nltk>=3.7"]
-gpu = [
-    "pyopencl>=2022.3",
-    "pyviennacl>=1.7",
-]
 dev = [
     "pytest>=7.0",
     "pytest-cov>=4.0",
@@ -55,8 +51,6 @@ all = [
     "beautifulsoup4>=4.11",
     "lxml>=4.9",
     "nltk>=3.7",
-    "pyopencl>=2022.3",
-    "pyviennacl>=1.7",
 ]
 
 [tool.setuptools]
@@ -85,8 +79,6 @@ addopts = "-ra"
 testpaths = ["tests"]
 python_files = ["test_*.py"]
 norecursedirs = [
-    "examples",
-    "old",
     "build",
     "dist",
     ".eggs",

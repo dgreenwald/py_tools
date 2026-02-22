@@ -56,7 +56,6 @@ df = datasets.load_dataset("fred", codes=["UNRATE"])
 
 - Core modules live at the repository root (for example `time_series.py`, `state_space.py`, `numerical.py`, `data.py`).
 - Dataset-specific loaders live in `datasets/`.
-- Script-style usage examples live in `examples/`.
 - Future unit tests should live in `tests/`.
 
 The top-level package exposes a curated API via lazy imports in `py_tools.__all__`.
@@ -67,12 +66,6 @@ Run test discovery (currently targets `tests/`):
 
 ```bash
 python -m pytest
-```
-
-Run one of the script-style examples directly:
-
-```bash
-python examples/test_state_space.py
 ```
 
 ## Contributing
