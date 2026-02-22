@@ -78,9 +78,6 @@ def reghdfe_formula(df, formula, fes=None, weight_var=None, se_type='robust',
             if xvar != 'Intercept':
                 X_list.append(dt.absorb(data, fes, xvar, weight_var=weight_var, 
                                         restore_mean=False, display=False, tol=tol))
-            # else:
-            #     X_list.append(data[xvar])
-            
         X = pd.concat(X_list, axis=1)
         
     y = y.values

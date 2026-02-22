@@ -5,11 +5,8 @@ def compute_g(params, h, data):
 
     Nt = data.shape[1]
 
-    h_all = np.apply_along_axis(h, 0, data, params)
-    g2 = np.mean(h_all, axis=1)
-
-    g = h(data[:, 1], params)
-    for tt in range(Nt):
+    g = h(data[:, 0], params)
+    for tt in range(1, Nt):
         g += h(data[:, tt], params)
     g /= Nt
 
@@ -19,8 +16,8 @@ def compute_dg(params, dh, data):
 
     Nt = data.shape[1]
 
-    dg = dh(data[:, 1])
-    for tt in range(Nt):
+    dg = dh(data[:, 0], params)
+    for tt in range(1, Nt):
         dg += dh(data[:, tt], params)
     dg /= Nt
 
@@ -32,10 +29,11 @@ def compute_d2g(params, d2h, data):
 
     d2g = []
     for d2h_i in d2h:
-        d2g_i = d2h_i(data[:, 1], params)
-        for tt in range(Nt):
+        d2g_i = d2h_i(data[:, 0], params)
+        for tt in range(1, Nt):
             d2g_i += d2h_i(data[:, tt], params)
         d2g_i /= Nt
+        d2g.append(d2g_i)
 
     return d2g
 

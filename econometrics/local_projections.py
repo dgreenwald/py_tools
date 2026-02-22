@@ -123,10 +123,10 @@ def estimate(df_in, y_var, shock_var, control_vars=None, fe_vars=None,
 class LocalProjection:
     """Local projection object"""
     
-    def __init__(self, df=None, labels={}):
-        
+    def __init__(self, df=None, labels=None):
+
         self.df = df
-        self.labels = labels
+        self.labels = labels or {}
         
     def estimate(self, y_var_list, shock_var, **kwargs):
         

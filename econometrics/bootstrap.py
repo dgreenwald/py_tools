@@ -19,7 +19,6 @@ def ar1_bootstrap_inner(rho, mu, eps_boot, x_init):
     for tt in range(1, Nt_eps+1):
         X[:, tt] = (1.0 - rho) * mu + rho * X[:, tt-1] + eps_boot[:, tt-1]
         
-    # X_til = X - np.mean(axis=1)
     X_next = X[:, 1:]
     X_pre = X[:, :-1]
     

@@ -1,15 +1,10 @@
-# from sklearnex import patch_sklearn
-# patch_sklearn()
-
 from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestClassifier
-# from sklearn.impute import KKNImputer
 
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 
-# from utilities import tic, toc
 from py_tools import in_out
 
 class RandomForestWrapper:
@@ -25,10 +20,7 @@ class RandomForestWrapper:
             self.load(infile)
         else:
             self.rf = RandomForestClassifier(**kwargs)
-            
-        # if label_var is not None:
-        #     self.set_labels_features(label_var, continuous_vars, category_vars)
-            
+
     def set_data(self, data):
         self.data = data
         
@@ -66,7 +58,7 @@ class RandomForestWrapper:
         else:
             
             self.train_features, self.test_features, self.train_labels, self.test_labels = train_test_split(
-                self.features, self.labels, train_size=train_size, test_size=test_size, random_state=17
+                self.features, self.labels, train_size=train_size, test_size=test_size, random_state=random_state
             )
         
     def fit(self):
@@ -150,18 +142,7 @@ def evaluate_random_forest(rf, test_features, test_labels):
     return predictions 
 
 def estimate_random_forest(rf, labels, features, train_size=0.25, test_size=0.75):
-    
-    # if rf is None:
-    #     rf = RandomForestClassifier(**kwargs)
-    
-    # if labels is None:
-    #     assert features is None
-    #     assert df is not None
-    #     labels, features = get_labels_features(df, label_var, continuous_vars, category_vars)
-    
-    # label_vals = labels.values.ravel()
-    # feature_vals = features.values
-    
+
     if train_size is None:
         
         assert test_size is None
@@ -177,16 +158,8 @@ def estimate_random_forest(rf, labels, features, train_size=0.25, test_size=0.75
             features, labels, train_size=train_size, test_size=test_size, random_state=17
         )
 
-    # start = tic()
     rf.fit(train_features, train_labels)
-    # toc(start)
-    
-    # if evaluate and (test_features is not None):
-    #     _ = evaluate_random_forest(rf, test_features, test_labels)
-        
-    # if plot:
-    #     plot_importance_random_forest(rf, features.columns)
-    
+
     return rf
 
 def plot_importance_random_forest(rf, names, plotpath=None):
@@ -232,64 +205,3 @@ def get_labels_features(df, label_var, continuous_vars=None,
     names = list(feature_data.columns)
     
     return label_vals, feature_vals, names
-
-# class Model:
-
-#     def __init__(self, model):
-
-#         self.model = model
-        
-#     def set_data(self, mldata):
-
-#         self.mldata = mldata
-
-#     def fit(self, data=None):
-
-#         if data is not None:
-#             self.set_data(data)
-#         self.model.fit(self.mldata.train_features, self.mldata.train_labels)
-
-#     def predict(self, test_features=None, test_labels=None, display=False):
-
-#         if test_features is None:
-#             test_features = self.mldata.test_features
-#             test_labels = self.mldata.test_labels
-
-#         predictions = self.model.predict(test_features)
-#         if test_labels is not None:
-#             errors = np.abs(predictions - test_labels)
-#             if display: print("Error rate: {:g}".format(np.mean(errors)))
-#         else:
-#             errors = None
-
-#         return predictions, errors
-
-# class Data:
-
-#     def __init__(self, train_features, test_features, train_labels, test_labels):
-
-#         self.train_features = train_features
-#         self.test_features = test_features
-#         self.train_labels = train_labels
-#         self.test_labels = test_labels
-
-# def encode_dummies(df, old_feature_vars, categorical_vars):
-
-#     feature_vars = [var for var in old_feature_vars if var not in categorical_vars]
-
-#     for var in categorical_vars:
-#         this_series = var + '_' + df[var].astype(str)
-#         dummies = pd.get_dummies(this_series)
-#         feature_vars += list(dummies.columns)
-#         df = df.join(dummies)
-
-#     return df, feature_vars
-
-# def get_labels_features(df, label_var, feature_vars, categorical_vars=None, **kwargs):
-
-#     df, feature_vars = encode_dummies(df, feature_vars, categorical_vars)
-#     train_features, test_features, train_labels, test_labels = train_test_split(
-#         df[feature_vars].values, df[label_var].values, **kwargs
-#     )
-
-#     return Data(train_features, test_features, train_labels, test_labels)
