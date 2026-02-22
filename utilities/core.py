@@ -2,7 +2,7 @@ import os
 from collections.abc import Mapping
 import itertools
 import numpy as np
-from time import time, perf_counter
+from time import perf_counter
 
 def as_list(x):
 
@@ -44,9 +44,7 @@ def check_duplicates(var_list):
                 seen.add(var)
             else:
                 duplicate.add(var)
-        print("Repeated variables detected:")
-        print(duplicate)
-        raise Exception
+        raise Exception("Repeated variables detected: {}".format(duplicate))
 
 def swap_all_axes(a, target_axes, count=0):
 
@@ -83,8 +81,9 @@ def toc(start, display=True):
 def timer(func):
     def wrapper(*args, **kwargs):
         start = tic()
-        func(*args, **kwargs)
+        result = func(*args, **kwargs)
         toc(start)
+        return result
     return wrapper
 
 def log_if_pos(x):
@@ -170,7 +169,6 @@ def get_env(name, default, prefix='', upper=True, dtype=None, no_underscore=Fals
     if (prefix != '') and (not no_underscore) and (prefix[-1] != '_'):
         prefix += '_'
 
-    # ipdb.set_trace()
     fullname = prefix + name
     if upper:
         fullname = fullname.upper()
