@@ -7,15 +7,7 @@ Created on Sat Mar  5 07:46:14 2016
 
 import numpy as np
 import scipy.sparse as sp
-from py_tools import walker
-# from walker import WalkerRandomSampling
-
-# def lse(x, axis=None):
-    # """Safely computes log(sum(exp(x)))"""
-
-    # x_star = np.amax(x)
-    # x_til = x - x_star
-    # return x_star + np.log(np.sum(np.exp(x_til), axis=axis))
+from py_tools.stats import walker
 
 def get_unit_vecs(P, tol=1e-8, normalize=False, **kwargs):
     
@@ -42,7 +34,6 @@ def stationary_doubling(P, tol=1e-12, pi_seed=None, maxit=500, normalize=True, *
         pi_new = pi @ Pj
         Pj = Pj @ Pj
         dist = np.max(np.abs(pi_new - pi))
-        # print(dist)
         if dist < tol:
             break
         pi = pi_new
@@ -104,7 +95,7 @@ def sim_discrete(P, N, i0=0):
     ix[0] = i0
     
     for ii in range(1, N):
-        ix[ii] = samplers[ix[ii-1]].random(1)
+        ix[ii] = samplers[ix[ii-1]].random()
     
     return ix
 
@@ -209,9 +200,7 @@ def sim_cir(rho, sig, mu=0.0, Nsim=100, e=None, x0=None, bound=False):
         e = np.random.randn(Nsim)
 
     if x0 is None:
-        raise Exception
-        sig0 = sig / np.sqrt(1.0 - rho ** 2)
-        x[0] = mu + mu * sig0 * e[0] 
+        raise Exception("x0 must be provided for sim_cir")
     else:
         x[0] = x0
 
