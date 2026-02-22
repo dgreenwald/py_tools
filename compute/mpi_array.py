@@ -232,7 +232,8 @@ class MPIArray:
         if self.rank == 0:
             self.root_data[self.ix_root, :] = data.reshape((self.nrow_root, self.ncol))
 
-        if scatter: self.scatter()
+        if scatter:
+            self.scatter()
 
     def set_local_data(self, data, gather=True):
         """Copy *data* into the local buffer and optionally gather it.
@@ -247,7 +248,8 @@ class MPIArray:
         """
 
         self.local_data[self.ix_local, :] = data.reshape((self.nrow_local, self.ncol))
-        if gather: self.gather()
+        if gather:
+            self.gather()
 
     def get_root_data(self, gather=False):
         """Retrieve the full (unpadded) array on rank 0.
@@ -264,7 +266,8 @@ class MPIArray:
             Full array on rank 0; ``None`` on all other ranks.
         """
 
-        if gather: self.gather()
+        if gather:
+            self.gather()
 
         if self.rank == 0:
 
@@ -295,7 +298,8 @@ class MPIArray:
             for multi-dimensional arrays, or a 1-D vector for 1-D arrays).
         """
 
-        if scatter: self.scatter()
+        if scatter:
+            self.scatter()
 
         out_data = self.local_data[self.ix_local, :]
 

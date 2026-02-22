@@ -145,9 +145,12 @@ def root(fun, x0, args=None, kwargs=None, grad=None, tol=1e-8,
             Either ``'max_backstep_iterations'`` or
             ``'max_iterations'``.
     """
-    if args is None: args = ()
-    if kwargs is None: kwargs = {}
-    if gradient_kwargs is None: gradient_kwargs = {}
+    if args is None:
+        args = ()
+    if kwargs is None:
+        kwargs = {}
+    if gradient_kwargs is None:
+        gradient_kwargs = {}
     
     # Initialization
     x = np.array(x0).copy()

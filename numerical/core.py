@@ -70,8 +70,10 @@ def gradient(f, x, args=None, kwargs=None, step=1e-5, two_sided=True, f_val=None
         ``x[i]``.  This is the *transpose* of the conventional
         Jacobian convention (which has shape ``(m, n)``).
     """
-    if args is None: args = ()
-    if kwargs is None: kwargs = {}
+    if args is None:
+        args = ()
+    if kwargs is None:
+        kwargs = {}
 
     x = x.copy()
 
@@ -409,69 +411,3 @@ def my_chol(A_in):
             A[jj+1:, jj+1:] -= (Aj @ Aj.T) / (Dj**2)
 
     return L
-
-def se99(A_in):
-    """Compute a modified Cholesky factorization using the SE99 algorithm.
-
-    Implements the Schnabel-Eskow (1999) algorithm, which produces a
-    numerically stable lower-triangular factor with pivoting for
-    matrices that may not be strictly positive definite.
-
-    Parameters
-    ----------
-    A_in : numpy.ndarray
-        Symmetric matrix of shape ``(n, n)``.
-
-    Returns
-    -------
-    L : numpy.ndarray
-        Lower-triangular Cholesky-like factor of shape ``(n, n)``.
-    perm : numpy.ndarray
-        Integer permutation array of shape ``(n,)`` recording the
-        pivoting order applied during factorization.
-    """
-    A = A_in.copy()
-
-    N = A.shape[0]
-
-    eps = np.finfo(float).eps
-    tau = eps**(1.0/3.0)
-    tau_bar = tau**2
-    mu = 0.1
-
-    gam = np.amax(np.abs(A.diagonal()))
-    tb_gam = tau_bar * gam
-    mu_gam = mu * gam
-
-    L = np.zeros(A.shape)
-    g = np.zeros(N)
-
-    perm = np.arange(N)
-
-    # Phase 1 loop
-    jj = 0
-    while jj < N:
-
-        imax = jj + np.argmax(A.diagonal()[jj:])
-        a_max = A[imax, imax]
-        a_min = A.diagonal()[jj:].min()
-
-        if imax != jj:
-            A[[imax, jj], jj:] = A[[jj, imax], jj:]
-            A[jj:, [imax, jj]] = A[jj:, [jj, imax]]
-            temp = perm[jj]
-            perm[jj] = perm[imax]
-            perm[imax] = temp
-
-        Dj = np.sqrt(A[jj, jj])
-        aj = A[jj+1:, jj]
-        Aj = aj[:, np.newaxis]
-
-        L[jj, jj] = Dj
-        L[jj+1:, jj] = aj / Dj
-        if jj < N - 1:
-            A[jj+1:, jj+1:] -= (Aj @ Aj.T) / A[jj, jj]
-
-        jj += 1
-
-    return L, perm
