@@ -2,7 +2,7 @@ import re
 
 def replace_camel(oldfile, newfile):
 
-    p_camel = re.compile('def ([a-z0-9_]*)([A-Z])(\w*)')
+    p_camel = re.compile(r'def ([a-z0-9_]*)([A-Z])(\w*)')
 
     done = False
     readfile = oldfile

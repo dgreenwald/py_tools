@@ -131,7 +131,7 @@ def remove_command(text, command):
 def remove_commands(text, command_list):
     
     for command in command_list:
-        text = remove_command(command)
+        text = remove_command(text, command)
         
     return text
 
@@ -151,7 +151,7 @@ def remove_defn(text, command):
 def remove_defns(text, defn_list):
     
     for defn in defn_list:
-        text = remove_defn(defn)
+        text = remove_defn(text, defn)
         
     return text
 
@@ -170,14 +170,6 @@ def replace_refs(text, refs_to_replace):
         text = replace_ref(text, label, replacement)
         
     return text
-
-# def replace_figures(text, figs_to_replace):
-    
-#     for orig, repl in figs_to_replace:
-#         pattern = re.escape(orig)
-#         text = re.sub(pattern, repl, text)
-        
-#     return text
 
 def get_commands(text):
     
@@ -198,13 +190,11 @@ def get_commands(text):
             nargs = 0
         else:
             # Has argument number
-            # print(match_nargs.groups(1))
             nargs = match_nargs.groups(1)[0]
             if nargs == '':
                 nargs = 0
             else:
                 nargs = int(nargs)
-            # nargs = int(match_nargs.groups(1)[0])
             
             # Skip past this
             after = after[match_nargs.end():]
@@ -317,7 +307,7 @@ def replace_commands_dynamic(text, commands_to_replace, names_to_replace=None):
                 
         else:
             
-            before += content + bracket
+            before += bma.middle + content + bracket
 
         # Now replace the rest of the text
         after = replace_commands_dynamic(
