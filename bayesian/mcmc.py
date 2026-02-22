@@ -1,39 +1,23 @@
 import os
+import time
 import numpy as np
 import scipy.optimize as opt
-# from scipy.optimize import minimize
-# from scipy.special import logsumexp
 from scipy.stats import multivariate_normal as mv
-# import py_tools.numerical as nm
-import py_tools.compute.mpi_array as mp
 from py_tools import in_out as io, numerical as nm
 from py_tools.bayesian.prior import Prior
-from py_tools.compute.mpi_array import MPIArray
 
-from mpi4py import MPI
 
-#class MultivariateNormalSingular:
-#    """MVN distribution for singular covariance matrix"""
-#    
-#    def __init__(self, mean, cov):
-#        
-#        self.mean = mean
-#        self.cov = cov
-#        self.Nx = len(mean)
-#        
-#        assert self.cov.shape == (self.Nx, self.Nx)
-#        
-#        self.u, self.s, self.vh = np.linalg.svd(cov)
-#        
-#        self.C = self.u @ np.diag(np.sqrt(self.s))
-#        
-#    def rvs(self, Nsim):
-#        
-#        return np.random.randn(Nsim, Nx) @ self.C.T
-#    
-#    def logpdf(self, x):
-#        
-#        
+def _load_parallel_tools():
+    try:
+        import py_tools.compute.mpi_array as mp
+        from py_tools.compute.mpi_array import MPIArray
+        from mpi4py import MPI
+    except Exception as exc:
+        raise RuntimeError(
+            "MPI parallel features are unavailable. "
+            "Use parallel=False or configure a working MPI runtime."
+        ) from exc
+    return mp, MPIArray, MPI
 
 def adapt_jump_scale(acc_rate, adapt_sens, adapt_target, adapt_range):
 
@@ -143,28 +127,35 @@ def metropolis_step(fcn, x, x_try, post=None, log_u=None, args=()):
 
 def importance_sample(fcn, dist, Nsim, Nx, args=(), parallel=False):
 
-    # draws = dist.rvs(Nsim)
-    draws = np.zeros((Nsim, Nx))
-    post = np.zeros(Nsim)
+    if not parallel:
+        draws = np.atleast_2d(dist.rvs(Nsim))
+        if draws.shape[0] != Nsim:
+            draws = draws.reshape(Nsim, Nx)
+        post = np.zeros(Nsim)
+        for jj in range(Nsim):
+            post[jj] = fcn(draws[jj, :], *args)
+    else:
+        mp, _, _ = _load_parallel_tools()
+        draws = np.zeros((Nsim, Nx))
+        post = np.zeros(Nsim)
 
-    fake = (not parallel)
+        draws_mpi, draws_loc = mp.initialize(draws, fake=False)
+        post_mpi, post_loc = mp.initialize(post, fake=False)
 
-    draws_mpi, draws_loc = mp.initialize(draws, fake=fake)
-    post_mpi, post_loc = mp.initialize(post, fake=fake)
+        Nloc = len(post_loc)
+        draws_loc = np.atleast_2d(dist.rvs(Nloc))
+        if draws_loc.shape[0] != Nloc:
+            draws_loc = draws_loc.reshape(Nloc, Nx)
+        mp.disp("Draws per task: {:d}".format(Nloc))
+        for jj in range(Nloc):
+            post_loc[jj] = fcn(draws_loc[jj, :], *args)
 
-    Nloc = len(post_loc)
-    draws_loc = dist.rvs(Nloc)
-    mp.disp("Draws per task: {:d}".format(Nloc))
-    for jj in range(Nloc):
-        post_loc[jj] = fcn(draws_loc[jj, :], *args)
-
-    draws = mp.finalize(draws_mpi, draws_loc)
-    post = mp.finalize(post_mpi, post_loc)
+        draws = mp.finalize(draws_mpi, draws_loc)
+        post = mp.finalize(post_mpi, post_loc)
+        
+        if mp.rank() != 0:
+            return None, None
     
-    if mp.rank() != 0:
-        return None, None
-    
-    # rank 0
     p_proposal = dist.logpdf(draws)
     log_weights = post - p_proposal
     return draws, log_weights
@@ -173,10 +164,10 @@ def rwmh(posterior, x_init, jump_scale=1.0, C_list=None, Nstep=1, blocks=None,
               block_sizes=None, post_init=None, e=None, log_u=None, quiet=True):
 
     Nx = len(x_init)
-    Nblock = len(blocks)
 
     if blocks is None:
         blocks = [np.ones(Nx, dtype=bool)]
+    Nblock = len(blocks)
 
     if block_sizes is None:
         block_sizes = [np.sum(block) for block in blocks]
@@ -223,7 +214,7 @@ def rwmh(posterior, x_init, jump_scale=1.0, C_list=None, Nstep=1, blocks=None,
 class MonteCarlo:
     """Master class for Monte Carlo samplers"""
 
-    def __init__(self, log_like=None, prior=Prior(), args=(), lb=None, ub=None,
+    def __init__(self, log_like=None, prior=None, args=(), lb=None, ub=None,
                  names=None, bounds_dict=None, out_dir=None, suffix=None,
                  Nx=None):
         """
@@ -254,6 +245,8 @@ class MonteCarlo:
         if bounds_dict is None: bounds_dict = {}
 
         self.log_like = log_like
+        if prior is None:
+            prior = Prior()
         self.prior = prior
         self.args = args
         self.names = names
@@ -261,6 +254,8 @@ class MonteCarlo:
         self.post_mode = None
         self.H_inv = None
         self.CH_inv = None
+        self.lb = None
+        self.ub = None
 
         if lb is not None:
             self.Nx = len(lb)
@@ -273,35 +268,37 @@ class MonteCarlo:
         else:
             self.Nx = None
             
-        # if self.names is not None:
-        #     for name in names:
-        #         if name not in prior.names:
-        #             print("Defaulting to flat prior for {}".format(name))
-        #             prior.add(None, name=name)
-            
-        if ((lb is None) or (ub is None)) and not self.Nx is None:
+        if self.Nx is not None:
 
-            if lb is None:
-                self.lb = np.inf * np.ones(self.Nx)
-            if ub is None:
+            lb_missing = (lb is None)
+            ub_missing = (ub is None)
+
+            if lb_missing:
+                self.lb = -np.inf * np.ones(self.Nx)
+            else:
+                self.lb = np.array(lb, copy=True)
+
+            if ub_missing:
                 self.ub = np.inf * np.ones(self.Nx)
+            else:
+                self.ub = np.array(ub, copy=True)
 
-            if self.names is not None:
+            if self.names is not None and (lb_missing or ub_missing):
                 for ii, name in enumerate(self.names):
                     lb_i, ub_i = bounds_dict.get(name, (-np.inf, np.inf))
 
                     if lb_i is None: lb_i = -np.inf
                     if ub_i is None: ub_i = np.inf
 
-                    if lb is None: self.lb[ii] = lb_i
-                    if ub is None: self.ub[ii] = ub_i
+                    if lb_missing: self.lb[ii] = lb_i
+                    if ub_missing: self.ub[ii] = ub_i
 
         self.out_dir = out_dir
         self.suffix = suffix
 
     def posterior(self, params):
 
-        if check_bounds(params.ravel(), self.lb, self.ub):
+        if (self.lb is None) or (self.ub is None) or check_bounds(params.ravel(), self.lb, self.ub):
             return (self.log_like(params, *self.args) + self.prior.logpdf(params))
         else:
             return -1e+10
@@ -340,11 +337,14 @@ class MonteCarlo:
 
             if iterate:
                 if disp_iterate:
-                    mp.disp("Iteration {0:d}: starting posterior = {1:g}, "
-                            "ending posterior = {2:g}".format(count, post_start, self.post_mode))
-                    
-                    these_params = {self.names[ii] : self.x_mode[ii] for ii in range(len(self.names))}
-                    mp.disp("Params: " + repr(these_params))
+                    print("Iteration {0:d}: starting posterior = {1:g}, "
+                          "ending posterior = {2:g}".format(count, post_start, self.post_mode), flush=True)
+
+                    if self.names is not None:
+                        these_params = {self.names[ii]: self.x_mode[ii] for ii in range(len(self.names))}
+                    else:
+                        these_params = {'param{:d}'.format(ii): self.x_mode[ii] for ii in range(len(self.x_mode))}
+                    print("Params: " + repr(these_params), flush=True)
                 done = np.abs(self.post_mode - post_start) < iter_tol
                 if not done:
                     x0 = self.x_mode
@@ -385,10 +385,6 @@ class MonteCarlo:
 
                 self.CH_inv = np.linalg.cholesky(self.H_inv)
 
-        # self.H = np.real(self.H)
-        # self.H_inv = np.real(self.H_inv)
-        # self.CH_inv = np.real(self.CH_inv)
-
         return None
 
     def set_CH_inv(self, CH_inv):
@@ -401,6 +397,10 @@ class MonteCarlo:
         return metropolis_step(self.posterior, x, x_try, post=post, **kwargs)
 
     def open_log(self, title='log', suffix=None):
+
+        if self.out_dir is None:
+            self.fid = None
+            return None
 
         if suffix is None:
             suffix = self.suffix
@@ -483,7 +483,6 @@ class MonteCarlo:
         assert self.x_mode is not None
         assert self.H_inv is not None
         
-#        (u, s, vh) = np.linalg.svd(self.H_inv)
         cov = self.H_inv.copy()
         if offset is not None:
             cov += np.diag(offset * np.ones(self.Nx))
@@ -491,7 +490,7 @@ class MonteCarlo:
         dist = mv(mean=self.x_mode, cov=cov)
         draws, log_weights = importance_sample(self.posterior, dist, Nsim, self.Nx, **kwargs)
 
-        if mp.rank() != 0:
+        if draws is None:
             
             return None, None, None
             
@@ -581,6 +580,9 @@ class RWMC(MonteCarlo):
                cov_offset=0.0, min_recov=0, n_retune=None, chain_no=0,
                *args, **kwargs):
 
+        if (n_save is not None) and (self.out_dir is None):
+            raise ValueError("RWMC.sample requires out_dir when n_save is set.")
+
         self.Nsim = Nsim
 
         x = self.x0.copy()
@@ -639,7 +641,7 @@ class RWMC(MonteCarlo):
                 if n_print is not None:
                     if (jstep + 1) % n_print == 0:
                         self.print_log("Draw {0:d}. Acceptance rate: {1:4.3f}. Max posterior = {2:4.3f}".format(
-                            jstep + 1, self.acc / istep, self.max_post
+                            jstep + 1, self.acc_rate, self.max_post
                         ))
 
                 if n_recov is not None:
@@ -662,7 +664,6 @@ class RWMC(MonteCarlo):
                         self.print_log("Acceptance rate for last {0:d} draws: {1:4.3f}".format(steps_since_retune, acc_rate_since_retune))
                         self.print_log("Retuning: old jump scale = {:7.6f}".format(self.jump_scale))
                         self.jump_scale *= adapt_jump_scale(
-                            # self.acc_rate, self.adapt_sens, self.adapt_target, self.adapt_range
                             acc_rate_since_retune, self.adapt_sens, self.adapt_target, self.adapt_range
                         )
                         self.print_log("Retuning: new jump scale = {:7.6f}".format(self.jump_scale))
@@ -674,7 +675,6 @@ class RWMC(MonteCarlo):
                 if n_save is not None:
                     if (jstep + 1) % n_save == 0:
                         self.print_log("Saving intermediate output")
-                        # self.save_all()
                         self.save_chain(chain_no=chain_no)
 
 
@@ -685,6 +685,8 @@ class RWMC(MonteCarlo):
         return None
 
     def chain_suffix(self, chain_no=0):
+        if self.suffix is None:
+            return 'chain{:d}'.format(chain_no)
         return self.suffix + '_chain{:d}'.format(chain_no)
 
     def save_chain(self, chain_no=0):
@@ -731,14 +733,25 @@ class RWMC(MonteCarlo):
 
         self.load_list(np_list=self.np_list, pkl_list=self.pkl_list)
 
-    def run_all(self, x0, Nsim, **kwargs):
+    def run_all(self, x0, Nsim, mode_kwargs=None, hess_kwargs=None,
+                init_kwargs=None, sample_kwargs=None, **kwargs):
         """Find mode, run MCMC chain, and save"""
 
-        self.find_mode(x0, **kwargs)
-        self.compute_hessian(**kwargs)
-        self.sample(Nsim, **kwargs)
+        if mode_kwargs is None:
+            mode_kwargs = {}
+        if hess_kwargs is None:
+            hess_kwargs = {}
+        if init_kwargs is None:
+            init_kwargs = {}
+        if sample_kwargs is None:
+            sample_kwargs = {}
+
+        self.find_mode(x0, **mode_kwargs)
+        self.compute_hessian(**hess_kwargs)
+        self.initialize(**init_kwargs)
+        self.sample(Nsim, **sample_kwargs)
         if self.out_dir is not None:
-            self.save(self.out_dir, **kwargs)
+            self.save_all(**kwargs)
 
 class SMC(MonteCarlo):
     """Sequential Monte Carlo Sampler"""
@@ -761,6 +774,9 @@ class SMC(MonteCarlo):
                    init_jump_scale=0.25, lam=2.0, adapt_sens=16.0,
                    adapt_range=0.1, adapt_target=0.25, parallel=False, 
                    save_intermediate=True, test_flag=False):
+
+        if save_intermediate and (self.out_dir is None):
+            raise ValueError("SMC.initialize requires out_dir when save_intermediate=True.")
 
         self.Npt = Npt
         self.Nstep = Nstep
@@ -827,10 +843,13 @@ class SMC(MonteCarlo):
         self.parallel = parallel
         
         if self.parallel:
-            self.comm = MPI.COMM_WORLD
+            _, self.MPIArray, self.MPI = _load_parallel_tools()
+            self.comm = self.MPI.COMM_WORLD
             self.mpi_size = self.comm.Get_size()
             self.rank = self.comm.Get_rank()
         else:
+            self.MPIArray = None
+            self.MPI = None
             self.rank = 0
 
     def sample(self, quiet=False):
@@ -842,19 +861,25 @@ class SMC(MonteCarlo):
             # On last step, force resampling
             last_step = (istep == self.Nstep - 1)
             
-            start = MPI.Wtime()
+            if self.parallel:
+                start = self.MPI.Wtime()
+            else:
+                start = time.perf_counter()
             
             self.correct(istep, force_resample=last_step)
 
             if self.parallel and self.test_flag:
-                end = MPI.Wtime()
+                end = self.MPI.Wtime()
                 self.rank_print("Step {0:d} time elapsed: {1:g} seconds".format(istep, end - start))
                 raise Exception
 
             self.adapt(istep)
             self.mutate(istep)
                 
-            end = MPI.Wtime()
+            if self.parallel:
+                end = self.MPI.Wtime()
+            else:
+                end = time.perf_counter()
             self.rank_print("Step {0:d} time elapsed: {1:g} seconds".format(istep, end - start))
             
             # End-of-iteration tasks
@@ -889,11 +914,9 @@ class SMC(MonteCarlo):
         # Only time we don't have posterior from the mutation step
         if istep == 1:
             if self.parallel:
-    #        if True:
-                 
                 # Create MPI arrays and scatter to nodes
-                mpi_draws = MPIArray(root_data=self.draws[istep, :, :])
-                mpi_post = MPIArray(root_data=self.post[istep, :])
+                mpi_draws = self.MPIArray(root_data=self.draws[istep, :, :])
+                mpi_post = self.MPIArray(root_data=self.post[istep, :])
     
                 # Get local data
                 local_draws = mpi_draws.get_local_data()
@@ -907,25 +930,15 @@ class SMC(MonteCarlo):
                 mpi_post.set_local_data(local_post)
                 
                 if self.rank > 0: return None
-    #                raise Exception
-                
-    #            this_post2 = mpi_post.get_root_data()
                 this_post = mpi_post.get_root_data()
                 
             else:
-    #        if True:
-                 
                 this_post = np.zeros(self.Npt)
                 for ipt in range(self.Npt):
                     this_post[ipt] = self.posterior(self.draws[istep, ipt, :])
         else:
             
             this_post = self.post[istep-1, :]
-                
-#        print("correct error:")
-#        print(this_post - this_post2)
-        
-#        raise Exception
 
         # Turn into weight using incremental, ignoring non-finite values
         ix_good = np.isfinite(this_post)
@@ -962,27 +975,19 @@ class SMC(MonteCarlo):
         
         # Weighted covariance
         the_til = self.draws[istep, :, :] - self.the_star[np.newaxis, :]
-        if np.any(self.the_star > 0.0):
-            w_the_til = weights[:, np.newaxis] * the_til
-            self.Sig_star = np.dot(w_the_til.T, the_til) / self.Npt
-#            print(self.Sig_star)
-            if not np.all(np.linalg.eigvals(self.Sig_star) > 0):
-                print("Bad Sig_star:")
-                print(self.Sig_star)
-            self.C_star = np.linalg.cholesky(self.Sig_star)
-                
-            # Update C_list as list by block
-            self.C_list = partition_C(self.C_star, self.blocks)
+        w_the_til = weights[:, np.newaxis] * the_til
+        self.Sig_star = np.dot(w_the_til.T, the_til) / self.Npt
 
-        elif self.C_star is None:
-            print("No valid value for C_star")
-            raise Exception
+        if not np.all(np.isfinite(self.Sig_star)):
+            raise ValueError("Sig_star contains non-finite values.")
+
+        self.C_star = nm.robust_cholesky(self.Sig_star, min_eig=0.0)
+            
+        # Update C_list as list by block
+        self.C_list = partition_C(self.C_star, self.blocks)
 
         self.jump_scales[istep] = self.jump_scales[istep-1]
         if istep > 1:
-            # e_term = np.exp(self.adapt_sens * (self.acc_rate[istep-1] - self.adapt_target))
-            # adj = (1.0 - 0.5 * self.adapt_range) + self.adapt_range * (e_term / (1.0 + e_term))
-            # self.jump_scales[istep] *= adj
             self.jump_scales[istep] *= adapt_jump_scale(
                 self.acc_rate[istep-1], self.adapt_sens, self.adapt_target, self.adapt_range
             )
@@ -992,21 +997,16 @@ class SMC(MonteCarlo):
         e = np.random.randn(self.Npt, self.Nmut, self.Nx)
         log_u = np.log(np.random.rand(self.Npt, self.Nmut, self.Nblock))
         
-#        old_draws = self.draws[istep, :, :].copy()
-#        if self.rank == 0:
-#            print("all draws:\n" + repr(self.draws[istep, :, :]))
-        
         if self.parallel:
-#        if True:
             
             local_C_list = self.comm.bcast(self.C_list, root=0)
             local_jump_scale = self.comm.bcast(self.jump_scales[istep], root=0)
             
             # Set arrays and scatter
-            mpi_draws = MPIArray(root_data=self.draws[istep, :, :])
-            mpi_post = MPIArray(root_data=self.post[istep, :])
-            mpi_e = MPIArray(root_data=e)
-            mpi_log_u = MPIArray(root_data=log_u)
+            mpi_draws = self.MPIArray(root_data=self.draws[istep, :, :])
+            mpi_post = self.MPIArray(root_data=self.post[istep, :])
+            mpi_e = self.MPIArray(root_data=e)
+            mpi_log_u = self.MPIArray(root_data=log_u)
             
             local_draws = mpi_draws.get_local_data()
             local_post = mpi_post.get_local_data()
@@ -1014,80 +1014,34 @@ class SMC(MonteCarlo):
             local_log_u = mpi_log_u.get_local_data()
             
             local_acc = np.zeros(1)
-            
-#            if self.rank == 1:
-#            local_pre = local_draws.copy()
-#                print("local draws_pre:\n" + repr(local_draws))
-            
-#            if self.rank == 1:
-#                quiet = False
-#                print("C_list = " + repr(local_C_list))
-#                print("jump_scale = " + repr(local_jump_scale))
-#            else:
-#                print("C_list = " + repr(self.C_list))
-#                print("jump_scale = " + repr(self.jump_scales[istep]))
-#                quiet = True
         
             Nloc = local_draws.shape[0]
             for ipt in range(Nloc):
-                
-#                if self.rank == 1:
-#                    print("ipt = " + repr(ipt))
-#                    print("e = " + repr(local_e[ipt, :, :]))
-                
                 x_i, post_i, acc_rate_i = rwmh(
                     self.posterior, local_draws[ipt, :],
                     jump_scale=local_jump_scale, C_list=local_C_list,
                     Nstep=self.Nmut, blocks=self.blocks,
                     block_sizes=self.block_sizes, post_init=local_post[ipt], 
                     e=local_e[ipt, :, :], log_u=local_log_u[ipt, :, :],
-#                    quiet=quiet,
                 )
-                
-#                    print("draw was: " + repr(local_pre[ipt, :]))
-#                    print("post was: " + repr(local_post[ipt]))
-#                    print("x_i: " + repr(x_i))
-#                    print("post_i: " + repr(post_i))
-#                    print("acc_rate_i: " + repr(acc_rate_i))
-                
                 local_draws[ipt, :] = x_i[-1, :]
                 local_post[ipt] = post_i[-1]
                 local_acc += acc_rate_i
-                
-#            if self.rank == 1:
-#            print("rank = " + repr(self.rank) + ", local update:\n" + repr(local_draws - local_pre))
-#            print("rank = " + repr(self.rank) + ", local acc rate:\n" + repr(local_acc))
-#            print("rank = " + repr(self.rank) + ", local log_u:\n" + repr(local_log_u))
-                
-#            if self.rank == 1:
-#                print("local_draws: " + repr(local_draws))
                 
             mpi_draws.set_local_data(local_draws)
             mpi_post.set_local_data(local_post)
                 
             root_acc = np.zeros(1)
-            self.comm.Reduce(local_acc, root_acc, op=MPI.SUM, root=0)
-#            root_acc /= self.Npt
+            self.comm.Reduce(local_acc, root_acc, op=self.MPI.SUM, root=0)
             self.acc_rate[istep] = root_acc / self.Npt
             
             
             if self.rank > 0: return None
             
-#            root_draws = mpi_draws.get_root_data()
-#            root_post = mpi_post.get_root_data()
-            
             self.draws[istep, :, :] = mpi_draws.get_root_data()
             self.post[istep, :] = mpi_post.get_root_data()
-            
-#            print("update:")
-#            print(self.draws[istep, :, :] - old_draws)
-        
-#        if True:
+
         else:
-            
-#            e = np.random.randn(self.Npt, self.Nmut, self.Nx)
-#            log_u = np.log(np.random.rand(self.Npt, self.Nmut, self.Nblock))
-    
             for ipt in range(self.Npt):
                 
                 x_i, post_i, acc_rate_i = rwmh(
@@ -1104,16 +1058,7 @@ class SMC(MonteCarlo):
                 
             self.acc_rate[istep] /= self.Npt
             
-#        print("draws:")
-#        print(np.sum(np.abs(self.draws[istep, :, :] - root_draws)))
-#        print("post:")
-#        print(self.post[istep, :] - root_post)
-#        print("acc:")
-#        print(self.acc_rate[istep] - root_acc)
-            
         self.rank_print("Acceptance rate: {:g}".format(self.acc_rate[istep]))
-        
-#        raise Exception
 
         return None
     

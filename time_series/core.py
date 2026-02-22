@@ -244,12 +244,6 @@ def long_horizon_contemp(df, lhs, rhs, horizon, **kwargs):
 
     raise Exception
 
-    long_list = transform(df, [lhs] + rhs, diff=horizon, other='cumsum') 
-    lhs_long = long_list[0]
-    rhs_long = long_list[1:]
-
-    return dt.regression(df, lhs_long, rhs_long, **kwargs)
-
 def long_horizon_predictive(df_in, lhs, rhs, horizon, norm_lhs=False, **kwargs):
 
     df = df_in[[lhs] + rhs].copy()
@@ -355,13 +349,12 @@ def VECM(df, var_list, n_var_lags=1, n_dls_lags=8):
     alp, dlt = run_dls(df, dls_lhs, dls_rhs, n_dls_lags)
 
     # Get cointegration term
-    df['coint_resid'] = np.dot(df.ix[:, var_list], alp)
+    df['coint_resid'] = df.loc[:, var_list].to_numpy() @ alp
     rhs += transform(df, ['coint_resid'], lag=1)
 
     for lag in range(1, n_var_lags + 1):
         for var in var_list:
             rhs += transform(df, [var], diff=1, lag=lag)
-            # rhs.append(add_lag(df, var, lag))
 
     # Regression
     return VECMResults(dt.mv_ols(df, lhs, rhs), alp)
@@ -420,21 +413,7 @@ class LongHorizonMA:
 
     def __init__(self, df, lhs_var, rhs_var, horizon, n_lags=16):
 
-        print("Need to fix!")
         raise Exception
-        # # First stage: MA dt.regression
-        # fr = MA(df, lhs_var, [rhs_var], n_lags)
-
-        # # Second stage: compute LH coefficient
-        # ma_coeffs = fr.results.params[1:]
-
-        # cov_term = 0.0
-        # for ii in range(horizon):
-            # start = max(0, ii - horizon + 1)
-            # end = ii + 1
-            # cov_term += np.sum(ma_coeffs[start : end])
-
-        # bet = cov_term / horizon
 
 class LongHorizonVAR:
     """Long Horizon VAR Regression"""
@@ -477,8 +456,7 @@ class LongHorizonVAR:
         self.lhs_ix = 0
 
     def predictive_reg(self):
-        
-        print("Need to check for lags > 1!")
+
         # Compute covariance of current with future sum
         C_sum = np.zeros(self.C[0].shape)
 
@@ -500,9 +478,6 @@ class LongHorizonVAR:
             lh_var = self.Vk[self.lhs_ix, self.lhs_ix]
             R2[ii] = (lh_rh_cov ** 2) / (lh_var * rh_var)
 
-        bet_lh = np.zeros(self.n_rhs)
-        R2 = np.zeros(self.n_rhs)
-
         return (bet_lh, R2)
 
     def contemp_reg(self, display=False):
@@ -514,7 +489,6 @@ class LongHorizonVAR:
 
         # OLS
         bet_lh = np.linalg.solve(cov_xx, cov_xy)
-        # R2 = nm.quad_form(bet_lh, cov_xx) / var_y
         R2 = np.dot(bet_lh.T, np.dot(cov_xx, bet_lh)) / var_y
 
         if display:
@@ -611,7 +585,6 @@ def run_dls(df, lhs_var, rhs_vars, n_lags=8, display=False):
     for lag in range(-n_lags, n_lags + 1):
         for var in rhs_vars:
             rhs += transform(df, [var], lag=lag, diff=1)
-            # rhs.append(add_lag(df, var, lag, diff=1))
             
     # Regression
     fr = dt.sm_regression(df, lhs, rhs, display=display)
@@ -801,11 +774,6 @@ def rolling_forecast_internal(y, X, t_min=None):
         bet_t = np.linalg.solve(XX_t, Xy_t)
         forecast[tt, :] = np.dot(bet_t.T, x_t)
 
-        # Testing
-        # XX_check = np.dot(X[:tt, :].T, X[:tt, :])
-        # Xy_check = np.dot(X[:tt, :].T, y[:tt, :])
-        # bet_check = np.linalg.solve(XX_check, Xy_check)
-
         # Update forecast
         XX_t += np.dot(x_t, x_t.T)
         Xy_t += np.dot(x_t, y_t.T) 
@@ -955,7 +923,6 @@ def bandpass_filter_christiano(series, period_lb, period_ub, detrend=False):
     grid = np.arange(1, Nt)
     B1 = (np.sin(grid * b) - np.sin(grid * a)) / (np.pi * grid)
     B0 = (b - a) / np.pi
-    # B = np.hstack((B0, B1))
     
     Bc = np.hstack((0.0, np.cumsum(B1)))
     B_til = -0.5 * B0 - Bc
@@ -1082,11 +1049,9 @@ def interpolate_to_high_frequency(z, freq=4, A=None):
         
     B = np.zeros((N, N))
     
-    # j = 0
     B[0, 0] = 1.0
     B[0, 1] = -1.0
     
-    # j = N - 1
     B[-1, -1] = 1.0
     B[-1, -2] = -1.0
     

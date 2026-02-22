@@ -2,10 +2,7 @@ import numpy as np
 import scipy as sp
 from scipy.stats import multivariate_normal as mvn
 
-import copy
-
 from py_tools import numerical as nm, stats as st
-# from py_tools.utilities import tic, toc
 
 def init_to_val(shape, val):
 
@@ -104,13 +101,9 @@ class StateSpaceModel:
             Nt = shocks.shape[0] + 1
 
         if shocks is None:
-            # CQ = np.linalg.cholesky(self.Q)
-            # shocks = np.dot(CQ, np.random.randn(self.Ne, Nt)).T
             shocks = self.draw_shocks(Nt - 1)
         
         if meas_err is None:
-            # CH = np.linalg.cholesky(self.H)
-            # meas_err = np.dot(CH, np.random.randn(self.Ny, Nt)).T
             meas_err = self.draw_meas_err(Nt)
 
         assert shocks.shape == (Nt - 1, self.Ne)
@@ -203,7 +196,7 @@ class StateSpaceModel:
             for ishock in range(self.Ne)
         ])
 
-        y_det_component_samp = det_component @ self.Z.T
+        y_det_component_samp = det_component_samp @ self.Z.T
 
         y_shock_only_samp = y_shock_components_samp + y_det_component_samp
         y_shock_removed_samp = y - y_shock_components_samp
@@ -227,7 +220,7 @@ class StateSpaceModel:
             y = states @ self.Z.T + self.b[np.newaxis, :]
 
         y_state_components_samp = np.concatenate([
-            (states[start_ix:, istate] @ self.Z[:, istate].T)[np.newaxis, :, :]
+            (states[start_ix:, istate][:, np.newaxis] @ self.Z[:, istate][np.newaxis, :])[np.newaxis, :, :]
             for istate in range(self.Nx)
         ], axis=0)
 
@@ -263,9 +256,6 @@ class StateSpaceEstimates:
         self.set_data(y)
         self.set_ssm(ssm)
 
-        # Data net of constant
-        # self.y_til = self.y - self.ssm.b[np.newaxis, :]
-
         # Set initializations
         if x_init is None:
             x_init = np.zeros(self.Nx)
@@ -282,6 +272,9 @@ class StateSpaceEstimates:
         
         # Item for smoother
         self.r = None
+        self.state_draw = None
+        self.shock_draw = None
+        self.meas_err_draw = None
 
     def set_data(self, y):
         """Read in a new set of observables"""
@@ -326,14 +319,8 @@ class StateSpaceEstimates:
             
         x_pred_t = self.x_init
         P_pred_t = self.P_init
-        
-        # x_pred_t = np.dot(self.ssm.A, self.x_init)
-        # P_pred_t = self.ssm.A @ self.P_init @ self.ssm.A.T + self.ssm.RQR
 
         self.err = np.zeros((self.Nt, self.Ny))
-
-#        self.x_filt = np.zeros((self.Nt, self.Nx))
-#        self.P_filt = np.zeros((self.Nt, self.Nx, self.Nx))
 
         self.x_pred = np.zeros((self.Nt, self.Nx))
         self.P_pred = np.zeros((self.Nt, self.Nx, self.Nx))
@@ -374,28 +361,13 @@ class StateSpaceEstimates:
             x_pred_t = np.dot(self.ssm.A, x_pred_t) + np.dot(K_t, err_t)
             P_pred_t = np.dot(AP_t, G_t.T) + self.ssm.RQR
 
-            """OLD VERSION: STORE FILTERED RESULTS SEPARATELY"""            
-            # Note: "K" in DK notation is AK. "L" is AG.
-#            K_t = np.dot(P_pred_t, ZFi_t)
-#            G_t = np.eye(self.Nx) - np.dot(K_t, self.ssm.Z[ix_t, :])
-
-#            x_filt = x_pred_t + np.dot(K_t, err_t)
-#            P_filt = np.dot(P_pred_t, G_t.T)
-
             # Save values
             self.ix[tt, :] = ix_t
             self.err[tt, ix_t] = err_t
 
-#            self.x_filt[tt, :] = x_filt
-#            self.P_filt[tt, :, :] = P_filt
-
             self.ZFi[tt, :, ix_t] = ZFi_t.T
             self.K[tt, :, ix_t] = K_t.T
             self.G[tt, :, :] = G_t
-
-            # Update for next period
-#            x_pred_t = np.dot(self.ssm.A, x_filt)
-#            P_pred_t = np.dot(self.ssm.A, np.dot(P_filt, self.ssm.A.T)) + self.ssm.RQR
 
         return None
 
@@ -437,10 +409,6 @@ class StateSpaceEstimates:
 
         if (self.r is None) or disturbance_smooth:
             self.disturbance_smoother()
-
-        # empty_row = np.empty((1, self.Ne))
-        # empty_row.fill(np.nan)
-        # self.shocks_smooth = np.vstack((empty_row, self.r[1:, :] @ self.ssm.QR.T))
             
         self.shocks_smooth = self.r[1:, :] @ self.ssm.QR.T
         return None
@@ -472,9 +440,6 @@ class StateSpaceEstimates:
         # Draw shocks
         shocks = self.ssm.draw_shocks(self.Nt - 1)
         meas_err = self.ssm.draw_meas_err(self.Nt)
-
-        # shocks = st.draw_norm_multi(self.ssm.Q, self.Nt)
-        # meas_err = st.draw_norm_multi(self.ssm.H, self.Nt)
         x_1 = self.x_init + st.draw_norm(self.P_init)
 
         # Simulate using random draws
@@ -505,9 +470,8 @@ class StateSpaceEstimates:
     def get_shock_components(self, redraw_shocks=False, start_ix=0):
 
         # Set shock series to use
-        if redraw_shocks or (self.shock_draw is None):
-            self.state_smoother(draw_shocks=True)
+        if redraw_shocks or (self.shock_draw is None) or (self.state_draw is None):
+            self.draw_states(draw_shocks=True)
 
         return self.ssm.decompose_by_shock(self.shock_draw, self.state_draw,
                                            start_ix=start_ix)
-

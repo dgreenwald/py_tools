@@ -1,6 +1,5 @@
 import numpy as np
 from py_tools import data as dt, time_series as ts
-# import py_tools.time_series as ts
 from py_tools.utilities import as_list
 
 def instrument_var(df, var_list, policy_var, instrument, Sig=None, resid_prefix='u_'):
@@ -128,9 +127,6 @@ class VAR:
         self.n_var_lags = n_var_lags
         self.use_const = use_const
 
-        # Initial estimation
-        # self.fit()
-
         # IRFs
         self.irfs = None
         self.Nt_irf = None
@@ -139,28 +135,12 @@ class VAR:
         self.A_boot = None
         self.y_boot = None
 
-    # def lagged_reg(self, lhs, rhs_list, n_lags, use_const=True):
-
     def fit(self):
-
-        # lhs = self.var_list
-        # rhs = []
-
-        # for lag in range(1, self.n_var_lags + 1):
-            # for var in self.var_list:
-                # rhs += ts.transform(self.df, [var], lag=lag)
-
-        # # RHS variables
-        # if self.use_const:
-            # rhs += ['const']
-
-        # self.fr = dt.mv_ols(self.df, lhs, rhs)
         self.fr = ts.lagged_reg(self.df, self.var_list, self.var_list, 
                                 self.n_var_lags, use_const=self.use_const)
 
         # Process results
         self.A = self.fr.results.params.T
-        # self.A_comp = companion_form(self.A)
         self.resid = self.fr.results.resid
         self.Ny, self.Nx = self.A.shape
         self.Nt = self.fr.Xs.shape[0]
@@ -168,24 +148,6 @@ class VAR:
         self.X = self.fr.Xs
         self.y = self.fr.zs
         self.ix = self.fr.ix
-
-    # def X(self):
-        # return self.fr.Xs
-
-    # def y(self):
-        # return self.fr.zs
-
-    # def ix(self):
-        # return self.fr.ix
-
-    # def irfs(self, **kwargs):
-        # if self.irfs is None:
-            # compute_irfs(self, **kwargs)
-        # return self.irfs
-
-    # def irfs(self, **kwargs):
-        # if self.irfs is None:
-            # compute_irfs(self, kwargs)
 
     def get_companion_form(self):
 
@@ -202,7 +164,6 @@ class VAR:
         # Shift existing parameters
         A_old = self.A.copy()
         Ny_old = self.Ny
-        # Nx_old = self.Nx
 
         N_new = len(new_series)
         self.Ny += N_new
@@ -218,14 +179,6 @@ class VAR:
 
         A2_new = fr_new.results.params.T
         self.A = np.vstack((A1_new, A2_new))
-
-        # self.resid = fr_new.results.resid
-        # self.Ny, self.Nx = self.A.shape
-        # self.Nt = fr_new.Xs.shape[0]
-
-        # self.X = fr_new.Xs
-        # self.y = fr_new.zs
-        # self.ix = fr_new.ix
 
         return None
 
@@ -249,24 +202,6 @@ class VAR:
 
         return
 
-        # # Check
-        # n_shocks = B.shape[1]
-        # assert(B.shape[0] == self.Ny)
-
-        # # Update to companion form
-        # A_comp = companion_form(self.A)
-        # B_comp = np.zeros((self.Nx, n_shocks))
-        # B_comp[:self.Ny, :] = B
-
-        # # Run IRFs in companion form
-        # irf_comp_mats = np.zeros((self.Nx, n_shocks, Nt_irf))
-        # irf_comp_mats[:, :, 0] = B_comp
-        # for tt in range(1, Nt_irf):
-            # irf_comp_mats[:, :, tt] = np.dot(A_comp, irf_comp_mats[:, :, tt-1])
-
-        # # Chop extraneous rows
-        # return irf_comp_mats[:self.Ny, :, :]
-
     def wild_bootstrap(self, Nboot=1000):
 
         self.Nboot = Nboot
@@ -279,10 +214,6 @@ class VAR:
         # Draw bootstrapped residuals
         eta = 1.0 - 2.0 * (np.random.rand(self.Nt, Nboot) > 0.5)
         self.resid_boot = self.resid[:, :, np.newaxis] * eta[:, np.newaxis, :]
-        
-        # Companion form impact matrix
-        # impact_companion = np.zeros((self.Nx, self.Ny))
-        # impact_companion[:self.Ny, :] = np.eye(self.Ny)
 
         y_i = np.zeros((self.Nt, self.Ny))
         X_i = np.zeros((self.Nt, self.Nx))

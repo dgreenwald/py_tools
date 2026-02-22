@@ -1,4 +1,3 @@
-# import ipdb
 import numpy as np
 from scipy.optimize import minimize
 from scipy.special import gammaln
@@ -8,23 +7,9 @@ import re
 
 from py_tools import data as dt, numerical as nm, time_series as ts
 from py_tools.time_series import merge_date
-from py_tools.time_series import var as vr
 import py_tools.time_series.state_space as ss
+from py_tools.time_series import var as vr
 
-# def ols_likelihood(X, Y, S):
-
-    # Nt, Nx = X.shape
-    # _, Ny = Y.shape
-
-    # L = (
-        # - 0.5 * Ny * Nt * np.log(2.0 * np.pi)
-        # - 0.5 * Ny * np.log(np.abs(np.linalg.det(xtx(X))))
-        # - 0.5 * (Nt - Nx) * np.log(np.abs(np.linalg.det(S)))
-        # + 0.5 * Ny * (Nt - Nx) * np.log(2.0)
-        # + np.sum(gammaln(0.5 * (Nt - Nx - np.arange(Ny))))
-    # )
-
-    # return L
 
 def log_abs_det(x):
 
@@ -62,7 +47,6 @@ def post_mode(X, Y, b_bar, Om_inv_bar, Psi_bar, df_bar):
     Xy = np.dot(X.T, Y) + np.dot(Om_inv_bar, B_bar)
 
     XX_inv = np.linalg.inv(XX)
-    # b_hat = np.linalg.solve(XX, Xy)
     B_hat = np.dot(XX_inv, Xy)
 
     # Posterior for Sig
@@ -98,13 +82,7 @@ def draw_mniw(b_hat, XX_inv, Psi_hat, df_hat, Ny, Nx):
     Sig = invwishart.rvs(df_hat, scale=Psi_hat)
     V_b = np.kron(Sig, XX_inv)
     b = multivariate_normal.rvs(b_hat, V_b)
-    # B = np.reshape(b, (Ny, Nx))
-
     return (b, Sig)
-
-# def ols(X, y):
-
-    # return np.linalg.solve(np.dot(X.T, X), np.dot(X.T, y))
 
 def xtx(x):
 
@@ -359,10 +337,6 @@ class BVAR:
         self.X_all = np.vstack((self.X_star, self.X))
         self.Y_all = np.vstack((self.Y_star, self.Y))
 
-        # if compute_ols:
-            # self.Phi_star, self.Sig_star = fit_ols(self.X_star, self.Y_star)
-            # self.Phi_hat, self.Sig_hat = fit_ols(self.X_all, self.Y_all)
-
         self.Nt_all = self.X_all.shape[0]
 
         return None
@@ -499,48 +473,6 @@ class BVAR:
 
         self.Y = X_samp[:, :self.Ny]
 
-    # def sample_with_data_augmentation(self, Nsim=1000, Nburn=1000):
-
-        # self.Nsim = Nsim
-
-        # self.B_sim = np.zeros((self.Nsim, self.Nx, self.Ny))
-        # self.Sig_sim = np.zeros((self.Nsim, self.Ny, self.Ny))
-        # self.Y_sim = np.zeros((self.Nsim, self.Nt, self.Ny))
-
-        # for jj in range(self.Nsim): 
-
-            # # Update data
-            # self.X_all = np.vstack((self.X_star, self.X))
-            # self.Y_all = np.vstack((self.Y_star, self.Y))
-
-            # self.fit()
-
-            # # Coefficient drawing block
-            # b_j, Sig_j = draw_mniw(self.b_hat, self.XX_inv, self.Psi_hat, self.df_hat,
-                                   # self.Ny, self.Nx)
-           
-            # B_j = np.reshape(b_j, (self.Ny, self.Nx)).T
-
-            # # DATA AUGMENTATION BLOCK
-
-            # # Compute companion form and set up state space model
-            # A = vr.companion_form(B_j)
-            # ssm = ss.StateSpaceModel(A, R, Sig_j, Z, H)
-            # self.Y = ssm.draw_states(self.Y_data, x_init, P_init)
-
-        # return None 
-
-    # def sample_glp(self, Nsim=1000, Nburn=1000):
-
-        # for jj in range(self.Nsim + Nburn):
-
-            # b_t, Sig_t = draw_mniw(self.b_hat, self.XX_inv, self.Psi_hat, self.df_hat,
-                                   # self.Ny, self.Nx)
-
-            # jj_sim = jj - Nburn
-
-        # return None
-
     def compute_irfs_sim(self, Nirf=41, impact=None, impact_type='identity'):
         """ Computes IRFs from sampled parameters.
 
@@ -591,23 +523,3 @@ class BVAR:
             self.irf_sim[jj, :, :, :] = compute_irfs(self.B_sim[jj, :, :], self.p, Nirf, impact)
 
         return None
-
-    # def marg_like(self):
-
-        # L_all = ols_likelihood(self.X_all, self.Y_all, self.Sig_hat)
-        # L_star = ols_likelihood(self.X_star, self.Y_star, self.Sig_star)
-        
-        # return L_all - L_star
-
-    # def grid_search(self):
-
-        # for lam in itertools.product(
-                # np.linspace(0.1, 2.1, 5),
-                # np.linspace(0.25, 1.75, 4),
-                # [1],
-                # np.arange(1, 7),
-                # np.arange(1, 6),
-                # np.linspace(0.25, 1.0, 4),
-                # np.linspace(0.0, 3.0, 7),
-                # np.linspace(0.0, 1.0, 3),
-        # ):
