@@ -5,27 +5,80 @@ from scipy.stats import multivariate_normal as mvn
 from py_tools import numerical as nm, stats as st
 
 def init_to_val(shape, val):
+    """Create an array of a given shape filled with a specified value.
+
+    Parameters
+    ----------
+    shape : tuple of int
+        Shape of the output array.
+    val : scalar
+        Fill value.
+
+    Returns
+    -------
+    x : np.ndarray
+        Array of the given shape filled with val.
+    """
 
     x = np.empty(shape)
     x[:] = val
     return x
 
 class StateSpaceModel:
-    """State space model.
-    
-    Measurement equation: y_t = b + Z x_t + e_t, e_t ~ N(0, H_t)
-    Transition equation: x_t = c + A x_{t-1} + R eps_t, eps_t ~ N(0, Q_t)
+    """Linear Gaussian state space model.
 
-    Definitions (where y_t is an Ny x 1 vector):
-        A: (Nx x Nx) transition matrix
-        R: (Nx x Ne) shock impact matrix
-        Q: (Ne x Ne) shock covariance matrix
-        c: Length Nx transition equation constant vector
-        Z: (Ny x Nx) measurement matrix
-        b: Length Ny measurement equation constant vector 
+    Measurement equation:  y_t = b + Z x_t + e_t,       e_t   ~ N(0, H)
+    Transition equation:   x_t = c + A x_{t-1} + R eps_t, eps_t ~ N(0, Q)
+
+    Parameters
+    ----------
+    A : np.ndarray, shape (Nx, Nx)
+        Transition matrix.
+    R : np.ndarray, shape (Nx, Ne)
+        Shock impact matrix.
+    Q : np.ndarray, shape (Ne, Ne)
+        Shock covariance matrix.
+    Z : np.ndarray, shape (Ny, Nx)
+        Measurement matrix.
+    H : np.ndarray, shape (Ny, Ny)
+        Measurement error covariance matrix.
+    c : np.ndarray, shape (Nx,), optional
+        Transition equation constant vector. Default is None (zero).
+    b : np.ndarray, shape (Ny,), optional
+        Measurement equation constant vector. Default is None (zero).
+
+    Attributes
+    ----------
+    Nx : int
+        Number of states.
+    Ne : int
+        Number of shocks.
+    Ny : int
+        Number of observables.
+    RQR : np.ndarray, shape (Nx, Nx)
+        Product R @ Q @ R.T used in the Kalman filter.
     """
 
     def __init__(self, A, R, Q, Z, H, c=None, b=None):
+        """Initialize the state space model.
+
+        Parameters
+        ----------
+        A : np.ndarray, shape (Nx, Nx)
+            Transition matrix.
+        R : np.ndarray, shape (Nx, Ne)
+            Shock impact matrix.
+        Q : np.ndarray, shape (Ne, Ne)
+            Shock covariance matrix.
+        Z : np.ndarray, shape (Ny, Nx)
+            Measurement matrix.
+        H : np.ndarray, shape (Ny, Ny)
+            Measurement error covariance matrix.
+        c : np.ndarray, shape (Nx,), optional
+            Transition constant. Default is None.
+        b : np.ndarray, shape (Ny,), optional
+            Measurement constant. Default is None.
+        """
 
         # Copy data
         self.A = A
@@ -66,14 +119,28 @@ class StateSpaceModel:
             self.CHT = nm.robust_cholesky(self.H, min_eig=0.0).T
         
     def unconditional_cov(self, fixed_init=None):
+        """Compute the unconditional covariance of the state vector.
 
-        if fixed_init is None: fixed_init = []
+        Parameters
+        ----------
+        fixed_init : list of int, optional
+            Indices of states treated as fixed (zero variance) at initialization.
+            Default is None (no fixed states).
+
+        Returns
+        -------
+        P : np.ndarray, shape (Nx, Nx) or None
+            Unconditional covariance matrix, or None if computation fails.
+        """
+
+        if fixed_init is None:
+            fixed_init = []
         
         if not fixed_init:
 
             try: 
                 return sp.linalg.solve_discrete_lyapunov(self.A, self.RQR)
-            except:
+            except Exception:
                 return None
             
         else:
@@ -91,6 +158,30 @@ class StateSpaceModel:
 
     def simulate(self, x_1=None, Nt=None, shocks=None, meas_err=None, ix=None,
                  use_b=True):
+        """Simulate observations and states from the model.
+
+        Parameters
+        ----------
+        x_1 : np.ndarray, shape (Nx,), optional
+            Initial state vector. Drawn from unconditional distribution if None.
+        Nt : int, optional
+            Number of periods. Required if both shocks and meas_err are None.
+        shocks : np.ndarray, shape (Nt-1, Ne), optional
+            Pre-drawn structural shocks.
+        meas_err : np.ndarray, shape (Nt, Ny), optional
+            Pre-drawn measurement errors.
+        ix : np.ndarray of bool, shape (Nt, Ny), optional
+            Observation mask. Default is all True.
+        use_b : bool, optional
+            Whether to add the measurement constant b. Default is True.
+
+        Returns
+        -------
+        y_sim : np.ndarray, shape (Nt, Ny)
+            Simulated observations (NaN where ix is False).
+        x_sim : np.ndarray, shape (Nt, Nx)
+            Simulated states.
+        """
 
         if shocks is None:
             if meas_err is None:
@@ -138,12 +229,54 @@ class StateSpaceModel:
         return (y_sim, x_sim)
 
     def draw_shocks(self, Nt):
+        """Draw random structural shocks from N(0, Q).
+
+        Parameters
+        ----------
+        Nt : int
+            Number of periods to draw shocks for.
+
+        Returns
+        -------
+        shocks : np.ndarray, shape (Nt, Ne)
+            Simulated shocks.
+        """
         return np.dot(np.random.randn(Nt, self.Ne), self.CQT)
 
     def draw_meas_err(self, Nt):
+        """Draw random measurement errors from N(0, H).
+
+        Parameters
+        ----------
+        Nt : int
+            Number of periods to draw measurement errors for.
+
+        Returns
+        -------
+        meas_err : np.ndarray, shape (Nt, Ny)
+            Simulated measurement errors.
+        """
         return np.dot(np.random.randn(Nt, self.Ny), self.CHT)
 
     def decompose_by_shock(self, shocks, states, start_ix=0):
+        """Decompose state-vector history into contributions from each shock.
+
+        Parameters
+        ----------
+        shocks : np.ndarray, shape (Nt-1, Ne)
+            Structural shock series.
+        states : np.ndarray, shape (Nt, Nx)
+            State vector series.
+        start_ix : int, optional
+            Index at which to begin the decomposition. Default is 0.
+
+        Returns
+        -------
+        shock_components : np.ndarray, shape (Ne, Nt, Nx)
+            Contribution of each shock to the state vector at each period.
+        det_component : np.ndarray, shape (Nt, Nx)
+            Deterministic (drift) component of the state vector.
+        """
 
         shock_components_samp, det_component_samp = self.decompose_by_shock_init(
             shocks[start_ix:, :], states[start_ix, :]
@@ -159,6 +292,22 @@ class StateSpaceModel:
             return shock_components_samp, det_component_samp
 
     def decompose_by_shock_init(self, shocks, x1):
+        """Decompose states into shock and deterministic components from an initial state.
+
+        Parameters
+        ----------
+        shocks : np.ndarray, shape (Nt-1, Ne)
+            Structural shock series.
+        x1 : np.ndarray, shape (Nx,)
+            Initial state vector.
+
+        Returns
+        -------
+        shock_components : np.ndarray, shape (Ne, Nt, Nx)
+            Shock contributions to the state vector.
+        det_component : np.ndarray, shape (Nt, Nx)
+            Deterministic component.
+        """
 
         Nt = shocks.shape[0] + 1
 
@@ -183,6 +332,27 @@ class StateSpaceModel:
         return shock_components, det_component
 
     def decompose_y_by_shock(self, shocks, states, y=None, start_ix=0):
+        """Decompose observable history into contributions from each shock.
+
+        Parameters
+        ----------
+        shocks : np.ndarray, shape (Nt-1, Ne)
+            Structural shock series.
+        states : np.ndarray, shape (Nt, Nx)
+            State vector series.
+        y : np.ndarray, shape (Nt, Ny), optional
+            Observable series. Computed from states if None.
+        start_ix : int, optional
+            Index at which to begin the decomposition. Default is 0.
+
+        Returns
+        -------
+        y_shock_only : np.ndarray
+            Observables reconstructed from shock contributions plus the
+            deterministic component.
+        y_shock_removed : np.ndarray
+            Observables with each shock's contribution removed.
+        """
 
         if y is None:
             y = states @ self.Z.T + self.b[np.newaxis, :]
@@ -215,6 +385,24 @@ class StateSpaceModel:
             return y_shock_only_samp, y_shock_removed_samp
 
     def decompose_y_by_state(self, states, y=None, start_ix=0):
+        """Decompose observable history into contributions from each state variable.
+
+        Parameters
+        ----------
+        states : np.ndarray, shape (Nt, Nx)
+            State vector series.
+        y : np.ndarray, shape (Nt, Ny), optional
+            Observable series. Computed from states if None.
+        start_ix : int, optional
+            Index at which to begin the decomposition. Default is 0.
+
+        Returns
+        -------
+        y_state_only : np.ndarray
+            Observables reconstructed from each state's contribution plus constant.
+        y_state_removed : np.ndarray
+            Observables with each state's contribution removed.
+        """
 
         if y is None:
             y = states @ self.Z.T + self.b[np.newaxis, :]
@@ -241,14 +429,58 @@ class StateSpaceModel:
             return y_state_only_samp, y_state_removed_samp
 
 class StateSpaceEstimates:
-    """Estimated states from applying state space model to particular dataset
-    
-    Associated with StateSpaceModel ssm
+    """Estimated states from applying a state space model to a dataset.
+
+    Parameters
+    ----------
+    ssm : StateSpaceModel
+        The state space model to use for estimation.
+    y : np.ndarray, shape (Nt, Ny)
+        Observed data matrix.
+    x_init : np.ndarray, shape (Nx,), optional
+        Initial state mean. Defaults to zeros.
+    P_init : np.ndarray, shape (Nx, Nx), optional
+        Initial state covariance. Defaults to the unconditional covariance.
+    fixed_init : list of int, optional
+        Indices of states fixed at initialization. Default is None (empty list).
+
+    Attributes
+    ----------
+    Nt : int
+        Number of time periods.
+    Nx : int
+        Number of states.
+    Ny : int
+        Number of observables.
+    valid : bool
+        False if the model's unconditional covariance could not be computed.
+    x_pred : np.ndarray, shape (Nt, Nx)
+        Predicted state means (set after kalman_filter()).
+    x_smooth : np.ndarray, shape (Nt, Nx)
+        Smoothed state means (set after state_smoother()).
+    log_like : float
+        Log-likelihood (set after kalman_filter()).
     """
 
     def __init__(self, ssm, y, x_init=None, P_init=None, fixed_init=None):
+        """Initialize state space estimates.
 
-        if fixed_init is None: fixed_init = []
+        Parameters
+        ----------
+        ssm : StateSpaceModel
+            The state space model.
+        y : np.ndarray, shape (Nt, Ny)
+            Observed data.
+        x_init : np.ndarray, shape (Nx,), optional
+            Initial state mean. Default is zeros.
+        P_init : np.ndarray, shape (Nx, Nx), optional
+            Initial state covariance. Default is unconditional covariance.
+        fixed_init : list of int, optional
+            Fixed-state indices. Default is None.
+        """
+
+        if fixed_init is None:
+            fixed_init = []
 
         # Fixed vars for initial condition
         self.fixed_init = fixed_init        
@@ -277,13 +509,26 @@ class StateSpaceEstimates:
         self.meas_err_draw = None
 
     def set_data(self, y):
-        """Read in a new set of observables"""
+        """Read in a new set of observables.
+
+        Parameters
+        ----------
+        y : np.ndarray, shape (Nt, Ny)
+            New observable data matrix.
+        """
 
         self.y = y
         self.Nt, self.Ny = self.y.shape
         self.ix = np.isfinite(self.y)
 
     def set_ssm(self, ssm):
+        """Assign a new state space model.
+
+        Parameters
+        ----------
+        ssm : StateSpaceModel
+            The state space model to use.
+        """
 
         self.ssm = ssm
         self.Nx, self.Ne = self.ssm.R.shape
@@ -294,13 +539,18 @@ class StateSpaceEstimates:
 
     def kalman_filter(self, x_init=None, P_init=None, overwrite_r=True,
                       y_til=None):
-        """Run the Kalman filter on the data y.
-        
-        Inputs:
+        """Run the Kalman filter on the observed data.
 
-            y: (Nt x Ny) data matrix
-            x_init: Length Nx mean of initial x distribution
-            P_init: (Nx x Nx) covariance matrix of initial x distribution
+        Parameters
+        ----------
+        x_init : np.ndarray, shape (Nx,), optional
+            Initial state mean. Uses stored x_init if None.
+        P_init : np.ndarray, shape (Nx, Nx), optional
+            Initial state covariance. Uses stored P_init if None.
+        overwrite_r : bool, optional
+            If True, reset the smoother auxiliary variable r. Default is True.
+        y_til : np.ndarray, shape (Nt, Ny), optional
+            Pre-demeaned observable data. Uses stored y_til if None.
         """
 
         if overwrite_r:
@@ -348,7 +598,7 @@ class StateSpaceEstimates:
             if np.any(ix_t):
                 try:
                     self.log_like += mvn.logpdf(err_t, mean=np.zeros(np.sum(ix_t)), cov=F_t) 
-                except:
+                except Exception:
                     self.log_like = -1e+10
                     return None
             
@@ -372,6 +622,10 @@ class StateSpaceEstimates:
         return None
 
     def disturbance_smoother(self):
+        """Run the disturbance smoother to compute the auxiliary variable r.
+
+        Must be called after kalman_filter(). Populates self.r.
+        """
 
         self.r = np.zeros((self.Nt, self.Nx))
 
@@ -388,6 +642,14 @@ class StateSpaceEstimates:
         return None
 
     def state_smoother(self, disturbance_smooth=False):
+        """Compute smoothed state estimates.
+
+        Parameters
+        ----------
+        disturbance_smooth : bool, optional
+            If True, re-run the disturbance smoother even if r is already set.
+            Default is False.
+        """
         
         if (self.r is None) or (disturbance_smooth):
             self.disturbance_smoother()
@@ -406,6 +668,13 @@ class StateSpaceEstimates:
         return None
 
     def shock_smoother(self, disturbance_smooth=False):
+        """Compute smoothed structural shock estimates.
+
+        Parameters
+        ----------
+        disturbance_smooth : bool, optional
+            If True, re-run the disturbance smoother. Default is False.
+        """
 
         if (self.r is None) or disturbance_smooth:
             self.disturbance_smoother()
@@ -414,7 +683,17 @@ class StateSpaceEstimates:
         return None
 
     def meas_err_smoother(self, disturbance_smooth=False):
-        """NEED TO TEST THIS"""
+        """Compute smoothed measurement error estimates.
+
+        Parameters
+        ----------
+        disturbance_smooth : bool, optional
+            If True, re-run the disturbance smoother. Default is False.
+
+        Notes
+        -----
+        This method has not been fully tested.
+        """
         
         if (self.r is None) or disturbance_smooth:
             self.disturbance_smoother()
@@ -436,6 +715,15 @@ class StateSpaceEstimates:
         return None
 
     def draw_states(self, draw_shocks=False, draw_meas_err=False):
+        """Draw a sample of states using the simulation smoother.
+
+        Parameters
+        ----------
+        draw_shocks : bool, optional
+            If True, also draw a sample of structural shocks. Default is False.
+        draw_meas_err : bool, optional
+            If True, also draw a sample of measurement errors. Default is False.
+        """
 
         # Draw shocks
         shocks = self.ssm.draw_shocks(self.Nt - 1)
@@ -468,6 +756,22 @@ class StateSpaceEstimates:
         return None
 
     def get_shock_components(self, redraw_shocks=False, start_ix=0):
+        """Decompose the state path into contributions from each structural shock.
+
+        Parameters
+        ----------
+        redraw_shocks : bool, optional
+            If True, draw new state and shock samples. Default is False.
+        start_ix : int, optional
+            Period at which to begin the decomposition. Default is 0.
+
+        Returns
+        -------
+        shock_components : np.ndarray, shape (Ne, Nt, Nx)
+            Contribution of each shock to the state vector.
+        det_component : np.ndarray, shape (Nt, Nx)
+            Deterministic component.
+        """
 
         # Set shock series to use
         if redraw_shocks or (self.shock_draw is None) or (self.state_draw is None):

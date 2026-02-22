@@ -12,10 +12,38 @@ from py_tools.time_series import var as vr
 
 
 def log_abs_det(x):
+    """Compute the log of the absolute value of the determinant of a matrix.
+
+    Parameters
+    ----------
+    x : np.ndarray, shape (N, N)
+        Square matrix.
+
+    Returns
+    -------
+    result : float
+        log|det(x)|.
+    """
 
     return np.log(np.abs(np.linalg.det(x)))
 
 def fit_ols(X, Y):
+    """Estimate OLS coefficients and residual covariance.
+
+    Parameters
+    ----------
+    X : np.ndarray, shape (Nt, Nx)
+        Regressor matrix.
+    Y : np.ndarray, shape (Nt, Ny)
+        Dependent variable matrix.
+
+    Returns
+    -------
+    Phi : np.ndarray, shape (Nx, Ny)
+        OLS coefficient matrix.
+    Sig : np.ndarray, shape (Ny, Ny)
+        Residual covariance matrix.
+    """
 
     Phi = dt.least_sq(X, Y)
     e = Y - np.dot(X, Phi)
@@ -25,6 +53,27 @@ def fit_ols(X, Y):
 
 def eval_glp_hyperprior(hyperparams, gam_hyp_shape, gam_hyp_scale,
                         igam_hyp_shape, igam_hyp_scale):
+    """Evaluate the log-density of the GLP hyperprior.
+
+    Parameters
+    ----------
+    hyperparams : np.ndarray
+        Hyperparameter vector; first 3 entries use a gamma prior, the rest
+        use an inverse-gamma prior.
+    gam_hyp_shape : np.ndarray
+        Shape parameters for the gamma hyperprior.
+    gam_hyp_scale : np.ndarray
+        Scale parameters for the gamma hyperprior.
+    igam_hyp_shape : np.ndarray
+        Shape parameters for the inverse-gamma hyperprior.
+    igam_hyp_scale : np.ndarray
+        Scale parameters for the inverse-gamma hyperprior.
+
+    Returns
+    -------
+    L : float
+        Log-density of the hyperprior.
+    """
 
     gam_params = hyperparams[:3]
     L = np.sum(gamma.logpdf(gam_params, gam_hyp_shape, scale=gam_hyp_scale))
@@ -35,6 +84,38 @@ def eval_glp_hyperprior(hyperparams, gam_hyp_shape, gam_hyp_scale,
     return L
 
 def post_mode(X, Y, b_bar, Om_inv_bar, Psi_bar, df_bar):
+    """Compute the posterior mode under the MNIW prior.
+
+    Parameters
+    ----------
+    X : np.ndarray, shape (Nt, Nx)
+        Regressor matrix.
+    Y : np.ndarray, shape (Nt, Ny)
+        Dependent variable matrix.
+    b_bar : np.ndarray, shape (Nx * Ny,)
+        Prior mean for the vectorized coefficient matrix.
+    Om_inv_bar : np.ndarray, shape (Nx, Nx)
+        Prior precision matrix for the coefficients.
+    Psi_bar : np.ndarray, shape (Ny, Ny)
+        Prior scale matrix for the covariance.
+    df_bar : float
+        Prior degrees of freedom for the covariance.
+
+    Returns
+    -------
+    B_hat : np.ndarray, shape (Nx, Ny)
+        Posterior mode of the coefficient matrix.
+    XX_inv : np.ndarray, shape (Nx, Nx)
+        Inverse of the posterior precision matrix.
+    Psi_hat : np.ndarray, shape (Ny, Ny)
+        Posterior scale matrix.
+    df_hat : float
+        Posterior degrees of freedom.
+    eps_hat : np.ndarray, shape (Nt, Ny)
+        Posterior residuals.
+    L : float
+        Log marginal likelihood.
+    """
 
     Nt, Nx = X.shape
     _, Ny = Y.shape
@@ -78,6 +159,30 @@ def post_mode(X, Y, b_bar, Om_inv_bar, Psi_bar, df_bar):
     return (B_hat, XX_inv, Psi_hat, df_hat, eps_hat, L)
 
 def draw_mniw(b_hat, XX_inv, Psi_hat, df_hat, Ny, Nx):
+    """Draw from the matrix normal inverse Wishart (MNIW) posterior.
+
+    Parameters
+    ----------
+    b_hat : np.ndarray, shape (Nx * Ny,)
+        Posterior mean of the vectorized coefficient matrix.
+    XX_inv : np.ndarray, shape (Nx, Nx)
+        Posterior coefficient covariance factor.
+    Psi_hat : np.ndarray, shape (Ny, Ny)
+        Posterior scale matrix.
+    df_hat : float
+        Posterior degrees of freedom.
+    Ny : int
+        Number of dependent variables.
+    Nx : int
+        Number of regressors.
+
+    Returns
+    -------
+    b : np.ndarray, shape (Nx * Ny,)
+        Sampled vectorized coefficient matrix.
+    Sig : np.ndarray, shape (Ny, Ny)
+        Sampled covariance matrix.
+    """
 
     Sig = invwishart.rvs(df_hat, scale=Psi_hat)
     V_b = np.kron(Sig, XX_inv)
@@ -85,10 +190,40 @@ def draw_mniw(b_hat, XX_inv, Psi_hat, df_hat, Ny, Nx):
     return (b, Sig)
 
 def xtx(x):
+    """Compute x.T @ x.
+
+    Parameters
+    ----------
+    x : np.ndarray, shape (N, M)
+        Input matrix.
+
+    Returns
+    -------
+    result : np.ndarray, shape (M, M)
+        Product x.T @ x.
+    """
 
     return np.dot(x.T, x)
 
 def compute_irfs(B, p, Nirf, impact):
+    """Compute impulse response functions from BVAR coefficients.
+
+    Parameters
+    ----------
+    B : np.ndarray, shape (p*Ny + 1, Ny)
+        VAR coefficient matrix (lags stacked, with constant last row).
+    p : int
+        Number of VAR lags.
+    Nirf : int
+        Number of IRF periods.
+    impact : np.ndarray, shape (Ny, Nshock)
+        Impact matrix mapping shocks to variables.
+
+    Returns
+    -------
+    virf : np.ndarray, shape (Nirf, Ny, Nshock)
+        Impulse response functions.
+    """
 
     Ny, Nshock = impact.shape
     B_comp = np.vstack(( 
@@ -112,6 +247,34 @@ def compute_irfs(B, p, Nirf, impact):
 
 def glp_hyperprior(Ny, gam_hyp_modes=None, gam_hyp_stds=None, 
                    igam_hyp_scale=None, igam_hyp_shape=None):
+    """Compute GLP hyperprior parameters from modes and standard deviations.
+
+    Parameters
+    ----------
+    Ny : int
+        Number of VAR variables.
+    gam_hyp_modes : np.ndarray, optional
+        Modes for the gamma hyperprior. Default is (0.2, 1.0, 1.0).
+    gam_hyp_stds : np.ndarray, optional
+        Standard deviations for the gamma hyperprior. Default is (0.4, 1.0, 1.0).
+    igam_hyp_scale : np.ndarray, optional
+        Scale parameters for the inverse-gamma hyperprior.
+        Default is 0.02^2 * ones(Ny).
+    igam_hyp_shape : np.ndarray, optional
+        Shape parameters for the inverse-gamma hyperprior.
+        Default is 0.02^2 * ones(Ny).
+
+    Returns
+    -------
+    gam_hyp_shape : np.ndarray
+        Gamma prior shape parameters.
+    gam_hyp_scale : np.ndarray
+        Gamma prior scale parameters.
+    igam_hyp_shape : np.ndarray
+        Inverse-gamma prior shape parameters.
+    igam_hyp_scale : np.ndarray
+        Inverse-gamma prior scale parameters.
+    """
 
     # Gamma hyperprior
     if gam_hyp_modes is None:
@@ -135,6 +298,29 @@ def glp_hyperprior(Ny, gam_hyp_modes=None, gam_hyp_stds=None,
     return (gam_hyp_shape, gam_hyp_scale, igam_hyp_shape, igam_hyp_scale) 
 
 def mniw_prior(params, Ny, Nx, p):
+    """Construct the MNIW prior from GLP hyperparameters.
+
+    Parameters
+    ----------
+    params : np.ndarray
+        Hyperparameter vector; first element is lambda (overall tightness),
+        remaining elements are psi (diagonal prior scale per variable).
+    Ny : int
+        Number of VAR variables.
+    Nx : int
+        Number of regressors per equation.
+    p : int
+        Number of VAR lags.
+
+    Returns
+    -------
+    b_bar : np.ndarray, shape (Nx * Ny,)
+        Prior mean for the vectorized coefficient matrix.
+    Om_inv_bar : np.ndarray, shape (Nx, Nx)
+        Prior precision matrix.
+    df_bar : float
+        Prior degrees of freedom.
+    """
 
     lam = params[0]
     psi = params[1:]
@@ -156,6 +342,29 @@ def mniw_prior(params, Ny, Nx, p):
     return (b_bar, Om_inv_bar, df_bar)
 
 def co_persistence_prior(params, Nx, Ny, p, ybar):
+    """Construct co-persistence dummy observations for the BVAR prior.
+
+    Parameters
+    ----------
+    params : array-like, length 2
+        mu: sum-of-coefficients tightness parameter.
+        delta: co-persistence tightness parameter.
+    Nx : int
+        Number of regressors per equation.
+    Ny : int
+        Number of VAR variables.
+    p : int
+        Number of VAR lags.
+    ybar : np.ndarray, shape (Ny,)
+        Sample mean of each variable.
+
+    Returns
+    -------
+    X_star : np.ndarray, shape (Ny+1, Nx)
+        Dummy regressor matrix.
+    Y_star : np.ndarray, shape (Ny+1, Ny)
+        Dummy dependent variable matrix.
+    """
 
     mu, delta = params
 
@@ -179,6 +388,32 @@ def co_persistence_prior(params, Nx, Ny, p, ybar):
     return (X_star, Y_star)
 
 def mn_prior(lam, Nx, Ny, p, rwlist, ybar, sbar):
+    """Construct dummy observations for the Minnesota-style BVAR prior.
+
+    Parameters
+    ----------
+    lam : array-like, length 8
+        Hyperparameter vector (lam1 through lam8) controlling prior tightness.
+    Nx : int
+        Number of regressors per equation.
+    Ny : int
+        Number of VAR variables.
+    p : int
+        Number of VAR lags.
+    rwlist : np.ndarray, shape (Ny,)
+        Binary indicators for random-walk prior (1 = random walk, 0 = white noise).
+    ybar : np.ndarray, shape (Ny,)
+        Sample mean of each variable.
+    sbar : np.ndarray, shape (Ny,)
+        Sample standard deviation of each variable.
+
+    Returns
+    -------
+    X_star : np.ndarray, shape (Nt_star, Nx)
+        Dummy regressor matrix.
+    Y_star : np.ndarray, shape (Nt_star, Ny)
+        Dummy dependent variable matrix.
+    """
 
     lam1, lam2, lam3, lam4, lam5, lam6, lam7, lam8 = lam
 
@@ -226,6 +461,22 @@ def mn_prior(lam, Nx, Ny, p, rwlist, ybar, sbar):
     return (X_star, Y_star)
 
 def check_nan_var(var, data_augmentation_vars):
+    """Check whether a variable should be included in the NaN-dropping step.
+
+    Returns True if the variable is not a lag of a data-augmentation variable.
+
+    Parameters
+    ----------
+    var : str
+        Variable name to check.
+    data_augmentation_vars : list of str
+        Variables whose missing values will be imputed by data augmentation.
+
+    Returns
+    -------
+    result : bool
+        True if the variable should be dropped when NaN, False otherwise.
+    """
 
     for da in data_augmentation_vars:
         if re.match('(L\d*_)?' + da, var) is not None:
@@ -234,12 +485,67 @@ def check_nan_var(var, data_augmentation_vars):
     return True
 
 class BVAR:
-    """Bayesian VAR"""
+    """Bayesian Vector Autoregression (BVAR).
+
+    Parameters
+    ----------
+    df_in : pd.DataFrame
+        Input DataFrame containing the VAR variables.
+    y_vars : list of str
+        Names of the VAR variables.
+    p : int, optional
+        Number of lags. Default is 1.
+    hyperparams_init : np.ndarray, optional
+        Initial hyperparameter values. If None, defaults are used.
+    rwlist : np.ndarray, optional
+        Binary indicators for random-walk prior (Minnesota prior only).
+        Default is all ones.
+    glp_prior : bool, optional
+        If True, use the GLP prior; otherwise use the Minnesota prior.
+        Default is False.
+    data_augmentation_vars : list of str, optional
+        Variables whose missing data will be handled by data augmentation.
+
+    Attributes
+    ----------
+    Ny : int
+        Number of VAR variables.
+    Nt : int
+        Number of observations.
+    B_hat : np.ndarray
+        Posterior mode coefficient matrix (set after fit()).
+    B_sim : np.ndarray, shape (Nsim, Nx, Ny)
+        Sampled coefficient matrices (set after sample()).
+    Sig_sim : np.ndarray, shape (Nsim, Ny, Ny)
+        Sampled covariance matrices (set after sample()).
+    irf_sim : np.ndarray
+        Simulated IRFs (set after compute_irfs_sim()).
+    """
 
     def __init__(self, df_in, y_vars, p=1, hyperparams_init=None, rwlist=None, glp_prior=False,
                  data_augmentation_vars=None):
+        """Initialize the BVAR model.
 
-        if data_augmentation_vars is None: data_augmentation_vars = []
+        Parameters
+        ----------
+        df_in : pd.DataFrame
+            Input DataFrame containing the VAR variables.
+        y_vars : list of str
+            Names of the VAR variables.
+        p : int, optional
+            Number of lags. Default is 1.
+        hyperparams_init : np.ndarray, optional
+            Initial hyperparameter values. Default is None.
+        rwlist : np.ndarray, optional
+            Random-walk indicators (Minnesota prior). Default is ones.
+        glp_prior : bool, optional
+            Use GLP prior if True, else Minnesota prior. Default is False.
+        data_augmentation_vars : list of str, optional
+            Variables with missing data to impute. Default is None.
+        """
+
+        if data_augmentation_vars is None:
+            data_augmentation_vars = []
 
         # Copy data
         self.y_vars = y_vars
@@ -309,6 +615,10 @@ class BVAR:
 
 
     def add_prior(self):
+        """Construct prior dummy observations from the current hyperparameters.
+
+        Populates X_star, Y_star, X_all, Y_all, and related prior matrices.
+        """
 
         if self.glp_prior:
 
@@ -342,6 +652,10 @@ class BVAR:
         return None
 
     def fit(self):
+        """Compute the posterior mode of the BVAR coefficients.
+
+        Populates B_hat, XX_inv, Psi_hat, df_hat, eps_hat, and b_hat.
+        """
 
         (self.B_hat, self.XX_inv, self.Psi_hat, self.df_hat, 
          self.eps_hat, _
@@ -351,11 +665,37 @@ class BVAR:
         return None
 
     def eval_post_mode(self, X, Y):
+        """Evaluate the posterior mode for a given data matrix.
+
+        Parameters
+        ----------
+        X : np.ndarray, shape (Nt, Nx)
+            Regressor matrix.
+        Y : np.ndarray, shape (Nt, Ny)
+            Dependent variable matrix.
+
+        Returns
+        -------
+        result : tuple
+            (B_hat, XX_inv, Psi_hat, df_hat, eps_hat, L) as returned by post_mode.
+        """
 
         return post_mode(X, Y, self.b_bar, self.Om_inv_bar, 
                          self.Psi_bar, self.df_bar)
 
     def objfcn_glp(self, x):
+        """Evaluate the GLP posterior objective function.
+
+        Parameters
+        ----------
+        x : np.ndarray
+            Log-transformed hyperparameter vector.
+
+        Returns
+        -------
+        L_post : float
+            Log posterior (marginal likelihood + hyperprior - dummy likelihood).
+        """
 
         self.hyperparams = np.exp(x) 
         self.add_prior()
@@ -373,8 +713,14 @@ class BVAR:
         return L_post
 
     def glp_mode(self):
+        """Optimize the GLP hyperparameters via Nelder-Mead maximization.
 
-        fcn = lambda x: -self.objfcn_glp(x)
+        Updates self.hyperparams to the optimal values and prints results.
+        """
+
+        def fcn(x):
+            return -self.objfcn_glp(x)
+
         x0 = np.log(self.hyperparams)
 
         res = minimize(fcn, x0, method='Nelder-Mead', options={'maxiter': 10000, 'disp' : True})
@@ -390,6 +736,13 @@ class BVAR:
         return None
 
     def glp_em(self, n_iter=5):
+        """Run EM iterations to jointly optimize hyperparameters and impute missing data.
+
+        Parameters
+        ----------
+        n_iter : int, optional
+            Number of EM iterations. Default is 5.
+        """
 
         Y_sim = np.zeros((n_iter,) + self.Y.shape)
 
@@ -402,7 +755,9 @@ class BVAR:
 
             print("\n\n\nITERATION {}\n\n\n".format(ii))
 
-            fcn = lambda x: -self.objfcn_glp(x)
+            def fcn(x):
+                return -self.objfcn_glp(x)
+
             x0 = np.log(self.hyperparams)
             res = minimize(fcn, x0, method='Nelder-Mead', options={'maxiter': 10000, 'disp' : True})
 
@@ -422,6 +777,13 @@ class BVAR:
         return None
 
     def sample(self, Nsim=1000):
+        """Draw posterior samples of VAR coefficients and covariance matrices.
+
+        Parameters
+        ----------
+        Nsim : int, optional
+            Number of posterior draws. Default is 1000.
+        """
 
         self.Nsim = Nsim
         self.B_sim = np.zeros((self.Nsim, self.Nx, self.Ny))
@@ -438,7 +800,17 @@ class BVAR:
         return None
 
     def augment_data(self, B, Sig, sample=True):
-        """Draw missing data from state space model."""
+        """Impute missing data using the state space model.
+
+        Parameters
+        ----------
+        B : np.ndarray, shape (Nx, Ny)
+            VAR coefficient matrix.
+        Sig : np.ndarray, shape (Ny, Ny)
+            Shock covariance matrix.
+        sample : bool, optional
+            If True, draw states; if False, use smoothed states. Default is True.
+        """
 
         # Picks out top Ny observations
         Z = np.zeros((self.Ny, self.Nx))
@@ -476,9 +848,16 @@ class BVAR:
         self.Y = X_samp[:, :self.Ny]
 
     def compute_irfs_sim(self, Nirf=41, impact=None, impact_type='identity'):
-        """ Computes IRFs from sampled parameters.
+        """Compute IRFs from sampled VAR parameters.
 
-        impact_type should be 'identity' or 'cholesky'.
+        Parameters
+        ----------
+        Nirf : int, optional
+            Number of IRF periods. Default is 41.
+        impact : np.ndarray, optional
+            Impact matrix. If None, determined by impact_type.
+        impact_type : {'identity', 'cholesky'}, optional
+            Type of impact matrix to use if impact is None. Default is 'identity'.
         """
 
         self.irf_sim = np.zeros((self.Nsim, Nirf, self.Ny, self.Ny))
@@ -496,6 +875,17 @@ class BVAR:
         return None
 
     def add_instrument(self, df_new, policy_var, instrument):
+        """Register an external instrument for IV-identified IRFs.
+
+        Parameters
+        ----------
+        df_new : pd.DataFrame
+            DataFrame containing the instrument series.
+        policy_var : str
+            Name of the policy variable (must be the first VAR variable).
+        instrument : str
+            Name of the instrument column in df_new.
+        """
 
         self.policy_var = policy_var
         self.instrument = instrument
@@ -503,8 +893,15 @@ class BVAR:
         return None
 
     def compute_irfs_instrument(self, Nirf=41, exact_sigma=True):
-        """Computes IRFs from sampled parameters using instrument
-        to define structural shocks.
+        """Compute IRFs using an external instrument to identify structural shocks.
+
+        Parameters
+        ----------
+        Nirf : int, optional
+            Number of IRF periods. Default is 41.
+        exact_sigma : bool, optional
+            If True, use the sampled covariance matrix in the IV regression.
+            Default is True.
         """
 
         self.irf_sim = np.zeros((self.Nsim, Nirf, self.Ny, 1))

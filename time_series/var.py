@@ -3,6 +3,28 @@ from py_tools import data as dt, time_series as ts
 from py_tools.utilities import as_list
 
 def instrument_var(df, var_list, policy_var, instrument, Sig=None, resid_prefix='u_'):
+    """Estimate the structural shock impact vector using an external instrument (IV).
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        DataFrame containing residuals and instrument data.
+    var_list : list of str
+        Ordered list of VAR variable names; the policy variable must be first.
+    policy_var : str
+        Name of the policy variable (must equal var_list[0]).
+    instrument : str
+        Name of the instrument column in df.
+    Sig : np.ndarray, optional
+        (Ny x Ny) residual covariance matrix. If None, estimated from data.
+    resid_prefix : str, optional
+        Prefix used for residual column names. Default is 'u_'.
+
+    Returns
+    -------
+    S : np.ndarray, shape (Ny, 1)
+        Impact vector for the structural shock.
+    """
 
     assert policy_var == var_list[0] # Is this important?
 
@@ -56,6 +78,20 @@ def instrument_var(df, var_list, policy_var, instrument, Sig=None, resid_prefix=
     return S 
 
 def companion_form(A, use_const=True):
+    """Convert a VAR coefficient matrix to companion form.
+
+    Parameters
+    ----------
+    A : np.ndarray, shape (Ny, Nx)
+        VAR coefficient matrix (including constant if use_const is True).
+    use_const : bool, optional
+        Whether A includes a constant term column. Default is True.
+
+    Returns
+    -------
+    A_comp : np.ndarray, shape (Nx, Nx)
+        Companion-form transition matrix.
+    """
 
     # Get sizes
     Ny, Nx = A.shape
@@ -83,14 +119,21 @@ def companion_form(A, use_const=True):
     return A_comp
 
 def compute_irfs(A, B, Nt_irf):
-    """
-    Inputs:
-    A: transition matrix
-    B: impact matrix
-    Nt_irf: number of periods
+    """Compute impulse response functions for a VAR.
 
-    Output:
-    irfs: Ny x Nshock x Nt_irf array
+    Parameters
+    ----------
+    A : np.ndarray, shape (Ny, Nx)
+        VAR transition matrix.
+    B : np.ndarray, shape (Ny, Nshock)
+        Impact matrix mapping shocks to variables.
+    Nt_irf : int
+        Number of periods for the IRFs.
+
+    Returns
+    -------
+    irfs : np.ndarray, shape (Ny, Nshock, Nt_irf)
+        Impulse response functions.
     """
 
     # Get sizes
@@ -113,10 +156,50 @@ def compute_irfs(A, B, Nt_irf):
     return irf_comp_mats[:Ny, :, :]
 
 class VAR:
-    """Vector Auto-Regression"""
+    """Vector Autoregression (VAR) estimated by OLS.
+
+    Parameters
+    ----------
+    df_in : pd.DataFrame
+        Input DataFrame containing the series.
+    var_list : list of str
+        Names of the variables to include in the VAR.
+    n_var_lags : int, optional
+        Number of lags. Default is 1.
+    use_const : bool, optional
+        Whether to include a constant term. Default is True.
+    copy_df : bool, optional
+        Whether to copy the input DataFrame. Default is True.
+
+    Attributes
+    ----------
+    A : np.ndarray
+        Estimated coefficient matrix (set after fit()).
+    resid : np.ndarray
+        Residuals (set after fit()).
+    irfs : np.ndarray or None
+        Impulse response functions (set after compute_irfs()).
+    A_boot : np.ndarray or None
+        Bootstrapped coefficient matrices (set after wild_bootstrap()).
+    """
 
     def __init__(self, df_in, var_list, n_var_lags=1, use_const=True,
                  copy_df=True):
+        """Initialize the VAR model.
+
+        Parameters
+        ----------
+        df_in : pd.DataFrame
+            Input DataFrame.
+        var_list : list of str
+            Variable names to include.
+        n_var_lags : int, optional
+            Number of lags. Default is 1.
+        use_const : bool, optional
+            Include constant term. Default is True.
+        copy_df : bool, optional
+            Copy the DataFrame. Default is True.
+        """
 
         if copy_df:
             self.df = df_in.copy()
@@ -136,6 +219,7 @@ class VAR:
         self.y_boot = None
 
     def fit(self):
+        """Estimate the VAR coefficients using OLS."""
         self.fr = ts.lagged_reg(self.df, self.var_list, self.var_list, 
                                 self.n_var_lags, use_const=self.use_const)
 
@@ -150,13 +234,26 @@ class VAR:
         self.ix = self.fr.ix
 
     def get_companion_form(self):
+        """Return the companion-form transition matrix for the estimated VAR.
+
+        Returns
+        -------
+        A_comp : np.ndarray
+            Companion-form transition matrix.
+        """
 
         return companion_form(self.A)
 
     def add_series_recursive(self, new_series_in):
-        """Add additional series to the VAR using a recursive structure. 
-        The new series can be affected by the previous series, but cannot 
-        affect the previous series."""
+        """Add additional series to the VAR using a recursive structure.
+
+        The new series can be affected by existing series but cannot affect them.
+
+        Parameters
+        ----------
+        new_series_in : str or list of str
+            Name(s) of the new series to append recursively.
+        """
 
         new_series = as_list(new_series_in)
         self.var_list += new_series
@@ -183,9 +280,16 @@ class VAR:
         return None
 
     def compute_irfs(self, B=None, Nt_irf=20, bootstrap=False):
-        """Inputs:
-        B: impact matrix
-        Nt_irf: number of periods
+        """Compute impulse response functions for the estimated VAR.
+
+        Parameters
+        ----------
+        B : np.ndarray, optional
+            Impact matrix (Ny x Nshock). If None, uses the identity matrix.
+        Nt_irf : int, optional
+            Number of IRF periods. Default is 20.
+        bootstrap : bool, optional
+            If True, also compute bootstrapped IRFs. Default is False.
         """
 
         if B is None:
@@ -203,6 +307,13 @@ class VAR:
         return
 
     def wild_bootstrap(self, Nboot=1000):
+        """Run wild bootstrap to generate bootstrapped parameter draws.
+
+        Parameters
+        ----------
+        Nboot : int, optional
+            Number of bootstrap replications. Default is 1000.
+        """
 
         self.Nboot = Nboot
 
@@ -238,6 +349,15 @@ class VAR:
         return
 
     def bootstrap_irfs(self, B, **kwargs):
+        """Compute bootstrapped impulse response functions.
+
+        Parameters
+        ----------
+        B : np.ndarray, shape (Ny, Nshock)
+            Impact matrix.
+        **kwargs
+            Additional keyword arguments passed to wild_bootstrap if needed.
+        """
 
         if self.y_boot is None or self.A_boot is None:
             print("Bootstrap sample not found, rerunning...")
