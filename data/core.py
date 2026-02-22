@@ -146,7 +146,8 @@ def absorb(df, groups, value_var, weight_var=None, restore_mean=True, tol=1e-12,
                 
         err = get_err()
         count += 1
-        if display: print("Iteration {0:d}, rmse = {1:g}".format(count, err))
+        if display:
+            print("Iteration {0:d}, rmse = {1:g}".format(count, err))
 
     # Restore original mean and output
     fe_means = np.sum(_df[fe_list], axis=1)
@@ -186,9 +187,11 @@ def compute_binscatter(df_in, yvar, xvar, wvar=None, n_bins=10, bins=None, media
         If ``True``, compute the unweighted median within each bin instead of
         the weighted mean. Defaults to ``False``.
     control : list of str or None, optional
-        Additional RHS variables to partial out before binning.
+        Additional RHS variables to partial out before binning. Currently not
+        implemented; passing a non-empty value raises ``NotImplementedError``.
     absorb : list or None, optional
-        Group variables to absorb (fixed effects) before binning.
+        Group variables to absorb (fixed effects) before binning. Currently not
+        implemented; passing a non-empty value raises ``NotImplementedError``.
 
     Returns
     -------
@@ -197,8 +200,14 @@ def compute_binscatter(df_in, yvar, xvar, wvar=None, n_bins=10, bins=None, media
         within-bin averages (or medians), and *wvar* (normalized weights) when
         not using the median.
     """
-    if control is None: control = []
-    if absorb is None: absorb = []
+    if control is None:
+        control = []
+    if absorb is None:
+        absorb = []
+    if control or absorb:
+        raise NotImplementedError(
+            "compute_binscatter control/absorb residualization is not implemented."
+        )
 
     if median:
         assert wvar is None
@@ -597,8 +606,10 @@ def regression(df, lhs, rhs, fes=None, absorb_vars=None, intercept=True, formula
         design matrix, and the outcome vector.
     """
 
-    if fes is None: fes = []
-    if absorb_vars is None: absorb_vars = []
+    if fes is None:
+        fes = []
+    if absorb_vars is None:
+        absorb_vars = []
 
     if isinstance(rhs, str):
         rhs = [rhs]
@@ -1073,15 +1084,16 @@ def mv_ols(df, lhs, rhs, match='inner', ix=None, nw_lags=0):
 
     Raises
     ------
-    Exception
+    NotImplementedError
         If ``nw_lags > 0`` (not yet implemented).
     """
     if 'const' in rhs and 'const' not in df:
         df['const'] = 1.0
 
     if nw_lags > 0:
-        print("Need to code")
-        raise Exception
+        raise NotImplementedError(
+            "mv_ols with nw_lags > 0 is not implemented."
+        )
 
     X = df[rhs].values
     z = df[lhs].values
@@ -1426,7 +1438,22 @@ def sum_regression_params(positions, *args, **kwargs):
         Standard error of the sum.
     """
 
-    e_vec = np.zeros(len(positions))
+    if "results" in kwargs and kwargs["results"] is not None:
+        n_params = len(kwargs["results"].params)
+    elif "params" in kwargs and kwargs["params"] is not None:
+        n_params = len(kwargs["params"])
+    elif "cov" in kwargs and kwargs["cov"] is not None:
+        n_params = np.asarray(kwargs["cov"]).shape[0]
+    elif len(args) >= 1 and args[0] is not None:
+        n_params = len(args[0])
+    elif len(args) >= 2 and args[1] is not None:
+        n_params = np.asarray(args[1]).shape[0]
+    else:
+        raise ValueError(
+            "sum_regression_params requires params/cov or results to infer coefficient length."
+        )
+
+    e_vec = np.zeros(n_params)
     e_vec[positions] = 1.0
 
     return weight_regression_params(e_vec, *args, **kwargs)
@@ -1461,7 +1488,8 @@ def collapse(df, method='mean', var_list=None, by=None, wvar=None):
         If *by* is empty, *method* is unsupported, *wvar* is ``None``, or
         *wvar* appears in *var_list*.
     """
-    if by is None: by = []
+    if by is None:
+        by = []
     
     assert by
     assert method in ['mean', 'sum']

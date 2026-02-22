@@ -153,7 +153,8 @@ def load_collapser(filename, add_suffix=True, by_list=None, weight_var=None):
     Collapser
         The loaded :class:`Collapser` object.
     """
-    if by_list is None: by_list = []
+    if by_list is None:
+        by_list = []
         
     col = Collapser(by_list=by_list, weight_var=weight_var)
     col.load(filename, add_suffix=add_suffix)
@@ -202,7 +203,8 @@ def collapse(df, by_list, var_list=None, weight_var=None, weight_suffix=False):
     pandas.DataFrame
         Collapsed DataFrame indexed by *by_list*.
     """
-    if var_list is None: var_list = []
+    if var_list is None:
+        var_list = []
     
     coll = Collapser(df, var_list=var_list, by_list=by_list, 
                      weight_var=weight_var)
@@ -230,7 +232,8 @@ def collapse_multiweight(df, weight_dict, by_list=None):
         Collapsed DataFrame with one column per variable in *weight_dict*,
         indexed by *by_list*.
     """
-    if by_list is None: by_list = []
+    if by_list is None:
+        by_list = []
     
     return pd.concat(
         [collapse(df, by_list, var_list=[var], weight_var=weight_var)
@@ -369,8 +372,10 @@ class Collapser:
             If both *df* and *dfc* are provided.
         """
 
-        if by_list is None: by_list = []
-        if var_list is None: var_list = []
+        if by_list is None:
+            by_list = []
+        if var_list is None:
+            var_list = []
     
         assert (df is None) or (dfc is None)
         
@@ -528,10 +533,13 @@ class Collapser:
 
         Raises
         ------
-        Exception
+        NotImplementedError
             If ``method='median'`` is requested (not yet implemented).
+        ValueError
+            If an unsupported *method* is requested.
         """
-        if by_list is None: by_list = []
+        if by_list is None:
+            by_list = []
         
         singleton = (not by_list)
 
@@ -541,8 +549,12 @@ class Collapser:
             else:
                 dfc_new = self.dfc.groupby(by_list).sum()
         elif method == 'median':
-            raise Exception
+            raise NotImplementedError(
+                "Collapser.collapse(method='median') is not implemented."
+            )
             # dfc_new = dfc_old.groupby(by_list).agg(st.weighted_quantile, )
+        else:
+            raise ValueError("Unsupported collapse method: {}".format(method))
             
         if inplace:
             self.dfc = dfc_new

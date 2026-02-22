@@ -59,8 +59,10 @@ class ModSpec:
         label : str, optional
             Override the auto-generated label.
         """
-        if add_list is None: add_list = []
-        if remove_list is None: remove_list = []
+        if add_list is None:
+            add_list = []
+        if remove_list is None:
+            remove_list = []
         
         self.features = add_list.copy()
         if mod is not None:

@@ -56,7 +56,7 @@ Author: Generated for research project configuration management
 License: MIT
 """
 
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Tuple, Union
 import copy
 
 
@@ -434,7 +434,7 @@ class ConfigRegistry:
         name2 = config2.get('name', str(config_id2))
 
         print(f"\n{'='*70}")
-        print(f"Comparing Configurations")
+        print("Comparing Configurations")
         print(f"{'='*70}")
         print(f"Config 1: {config_id1} - {name1}")
         print(f"Config 2: {config_id2} - {name2}")

@@ -37,7 +37,7 @@ def pairwise_match(treated_score, untreated_score, caliper=0.0,
 
     Raises
     ------
-    Exception
+    NotImplementedError
         If ``replacement=False`` (not yet implemented).
     """
     
@@ -60,6 +60,8 @@ def pairwise_match(treated_score, untreated_score, caliper=0.0,
     else:
         
         # For now, only works with replacement
-        raise Exception
+        raise NotImplementedError(
+            "pairwise_match with replacement=False is not implemented."
+        )
         
     return good_rows, min_ix
