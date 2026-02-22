@@ -12,13 +12,80 @@ import pandas as pd
 from py_tools import data as dt
 
 def reghdfe(df, yvar, xvars, **kwargs):
-    
+    """
+    High-dimensional fixed-effects regression (convenience wrapper).
+
+    Builds a formula string from ``yvar`` and ``xvars`` and delegates to
+    :func:`reghdfe_formula`.
+
+    Parameters
+    ----------
+    df : pandas.DataFrame
+        Input data.
+    yvar : str
+        Name of the dependent variable.
+    xvars : list of str
+        Names of independent variables.
+    **kwargs
+        Additional keyword arguments forwarded to :func:`reghdfe_formula`
+        (e.g. ``fes``, ``weight_var``, ``se_type``, ``cluster``).
+
+    Returns
+    -------
+    coeffs : ndarray of shape (n_regressors,)
+        OLS coefficient estimates on the demeaned variables.
+    se : ndarray of shape (n_regressors,)
+        Robust standard errors.
+    """
     formula = '{0} ~ {1}'.format(yvar, ' + '.join(xvars))
     return reghdfe_formula(df, formula, **kwargs)
 
 def reghdfe_formula(df, formula, fes=None, weight_var=None, se_type='robust', 
                     tol=1e-12, cluster=None):
+    """
+    High-dimensional fixed-effects regression via within-transformation.
 
+    Absorbs fixed effects iteratively (Frisch-Waugh-Lovell), removes singleton
+    observations, then runs weighted OLS on the demeaned outcome and
+    regressors.
+
+    Parameters
+    ----------
+    df : pandas.DataFrame
+        Input data.
+    formula : str
+        Patsy-compatible formula string (e.g. ``'y ~ x1 + x2'``).
+    fes : list, optional
+        Fixed effects to absorb.  Each element may be a string (single FE
+        variable) or a list of strings (interaction FE).  Defaults to ``[]``
+        (no fixed effects).
+    weight_var : str, optional
+        Column name of observation weights.  If ``None`` (default), unit
+        weights are used.
+    se_type : {'robust'}, optional
+        Type of standard errors to compute.  Currently only ``'robust'``
+        (HC0 sandwich) is supported.  Default is ``'robust'``.
+    tol : float, optional
+        Convergence tolerance passed to the within-transformation absorber.
+        Default is ``1e-12``.
+    cluster : ignored
+        Reserved for future cluster-robust standard errors; not yet
+        implemented.
+
+    Returns
+    -------
+    coeffs : ndarray of shape (n_regressors,)
+        OLS coefficient estimates on the demeaned data (intercept absorbed).
+    se : ndarray of shape (n_regressors,)
+        HC0 robust standard errors.
+
+    Notes
+    -----
+    Singleton observations (groups with only one observation for any FE level)
+    are dropped before estimation.  The degrees-of-freedom adjustment accounts
+    for both the number of regressors and the number of absorbed fixed-effect
+    groups.
+    """
     if fes is None: fes = []
     
     unweighted = (weight_var is None)

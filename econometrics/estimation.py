@@ -4,11 +4,52 @@ from scipy.optimize import minimize
 from py_tools.numerical import gradient
 
 def objfcn(b, err_fcn, *args):
+    """
+    NLS objective function (RMSE).
 
+    Parameters
+    ----------
+    b : array_like
+        Parameter vector.
+    err_fcn : callable
+        Function ``err_fcn(b, *args)`` returning a 1-D array of residuals.
+    *args
+        Additional arguments forwarded to ``err_fcn``.
+
+    Returns
+    -------
+    float
+        Root-mean-square of the residuals returned by ``err_fcn``.
+    """
     return np.sqrt(np.mean(err_fcn(b, *args) ** 2))
 
 def se_nls(err_fcn, b, args=()):
+    """
+    Compute heteroskedasticity-robust standard errors for NLS estimates.
 
+    Uses the sandwich (HC0) formula: ``V = (G'G)^{-1} (4/T * sum e_t^2 g_t
+    g_t') (G'G)^{-1}``, where ``G`` is the Jacobian of the residuals and
+    ``g_t`` is the gradient at observation ``t``.
+
+    Parameters
+    ----------
+    err_fcn : callable
+        Function ``err_fcn(b, *args)`` returning a 1-D array of residuals of
+        length ``T``.
+    b : array_like of shape (Nb,)
+        Parameter vector at which to evaluate the standard errors.
+    args : tuple, optional
+        Additional arguments forwarded to ``err_fcn``.
+
+    Returns
+    -------
+    se : ndarray of shape (Nb,)
+        Heteroskedasticity-robust standard errors.
+    V : ndarray of shape (Nb, Nb)
+        Robust covariance matrix scaled by ``1/T``.
+    e : ndarray of shape (T,)
+        Residuals evaluated at ``b``.
+    """
     e = err_fcn(b, *args)
     grad = gradient(err_fcn, b, args=args)
 
@@ -33,7 +74,39 @@ def se_nls(err_fcn, b, args=()):
     return se, V, e
 
 def nls(err_fcn, b0, args=(), **kwargs):
+    """
+    Estimate a nonlinear least squares (NLS) model.
 
+    Minimises the RMSE of ``err_fcn`` via ``scipy.optimize.minimize`` and
+    returns estimates together with heteroskedasticity-robust standard errors.
+
+    Parameters
+    ----------
+    err_fcn : callable
+        Function ``err_fcn(b, *args)`` returning a 1-D array of residuals.
+    b0 : array_like
+        Initial parameter guess.
+    args : tuple, optional
+        Extra arguments passed to ``err_fcn``.
+    **kwargs
+        Additional keyword arguments forwarded to ``scipy.optimize.minimize``.
+
+    Returns
+    -------
+    output : dict
+        Dictionary with the following keys:
+
+        ``b_hat`` : ndarray
+            Estimated parameter vector.
+        ``e_hat`` : ndarray
+            Residuals evaluated at ``b_hat``.
+        ``V`` : ndarray
+            Robust covariance matrix of ``b_hat``.
+        ``se`` : ndarray
+            Robust standard errors of ``b_hat``.
+        ``res`` : OptimizeResult
+            Full result object from ``scipy.optimize.minimize``.
+    """
     all_args = (err_fcn,) + args
     res = minimize(objfcn, b0, args=all_args, **kwargs)
 
