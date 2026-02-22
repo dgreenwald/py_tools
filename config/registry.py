@@ -299,7 +299,15 @@ class ConfigRegistry:
         self._invalidate_cache()
 
     def remove(self, config_id: Union[str, int]):
-        """Remove a configuration from the registry."""
+        """Remove a configuration from the registry.
+
+        If *config_id* is not present, the call is a no-op.
+
+        Parameters
+        ----------
+        config_id : str or int
+            Identifier of the configuration to remove.
+        """
         if config_id in self.configs:
             del self.configs[config_id]
             self._invalidate_cache()
@@ -367,7 +375,25 @@ class ConfigRegistry:
         print()
 
     def _print_value(self, key: str, value: Any, indent: int = 0, max_depth: int = None):
-        """Recursively print a configuration value."""
+        """Recursively print a single configuration key-value pair.
+
+        Nested dicts are printed with increased indentation up to *max_depth*.
+        Short lists (≤ 5 items) are expanded; long lists show only item count.
+        Floats are formatted in scientific notation when very small or very
+        large, otherwise with up to 6 significant figures.
+
+        Parameters
+        ----------
+        key : str
+            Name of the configuration field.
+        value : any
+            Value associated with *key*.
+        indent : int, optional
+            Current indentation level (number of two-space increments).
+            Defaults to ``0``.
+        max_depth : int or None, optional
+            Maximum depth for nested dict expansion. ``None`` means unlimited.
+        """
         prefix = "  " * indent
 
         if isinstance(value, dict) and (max_depth is None or indent < max_depth):
@@ -460,20 +486,55 @@ class ConfigRegistry:
         return errors
 
     def _invalidate_cache(self):
-        """Clear the resolution cache."""
+        """Clear the resolution cache.
+
+        Called automatically whenever the underlying ``configs`` dictionary
+        is modified (e.g. via :meth:`add`, :meth:`update`, or :meth:`remove`).
+        """
         self._cache.clear()
 
     def __repr__(self):
+        """Return a concise string representation of the registry.
+
+        Returns
+        -------
+        str
+            A string of the form ``ConfigRegistry(<n> configs)``.
+        """
         return f"ConfigRegistry({len(self.configs)} configs)"
 
     def __len__(self):
+        """Return the number of configurations in the registry.
+
+        Returns
+        -------
+        int
+            Number of entries in :attr:`configs`.
+        """
         return len(self.configs)
 
     def __contains__(self, config_id):
+        """Return ``True`` if *config_id* is present in the registry.
+
+        Parameters
+        ----------
+        config_id : str or int
+            Configuration identifier to test.
+
+        Returns
+        -------
+        bool
+        """
         return config_id in self.configs
 
     def __iter__(self):
-        """Iterate over config IDs."""
+        """Iterate over config IDs.
+
+        Yields
+        ------
+        str or int
+            Each configuration identifier in insertion order.
+        """
         return iter(self.configs)
 
 
