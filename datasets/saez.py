@@ -8,7 +8,26 @@ default_dir = config.base_dir() + 'saez/'
 DATASET_NAME = "saez"
 DESCRIPTION = "Saez income share dataset loader."
 def update_names(df, usecols):
+    """Rename DataFrame columns to match usecols list by positional index.
 
+    Assigns names from ``usecols`` to the first ``len(usecols)`` columns of
+    ``df`` by position. Any additional columns beyond ``len(usecols)`` receive
+    temporary names of the form ``TEMP_VARIABLE_<index>``. The returned
+    DataFrame is restricted to the columns named in ``usecols``.
+
+    Parameters
+    ----------
+    df : pandas.DataFrame
+        DataFrame whose columns will be renamed.
+    usecols : list of str
+        Desired column names, applied positionally from column 0.
+
+    Returns
+    -------
+    pandas.DataFrame
+        DataFrame containing only the columns listed in ``usecols``,
+        renamed by positional index.
+    """
     mapping = {
         ii : name for ii, name in enumerate(usecols)
     }
@@ -24,7 +43,28 @@ def update_names(df, usecols):
 # data_dir = '/home/dan/Dropbox/data/saez/'
 
 def load(table='shares', reimport=False, data_dir=default_dir):
+    """Load Saez income/wealth data from Excel files.
 
+    Reads one of several Saez dataset tables, caching the result as a pickle
+    file for subsequent calls. Pass ``reimport=True`` to force re-reading from
+    the source Excel file.
+
+    Parameters
+    ----------
+    table : str, optional
+        Name of the table to load. One of ``'shares'``, ``'sources'``,
+        ``'wealth_by_asset'``, or ``'distribution_by_asset'``.
+    reimport : bool, optional
+        If ``True``, re-read from the source Excel file even if a cached
+        pickle exists.
+    data_dir : str, optional
+        Path to the directory containing the Saez Excel files.
+
+    Returns
+    -------
+    pandas.DataFrame
+        Annual time-indexed DataFrame for the requested table.
+    """
     pkl_file = table + '.pkl'
 
     if reimport or not os.path.exists(pkl_file):
