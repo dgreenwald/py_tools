@@ -10,7 +10,38 @@ import numpy as np
 from . import core as nm
 
 def secant(fcn, args, x0, x1, tol=1e-6, max_it_inner=20, max_it_outer=50, verbose=True):
+    """Find a root of a scalar function using the secant method.
 
+    Applies a secant step at each outer iteration, then uses a
+    line-search (halving the step) to ensure progress.
+
+    Parameters
+    ----------
+    fcn : callable
+        Scalar-valued function whose root is sought.  Called as
+        ``fcn(x, *args)``.
+    args : tuple
+        Positional arguments passed to *fcn* after *x*.
+    x0 : float
+        First initial guess.
+    x1 : float
+        Second initial guess.  Must differ from *x0*.
+    tol : float, optional
+        Convergence tolerance on ``|f(x)|``, by default ``1e-6``.
+    max_it_inner : int, optional
+        Maximum number of line-search halvings per outer iteration,
+        by default ``20``.
+    max_it_outer : int, optional
+        Maximum number of secant iterations, by default ``50``.
+    verbose : bool, optional
+        If ``True`` (default), print the residual at each iteration.
+
+    Returns
+    -------
+    float or None
+        The root *x* such that ``|f(x)| < tol``, or ``None`` if the
+        method failed to converge.
+    """
     it_outer = 0
 
     f0 = fcn(x0, *args)
@@ -58,7 +89,62 @@ def secant(fcn, args, x0, x1, tol=1e-6, max_it_inner=20, max_it_outer=50, verbos
 def root(fun, x0, args=None, kwargs=None, grad=None, tol=1e-8,
          gradient_kwargs=None, max_iterations=50, max_backstep_iterations=10,
          verbose=True):
+    """Find a root of a vector-valued function using Newton's method.
 
+    At each iteration the Jacobian is estimated (or supplied) and a
+    Newton step is taken.  A back-tracking line search halves the step
+    while the residual fails to decrease.
+
+    Parameters
+    ----------
+    fun : callable
+        Function whose root is sought.  Called as
+        ``fun(x, *args, **kwargs)`` and must return a 1-D array with
+        the same length as *x0*.
+    x0 : array-like
+        Initial guess.
+    args : tuple, optional
+        Positional arguments forwarded to *fun*, by default ``()``.
+    kwargs : dict, optional
+        Keyword arguments forwarded to *fun*, by default ``{}``.
+    grad : callable or None, optional
+        Function returning the Jacobian matrix at a given *x*, called
+        as ``grad(x, *args, **kwargs)``.  If ``None`` (default), the
+        Jacobian is estimated by finite differences using
+        :func:`~py_tools.numerical.core.gradient`.
+    tol : float, optional
+        Convergence tolerance on the Euclidean norm of the residual,
+        by default ``1e-8``.
+    gradient_kwargs : dict, optional
+        Extra keyword arguments forwarded to the finite-difference
+        gradient estimator, by default ``{}``.
+    max_iterations : int, optional
+        Maximum number of Newton iterations, by default ``50``.
+    max_backstep_iterations : int, optional
+        Maximum number of step-halving attempts per iteration, by
+        default ``10``.
+    verbose : bool, optional
+        If ``True`` (default), print the residual norm at each
+        iteration.
+
+    Returns
+    -------
+    dict
+        Result dictionary with keys:
+
+        ``'success'`` : bool
+            Whether convergence was achieved.
+        ``'x'`` : numpy.ndarray
+            Solution vector (present only on success).
+        ``'f_val'`` : numpy.ndarray
+            Residual at the solution (present only on success).
+        ``'dist'`` : float
+            Final residual norm (present only on success).
+        ``'failure_cause'`` : str
+            Reason for failure (present only on failure).
+            Either ``'max_backstep_iterations'`` or
+            ``'max_iterations'``.
+    """
     if args is None:
         args = ()
     if kwargs is None:
