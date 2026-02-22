@@ -8,6 +8,22 @@ from py_tools.bayesian.prior import Prior
 
 
 def _load_parallel_tools():
+    """Import and return MPI-related modules, raising a clear error if unavailable.
+
+    Returns
+    -------
+    mp : module
+        ``py_tools.compute.mpi_array`` module.
+    MPIArray : type
+        :class:`~py_tools.compute.mpi_array.MPIArray` class.
+    MPI : module
+        ``mpi4py.MPI`` module.
+
+    Raises
+    ------
+    RuntimeError
+        If ``mpi4py`` or ``py_tools.compute.mpi_array`` cannot be imported.
+    """
     try:
         import py_tools.compute.mpi_array as mp
         from py_tools.compute.mpi_array import MPIArray
@@ -20,12 +36,48 @@ def _load_parallel_tools():
     return mp, MPIArray, MPI
 
 def adapt_jump_scale(acc_rate, adapt_sens, adapt_target, adapt_range):
+    """Compute a multiplicative scaling factor for the MCMC jump scale.
+
+    Uses a logistic function to map the acceptance rate to a scaling
+    factor in the interval ``(1 - adapt_range/2, 1 + adapt_range/2)``.
+
+    Parameters
+    ----------
+    acc_rate : float
+        Current acceptance rate, in ``[0, 1]``.
+    adapt_sens : float
+        Sensitivity parameter controlling the steepness of the logistic
+        curve.
+    adapt_target : float
+        Target acceptance rate (the midpoint of the logistic curve).
+    adapt_range : float
+        Total range of the scaling factor (half on each side of 1.0).
+
+    Returns
+    -------
+    float
+        Multiplicative scaling factor to apply to the jump scale.
+    """
 
     e_term = np.exp(adapt_sens * (acc_rate - adapt_target))
     return (1.0 - 0.5 * adapt_range) + adapt_range * (e_term / (1.0 + e_term))
 
 def randomize_blocks(nx, nblock):
-    """nx is number of entries, nblock is number of blocks"""
+    """Randomly partition *nx* indices into *nblock* roughly equal boolean blocks.
+
+    Parameters
+    ----------
+    nx : int
+        Total number of parameter indices.
+    nblock : int
+        Number of blocks to create.
+
+    Returns
+    -------
+    list of ndarray of bool
+        List of length *nblock*, where each element is a boolean mask of
+        length *nx* indicating which indices belong to that block.
+    """
     ix_all = np.random.permutation(nx)
     block_size = int(np.ceil(nx / nblock))
 
@@ -43,6 +95,21 @@ def randomize_blocks(nx, nblock):
     return numerical_to_bool_blocks(blocks, nx)
 
 def partition_C(C, blocks):
+    """Extract sub-matrices of *C* corresponding to each block.
+
+    Parameters
+    ----------
+    C : ndarray of shape ``(nx, nx)``
+        Full covariance (or Cholesky) matrix.
+    blocks : list of ndarray of bool
+        Boolean block masks as returned by :func:`randomize_blocks`.
+
+    Returns
+    -------
+    list of ndarray
+        List where element *i* is the sub-matrix of *C* restricted to
+        the rows and columns indicated by ``blocks[i]``.
+    """
     
     C_list = []
     for iblock, block in enumerate(blocks):
@@ -51,6 +118,21 @@ def partition_C(C, blocks):
     return C_list
 
 def numerical_to_bool_blocks(blocks, nx):
+    """Convert a list of numerical index arrays to boolean mask arrays.
+
+    Parameters
+    ----------
+    blocks : list of array-like of int
+        Each element contains the numerical (integer) indices that belong
+        to that block.
+    nx : int
+        Total number of parameters (length of each output mask).
+
+    Returns
+    -------
+    list of ndarray of bool
+        List of boolean masks of length *nx*, one per block.
+    """
     
     bool_blocks = []
     for block in blocks:
@@ -61,10 +143,38 @@ def numerical_to_bool_blocks(blocks, nx):
     return bool_blocks
 
 def check_bounds(x, lb, ub):
+    """Check whether all elements of *x* lie within ``[lb, ub]``.
+
+    Parameters
+    ----------
+    x : array-like
+        Parameter vector to check.
+    lb : array-like
+        Element-wise lower bounds.
+    ub : array-like
+        Element-wise upper bounds.
+
+    Returns
+    -------
+    bool
+        ``True`` if ``lb[i] <= x[i] <= ub[i]`` for every *i*;
+        ``False`` otherwise.
+    """
 
     return (np.all(x >= lb) and np.all(x <= ub))
 
 def print_mesg(mesg, fid=None):
+    """Print or write a message to a log file.
+
+    Parameters
+    ----------
+    mesg : str
+        Message to output.
+    fid : file-like object, optional
+        Open file handle.  If provided, the message is written there
+        (with a trailing newline) and flushed.  If ``None``, the message
+        is printed to stdout with ``flush=True``.
+    """
     
     if fid is not None:
         fid.write(mesg + '\n')
@@ -73,6 +183,22 @@ def print_mesg(mesg, fid=None):
         print(mesg, flush=True)
 
 def save_file(x, out_dir, name, suffix=None, pickle=False):
+    """Save an array or object to disk.
+
+    Parameters
+    ----------
+    x : ndarray or object
+        Data to save.
+    out_dir : str
+        Directory path (a trailing ``'/'`` is appended if absent).
+    name : str
+        Base filename (without extension).
+    suffix : str, optional
+        If provided, appended to *name* separated by ``'_'``.
+    pickle : bool, optional
+        If ``True``, save as a pickle file (``.pkl``); otherwise save as
+        a NumPy ``.npy`` file.  Default is ``False``.
+    """
 
     if out_dir[-1] != '/':
         out_dir += '/'
@@ -89,6 +215,25 @@ def save_file(x, out_dir, name, suffix=None, pickle=False):
         np.save(outfile, x)
 
 def load_file(out_dir, name, suffix=None, pickle=False):
+    """Load an array or object from disk.
+
+    Parameters
+    ----------
+    out_dir : str
+        Directory path (a trailing ``'/'`` is appended if absent).
+    name : str
+        Base filename (without extension).
+    suffix : str, optional
+        If provided, appended to *name* separated by ``'_'``.
+    pickle : bool, optional
+        If ``True``, load a pickle file (``.pkl``); otherwise load a
+        NumPy ``.npy`` file.  Default is ``False``.
+
+    Returns
+    -------
+    ndarray or object or None
+        Loaded data, or ``None`` if the file does not exist.
+    """
 
     if out_dir[-1] != '/':
         out_dir += '/'
@@ -111,6 +256,33 @@ def load_file(out_dir, name, suffix=None, pickle=False):
         return np.load(outfile)
 
 def metropolis_step(fcn, x, x_try, post=None, log_u=None, args=()):
+    """Perform a single Metropolis-Hastings accept/reject step.
+
+    Parameters
+    ----------
+    fcn : callable
+        Log-posterior function with signature ``fcn(x, *args)``.
+    x : ndarray
+        Current parameter vector.
+    x_try : ndarray
+        Proposed parameter vector.
+    post : float, optional
+        Log-posterior at *x*.  Computed from *fcn* if not provided.
+    log_u : float, optional
+        Log of a uniform random draw, used for the accept/reject
+        decision.  Drawn from ``log(Uniform(0, 1))`` if not provided.
+    args : tuple, optional
+        Additional arguments passed to *fcn*.
+
+    Returns
+    -------
+    x_new : ndarray
+        Accepted parameter vector (either *x_try* or *x*).
+    post_new : float
+        Log-posterior at *x_new*.
+    accepted : bool
+        ``True`` if the proposal was accepted.
+    """
 
     if post is None:
         post = fcn(x, *args)
@@ -126,6 +298,37 @@ def metropolis_step(fcn, x, x_try, post=None, log_u=None, args=()):
         return (x, post, False)
 
 def importance_sample(fcn, dist, Nsim, Nx, args=(), parallel=False):
+    """Draw importance-weighted samples from a posterior.
+
+    Draws *Nsim* proposals from *dist* and evaluates *fcn* (the
+    log-posterior) at each draw.  Optionally distributes the evaluation
+    across MPI ranks.
+
+    Parameters
+    ----------
+    fcn : callable
+        Log-posterior function with signature ``fcn(x, *args)``.
+    dist : scipy.stats frozen distribution
+        Proposal distribution with ``rvs`` and ``logpdf`` methods.
+    Nsim : int
+        Number of importance samples.
+    Nx : int
+        Dimensionality of the parameter space.
+    args : tuple, optional
+        Additional arguments forwarded to *fcn*.
+    parallel : bool, optional
+        If ``True``, distribute evaluation across MPI ranks using
+        :mod:`py_tools.compute.mpi_array`.  Default is ``False``.
+
+    Returns
+    -------
+    draws : ndarray of shape ``(Nsim, Nx)`` or None
+        Importance-sample draws.  ``None`` on non-root MPI ranks when
+        *parallel* is ``True``.
+    log_weights : ndarray of shape ``(Nsim,)`` or None
+        Log importance weights (log-posterior minus log-proposal).
+        ``None`` on non-root MPI ranks when *parallel* is ``True``.
+    """
 
     if not parallel:
         draws = np.atleast_2d(dist.rvs(Nsim))
@@ -162,6 +365,48 @@ def importance_sample(fcn, dist, Nsim, Nx, args=(), parallel=False):
 
 def rwmh(posterior, x_init, jump_scale=1.0, C_list=None, Nstep=1, blocks=None,
               block_sizes=None, post_init=None, e=None, log_u=None, quiet=True):
+    """Run a random-walk Metropolis-Hastings sampler for *Nstep* steps.
+
+    Parameters
+    ----------
+    posterior : callable
+        Log-posterior function with signature ``posterior(x)``.
+    x_init : ndarray
+        Starting parameter vector.
+    jump_scale : float, optional
+        Global scaling factor for the proposal covariance.  Default is
+        ``1.0``.
+    C_list : list of ndarray, optional
+        Cholesky factors of the proposal covariance for each block.  If
+        ``None``, identity matrices are used.
+    Nstep : int, optional
+        Number of MCMC steps.  Default is ``1``.
+    blocks : list of ndarray of bool, optional
+        Boolean block masks.  If ``None``, a single block covering all
+        parameters is used.
+    block_sizes : list of int, optional
+        Number of parameters in each block.  Inferred from *blocks* if
+        ``None``.
+    post_init : float, optional
+        Log-posterior at *x_init*.  Evaluated if ``None``.
+    e : ndarray of shape ``(Nstep, Nx)``, optional
+        Pre-drawn standard normal innovations.  Drawn if ``None``.
+    log_u : ndarray of shape ``(Nstep, Nblock)``, optional
+        Pre-drawn log-uniform acceptance thresholds.  Drawn if ``None``.
+    quiet : bool, optional
+        If ``False``, print *x*, *x_try*, and *post* at every step.
+        Default is ``True``.
+
+    Returns
+    -------
+    x_store : ndarray of shape ``(Nstep, Nx)``
+        Accepted parameter vectors at each step.
+    post_store : ndarray of shape ``(Nstep,)``
+        Log-posterior values at each accepted parameter vector.
+    acc_rate : float
+        Fraction of proposals accepted, averaged over all steps and
+        blocks.
+    """
 
     Nx = len(x_init)
 
@@ -212,34 +457,87 @@ def rwmh(posterior, x_init, jump_scale=1.0, C_list=None, Nstep=1, blocks=None,
     return (x_store, post_store, acc_rate)
 
 class MonteCarlo:
-    """Master class for Monte Carlo samplers"""
+    """Base class for Monte Carlo samplers.
+
+    Handles parameter bounds, log-posterior evaluation, mode finding,
+    Hessian computation, and file I/O common to all sampler sub-classes.
+
+    Parameters
+    ----------
+    log_like : callable, optional
+        Log-likelihood function with signature ``log_like(vals, *args)``.
+    prior : Prior, optional
+        Bayesian prior.  Defaults to an empty (flat) :class:`Prior`.
+    args : tuple, optional
+        Extra arguments forwarded to *log_like*.
+    lb : array-like, optional
+        Element-wise lower bounds on parameters.
+    ub : array-like, optional
+        Element-wise upper bounds on parameters.
+    names : list of str, optional
+        Human-readable parameter names.
+    bounds_dict : dict, optional
+        Mapping from parameter name to ``(lb, ub)`` pair.  Used to fill
+        in missing entries of *lb* / *ub* when *names* is provided.
+    out_dir : str, optional
+        Directory for saving output files.
+    suffix : str, optional
+        String appended to output filenames for identification.
+    Nx : int, optional
+        Number of parameters.  Inferred from *lb*, *ub*, or *names* when
+        possible.
+
+    Attributes
+    ----------
+    log_like : callable or None
+    prior : Prior
+    args : tuple
+    names : list of str or None
+    lb : ndarray or None
+    ub : ndarray or None
+    Nx : int or None
+    x_mode : ndarray or None
+        Parameter vector at the posterior mode (set by :meth:`find_mode`).
+    post_mode : float or None
+        Log-posterior at the mode.
+    H : ndarray or None
+        Negative Hessian of the log-posterior (set by
+        :meth:`compute_hessian`).
+    H_inv : ndarray or None
+        Pseudo-inverse of ``H``.
+    CH_inv : ndarray or None
+        Cholesky factor of ``H_inv``.
+    out_dir : str or None
+    suffix : str or None
+    """
 
     def __init__(self, log_like=None, prior=None, args=(), lb=None, ub=None,
                  names=None, bounds_dict=None, out_dir=None, suffix=None,
                  Nx=None):
-        """
+        """Initialise the Monte Carlo sampler.
+
         Parameters
         ----------
-        log_like : function
-            Function of (vals, *args) that evaluates the log likelihood.
-        prior : Prior object
-            Bayesian prior
-        args : tuple
-            Additional arguments of log_like
-        lb : ndarray
-            Lower bounds of parameters
-        ub : ndarray
-            Upper bounds of parameters
-        names : list
-            Names of parameters
-        bounds_dict: dict
-            Alternative bounds input, maps param names to (lb, ub) pairs
-        out_dir: string
-            Directory where output should be saved
-        suffix: string
-            Suffix for labeling
-        Nx : int
-            number of parameters
+        log_like : callable, optional
+            Log-likelihood function with signature ``log_like(vals, *args)``.
+        prior : Prior, optional
+            Bayesian prior.  Defaults to an empty (flat) :class:`Prior`.
+        args : tuple, optional
+            Extra arguments forwarded to *log_like*.
+        lb : array-like, optional
+            Element-wise lower bounds on parameters.
+        ub : array-like, optional
+            Element-wise upper bounds on parameters.
+        names : list of str, optional
+            Human-readable parameter names.
+        bounds_dict : dict, optional
+            Mapping from parameter name to ``(lb, ub)`` pair.
+        out_dir : str, optional
+            Directory for saving output files.
+        suffix : str, optional
+            String appended to output filenames.
+        Nx : int, optional
+            Number of parameters.
         """
 
         if bounds_dict is None: bounds_dict = {}
@@ -297,6 +595,20 @@ class MonteCarlo:
         self.suffix = suffix
 
     def posterior(self, params):
+        """Evaluate the log-posterior for a parameter vector.
+
+        Returns ``-1e+10`` when any bound is violated.
+
+        Parameters
+        ----------
+        params : ndarray
+            Parameter vector.
+
+        Returns
+        -------
+        float
+            Log-posterior value (log-likelihood + log-prior).
+        """
 
         if (self.lb is None) or (self.ub is None) or check_bounds(params.ravel(), self.lb, self.ub):
             return (self.log_like(params, *self.args) + self.prior.logpdf(params))
@@ -304,12 +616,64 @@ class MonteCarlo:
             return -1e+10
 
     def min_objfcn(self, unbdd_params):
+        """Objective function for minimisation (negative log-posterior).
+
+        Applies the inverse bound transform before evaluating the
+        posterior, allowing unconstrained optimisation.
+
+        Parameters
+        ----------
+        unbdd_params : ndarray
+            Unbounded (transformed) parameter vector.
+
+        Returns
+        -------
+        float
+            Negative log-posterior at the corresponding bounded parameters.
+        """
 
         params = self.bound_transform(unbdd_params, to_bdd=True)
         return -self.posterior(params)
 
     def find_mode(self, x0, tol=1e-8, basinhopping=False, method='bfgs',
                   iterate=False, iter_tol=1e-6, disp_iterate=True, **kwargs):
+        """Find the posterior mode via numerical optimisation.
+
+        Minimises the negative log-posterior using
+        :func:`scipy.optimize.minimize` (or
+        :func:`~scipy.optimize.basinhopping`).  Sets :attr:`x_mode` and
+        :attr:`post_mode` on completion.
+
+        Parameters
+        ----------
+        x0 : ndarray
+            Starting point for the optimiser.
+        tol : float, optional
+            Convergence tolerance passed to
+            :func:`scipy.optimize.minimize`.  Default is ``1e-8``.
+        basinhopping : bool, optional
+            If ``True``, use basin-hopping global optimisation instead
+            of a local method.  Default is ``False``.
+        method : str, optional
+            Optimisation method passed to ``scipy.optimize``.  Default
+            is ``'bfgs'``.
+        iterate : bool, optional
+            If ``True``, repeatedly optimise until the improvement in
+            the posterior falls below *iter_tol*.  Default is ``False``.
+        iter_tol : float, optional
+            Convergence criterion for iterative mode-finding.  Default
+            is ``1e-6``.
+        disp_iterate : bool, optional
+            If ``True`` (and *iterate* is ``True``), print progress at
+            each iteration.  Default is ``True``.
+        **kwargs
+            Additional keyword arguments forwarded to the optimiser.
+
+        Returns
+        -------
+        res : OptimizeResult
+            Result object returned by the scipy optimiser.
+        """
         
         x0 = x0.ravel()
 
@@ -355,6 +719,25 @@ class MonteCarlo:
         return res
 
     def find_mode_de(self, bounds, **kwargs):
+        """Find the posterior mode using differential evolution.
+
+        Uses :func:`scipy.optimize.differential_evolution` for global
+        optimisation.  Sets :attr:`x_mode` and :attr:`post_mode`.
+
+        Parameters
+        ----------
+        bounds : sequence of ``(min, max)`` pairs
+            Bounds for each parameter, passed directly to
+            :func:`~scipy.optimize.differential_evolution`.
+        **kwargs
+            Additional keyword arguments forwarded to the optimiser.
+
+        Returns
+        -------
+        res : OptimizeResult
+            Result object returned by
+            :func:`~scipy.optimize.differential_evolution`.
+        """
 
         res = opt.differential_evolution(self.min_objfcn, bounds, **kwargs)
         self.x_mode = res.x
@@ -362,11 +745,53 @@ class MonteCarlo:
         return res
 
     def bound_transform(self, vals, *args, **kwargs):
+        """Apply the bound transform to *vals* using this object's bounds.
+
+        Delegates to :func:`py_tools.numerical.bound_transform`.
+
+        Parameters
+        ----------
+        vals : ndarray
+            Parameter vector to transform.
+        *args, **kwargs
+            Additional arguments forwarded to
+            :func:`~py_tools.numerical.bound_transform` (e.g.
+            ``to_bdd=True`` to transform *from* unbounded space).
+
+        Returns
+        -------
+        ndarray
+            Transformed parameter vector.
+        """
 
         return nm.bound_transform(vals, self.lb, self.ub, *args, **kwargs)
 
     def compute_hessian(self, x0=None, cholesky=True, robust=True,
                         **kwargs):
+        """Compute the (negative) Hessian of the log-posterior at *x0*.
+
+        Sets :attr:`H`, :attr:`H_inv`, and optionally :attr:`CH_inv`.
+
+        Parameters
+        ----------
+        x0 : ndarray, optional
+            Point at which to compute the Hessian.  Defaults to
+            :attr:`x_mode`.
+        cholesky : bool, optional
+            If ``True`` (default), also compute and store
+            ``CH_inv = chol(H_inv)``.
+        robust : bool, optional
+            If ``True`` (default) and *cholesky* is ``True``, use
+            :func:`~py_tools.numerical.robust_cholesky` to handle
+            near-singular matrices.
+        **kwargs
+            Additional keyword arguments forwarded to
+            :func:`~py_tools.numerical.hessian`.
+
+        Returns
+        -------
+        None
+        """
 
         if x0 is None:
             x0 = self.x_mode.copy()
@@ -388,15 +813,65 @@ class MonteCarlo:
         return None
 
     def set_CH_inv(self, CH_inv):
+        """Manually set the Cholesky factor of the inverse Hessian.
+
+        Parameters
+        ----------
+        CH_inv : ndarray
+            Lower-triangular Cholesky factor to store as :attr:`CH_inv`.
+
+        Returns
+        -------
+        None
+        """
 
         self.CH_inv = CH_inv
         return None
 
     def metro(self, x, post, x_try, **kwargs):
+        """Perform a single Metropolis-Hastings step using the stored posterior.
+
+        Thin wrapper around :func:`metropolis_step` that passes
+        :meth:`posterior` as the log-posterior function.
+
+        Parameters
+        ----------
+        x : ndarray
+            Current parameter vector.
+        post : float
+            Log-posterior at *x*.
+        x_try : ndarray
+            Proposed parameter vector.
+        **kwargs
+            Additional keyword arguments forwarded to
+            :func:`metropolis_step`.
+
+        Returns
+        -------
+        x_new : ndarray
+            Accepted parameter vector.
+        post_new : float
+            Log-posterior at *x_new*.
+        accepted : bool
+            ``True`` if the proposal was accepted.
+        """
 
         return metropolis_step(self.posterior, x, x_try, post=post, **kwargs)
 
     def open_log(self, title='log', suffix=None):
+        """Open a text log file for recording sampler output.
+
+        Sets ``self.fid`` to the open file handle, or to ``None`` if
+        :attr:`out_dir` is not set.
+
+        Parameters
+        ----------
+        title : str, optional
+            Base name of the log file.  Default is ``'log'``.
+        suffix : str, optional
+            Suffix appended to the filename.  Falls back to
+            :attr:`suffix` when not provided.
+        """
 
         if self.out_dir is None:
             self.fid = None
@@ -418,13 +893,38 @@ class MonteCarlo:
         self.fid = open(log_file, 'wt')
 
     def print_log(self, mesg):
+        """Write *mesg* to the log file (or stdout if no file is open).
+
+        Parameters
+        ----------
+        mesg : str
+            Message to record.
+        """
         print_mesg(mesg, fid=self.fid)
 
     def close_log(self):
+        """Close the log file handle if one is open."""
         if self.fid is not None:
             self.fid.close()
 
     def save_item(self, name, suffix=None, **kwargs):
+        """Save a single attribute to disk.
+
+        Parameters
+        ----------
+        name : str
+            Name of the attribute to save (also used as the filename
+            base).
+        suffix : str, optional
+            File suffix.  Falls back to :attr:`suffix`.
+        **kwargs
+            Additional keyword arguments forwarded to
+            :func:`save_file`.
+
+        Returns
+        -------
+        None
+        """
 
         if suffix is None:
             suffix = self.suffix
@@ -437,6 +937,22 @@ class MonteCarlo:
         return None
 
     def load_item(self, name, suffix=None, **kwargs):
+        """Load a single attribute from disk and store it on self.
+
+        Parameters
+        ----------
+        name : str
+            Name of the attribute to load (also the filename base).
+        suffix : str, optional
+            File suffix.  Falls back to :attr:`suffix`.
+        **kwargs
+            Additional keyword arguments forwarded to
+            :func:`load_file`.
+
+        Returns
+        -------
+        None
+        """
         
         if suffix is None:
             suffix = self.suffix
@@ -447,6 +963,22 @@ class MonteCarlo:
         return None
     
     def save_list(self, np_list=None, pkl_list=None, **kwargs):
+        """Save multiple attributes to disk.
+
+        Parameters
+        ----------
+        np_list : list of str, optional
+            Attribute names to save as NumPy ``.npy`` files.
+        pkl_list : list of str, optional
+            Attribute names to save as pickle ``.pkl`` files.
+        **kwargs
+            Additional keyword arguments forwarded to
+            :meth:`save_item`.
+
+        Returns
+        -------
+        None
+        """
 
         if np_list is None: np_list = []
         if pkl_list is None: pkl_list = []
@@ -460,6 +992,24 @@ class MonteCarlo:
         return None
     
     def load_list(self, np_list=None, pkl_list=None, **kwargs):
+        """Load multiple attributes from disk.
+
+        Silently skips any file that does not exist, printing a warning.
+
+        Parameters
+        ----------
+        np_list : list of str, optional
+            Attribute names to load from NumPy ``.npy`` files.
+        pkl_list : list of str, optional
+            Attribute names to load from pickle ``.pkl`` files.
+        **kwargs
+            Additional keyword arguments forwarded to
+            :meth:`load_item`.
+
+        Returns
+        -------
+        None
+        """
 
         if np_list is None: np_list = []
         if pkl_list is None: pkl_list = []
@@ -479,6 +1029,36 @@ class MonteCarlo:
         return None
 
     def importance_sample(self, Nsim, resample=True, offset=None, **kwargs):
+        """Run importance sampling centred on the posterior mode.
+
+        Uses a multivariate normal proposal with covariance
+        :attr:`H_inv` (optionally inflated by *offset*).
+
+        Parameters
+        ----------
+        Nsim : int
+            Number of importance samples.
+        resample : bool, optional
+            If ``True`` (default), draw a new set of *Nsim* samples
+            with replacement using the importance weights, so that all
+            returned log-weights are zero.
+        offset : float, optional
+            If provided, add ``offset * I`` to the proposal covariance
+            to improve coverage.
+        **kwargs
+            Additional keyword arguments forwarded to
+            :func:`importance_sample` (e.g. ``parallel=True``).
+
+        Returns
+        -------
+        draws : ndarray of shape ``(Nsim, Nx)`` or None
+            Importance-sample (or resampled) draws.
+        log_weights : ndarray of shape ``(Nsim,)`` or None
+            Log importance weights (all zeros when *resample* is
+            ``True``).
+        ess : float or None
+            Effective sample size before resampling.
+        """
 
         assert self.x_mode is not None
         assert self.H_inv is not None
@@ -510,10 +1090,44 @@ class MonteCarlo:
         return draws, log_weights, ess
 
 class RWMC(MonteCarlo):
-    """Class for Markov Chain Monte Carlo sampler"""
+    """Random-Walk Markov Chain Monte Carlo sampler.
+
+    Inherits from :class:`MonteCarlo` and adds a Metropolis-Hastings
+    random-walk sampler with adaptive jump scaling and optional
+    block updates.
+
+    Parameters
+    ----------
+    rwmc_chains : list of RWMC, optional
+        If provided, merge the draws and posteriors from multiple
+        completed chains into this object.
+    *args, **kwargs
+        Forwarded to :class:`MonteCarlo`.
+
+    Attributes
+    ----------
+    np_list : list of str
+        Default list of array attributes to save as ``.npy`` files.
+    pkl_list : list of str
+        Default list of attributes to save as ``.pkl`` files.
+    draws : ndarray or None
+        Stored MCMC draws, shape ``(Nsim, Nx)``.
+    post_sim : ndarray or None
+        Log-posterior at each draw, shape ``(Nsim,)``.
+    acc_rate : float or None
+        Overall acceptance rate.
+    """
 
     def __init__(self, rwmc_chains=None, *args, **kwargs):
-        """Constructor -- need to finish"""
+        """Initialise the RWMC sampler.
+
+        Parameters
+        ----------
+        rwmc_chains : list of RWMC, optional
+            Completed chains whose draws and posteriors are merged.
+        *args, **kwargs
+            Forwarded to :class:`MonteCarlo`.
+        """
 
         MonteCarlo.__init__(self, *args, **kwargs)
         
@@ -528,6 +1142,42 @@ class RWMC(MonteCarlo):
                    C=None, C_list=None, blocks='none', bool_blocks=False,
                    n_blocks=None, adapt_sens=16.0, adapt_range=0.1,
                    adapt_target=0.25):
+        """Set up the sampler before calling :meth:`sample`.
+
+        Parameters
+        ----------
+        x0 : ndarray, optional
+            Starting point.  Defaults to :attr:`x_mode`.
+        jump_scale : float, optional
+            Initial proposal scaling factor.  If ``None``, defaults to
+            ``jump_mult * 2.4 / sqrt(Nx)``.
+        jump_mult : float, optional
+            Multiplier for the default jump scale.  Default is ``1.0``.
+        stride : int, optional
+            Only every *stride*-th step is recorded.  Default is ``1``.
+        C : ndarray, optional
+            Cholesky factor of the proposal covariance (shared across
+            blocks).  Defaults to :attr:`CH_inv`.
+        C_list : list of ndarray, optional
+            Per-block Cholesky factors.  Overrides *C* when provided.
+        blocks : {``'none'``, ``'random'``, list}, optional
+            Block structure.  ``'none'`` uses a single block.
+            ``'random'`` requires *n_blocks*.  A list is interpreted
+            according to *bool_blocks*.  Default is ``'none'``.
+        bool_blocks : bool, optional
+            If ``True``, the *blocks* list contains boolean masks;
+            otherwise it contains numerical index arrays.  Default is
+            ``False``.
+        n_blocks : int, optional
+            Number of random blocks.  Required when ``blocks='random'``.
+        adapt_sens : float, optional
+            Sensitivity of the adaptive jump-scale update.  Default is
+            ``16.0``.
+        adapt_range : float, optional
+            Range of the adaptive scaling factor.  Default is ``0.1``.
+        adapt_target : float, optional
+            Target acceptance rate for adaptation.  Default is ``0.25``.
+        """
 
         self.stride = stride
 
@@ -579,6 +1229,40 @@ class RWMC(MonteCarlo):
     def sample(self, Nsim, n_print=None, n_recov=None, n_save=None, log=True,
                cov_offset=0.0, min_recov=0, n_retune=None, chain_no=0,
                *args, **kwargs):
+        """Run the RWMC chain for *Nsim* draws.
+
+        Parameters
+        ----------
+        Nsim : int
+            Number of draws to store (after thinning by :attr:`stride`).
+        n_print : int, optional
+            Print progress every *n_print* stored draws.
+        n_recov : int, optional
+            Recompute the proposal covariance from the empirical sample
+            covariance every *n_recov* stored draws.
+        n_save : int, optional
+            Save intermediate output every *n_save* stored draws.
+            Requires :attr:`out_dir` to be set.
+        log : bool, optional
+            If ``True`` (default), write a text log file.
+        cov_offset : float, optional
+            Regularisation added to the diagonal of the empirical
+            covariance during recomputation.  Default is ``0.0``.
+        min_recov : int, optional
+            Minimum number of stored draws before covariance recomputation
+            starts.  Default is ``0``.
+        n_retune : int, optional
+            Re-tune the jump scale every *n_retune* stored draws using
+            adaptive scaling.
+        chain_no : int, optional
+            Chain index used in output filenames.  Default is ``0``.
+        *args, **kwargs
+            Accepted but unused (for API flexibility).
+
+        Returns
+        -------
+        None
+        """
 
         if (n_save is not None) and (self.out_dir is None):
             raise ValueError("RWMC.sample requires out_dir when n_save is set.")
@@ -685,23 +1369,63 @@ class RWMC(MonteCarlo):
         return None
 
     def chain_suffix(self, chain_no=0):
+        """Build the output file suffix for a given chain number.
+
+        Parameters
+        ----------
+        chain_no : int, optional
+            Chain index.  Default is ``0``.
+
+        Returns
+        -------
+        str
+            Suffix string, e.g. ``'chain0'`` or ``'run1_chain2'``.
+        """
         if self.suffix is None:
             return 'chain{:d}'.format(chain_no)
         return self.suffix + '_chain{:d}'.format(chain_no)
 
     def save_chain(self, chain_no=0):
+        """Save draws, log-posteriors, acceptance rate, and jump scale.
+
+        Parameters
+        ----------
+        chain_no : int, optional
+            Chain index used in the output filename suffix.  Default is
+            ``0``.
+        """
 
         full_suffix = self.chain_suffix(chain_no)
         self.save_list(np_list=['draws', 'post_sim', 'acc_rate'], suffix=full_suffix)
         self.save_list(np_list=['jump_scale'], suffix=full_suffix)
 
     def load_chain(self, chain_no=0):
+        """Load draws, log-posteriors, acceptance rate, and jump scale.
+
+        Parameters
+        ----------
+        chain_no : int, optional
+            Chain index used in the input filename suffix.  Default is
+            ``0``.
+        """
 
         full_suffix = self.chain_suffix(chain_no)
         self.load_list(np_list=['draws', 'post_sim', 'acc_rate'], suffix=full_suffix)
         self.load_list(np_list=['jump_scale'], suffix=full_suffix)
 
     def load_chains(self, chains):
+        """Load multiple chains and store them in list attributes.
+
+        Populates :attr:`draws_list`, :attr:`post_sim_list`, and
+        :attr:`acc_rate_list` from disk.  Resets the scalar
+        ``draws``, ``post_sim``, and ``acc_rate`` attributes to
+        ``None`` afterwards.
+
+        Parameters
+        ----------
+        chains : iterable of int
+            Chain indices to load.
+        """
 
         self.draws_list = []
         self.post_sim_list = []
@@ -719,6 +1443,25 @@ class RWMC(MonteCarlo):
         self.acc_rate = None
 
     def stack_chains(self, burn_in=0, stride=1):
+        """Concatenate draws and log-posteriors from all loaded chains.
+
+        Parameters
+        ----------
+        burn_in : int, optional
+            Number of initial draws to discard from each chain.  Default
+            is ``0``.
+        stride : int, optional
+            Keep every *stride*-th draw after burn-in.  Default is ``1``.
+
+        Returns
+        -------
+        draws_all : ndarray
+            Concatenated draws from all chains, shape
+            ``(total_draws, Nx)``.
+        post_sim_all : ndarray
+            Concatenated log-posteriors from all chains, shape
+            ``(total_draws,)``.
+        """
 
         draws_all = np.vstack([draws[burn_in::stride, :] for draws in self.draws_list])
         post_sim_all = np.hstack([post_sim[burn_in::stride] for post_sim in self.post_sim_list])
@@ -726,16 +1469,43 @@ class RWMC(MonteCarlo):
         return draws_all, post_sim_all
 
     def save_all(self, **kwargs):
+        """Save all standard numpy and pickle attributes to disk."""
 
         self.save_list(np_list=self.np_list, pkl_list=self.pkl_list)
 
     def load_all(self, **kwargs):
+        """Load all standard numpy and pickle attributes from disk."""
 
         self.load_list(np_list=self.np_list, pkl_list=self.pkl_list)
 
     def run_all(self, x0, Nsim, mode_kwargs=None, hess_kwargs=None,
                 init_kwargs=None, sample_kwargs=None, **kwargs):
-        """Find mode, run MCMC chain, and save"""
+        """Find mode, compute Hessian, initialise, run chain, and save.
+
+        Convenience method that chains
+        :meth:`~MonteCarlo.find_mode`,
+        :meth:`~MonteCarlo.compute_hessian`,
+        :meth:`initialize`, :meth:`sample`, and
+        :meth:`save_all`.
+
+        Parameters
+        ----------
+        x0 : ndarray
+            Starting point for mode-finding.
+        Nsim : int
+            Number of MCMC draws to collect.
+        mode_kwargs : dict, optional
+            Extra keyword arguments for :meth:`~MonteCarlo.find_mode`.
+        hess_kwargs : dict, optional
+            Extra keyword arguments for
+            :meth:`~MonteCarlo.compute_hessian`.
+        init_kwargs : dict, optional
+            Extra keyword arguments for :meth:`initialize`.
+        sample_kwargs : dict, optional
+            Extra keyword arguments for :meth:`sample`.
+        **kwargs
+            Extra keyword arguments forwarded to :meth:`save_all`.
+        """
 
         if mode_kwargs is None:
             mode_kwargs = {}
@@ -754,10 +1524,61 @@ class RWMC(MonteCarlo):
             self.save_all(**kwargs)
 
 class SMC(MonteCarlo):
-    """Sequential Monte Carlo Sampler"""
+    """Sequential Monte Carlo (SMC) sampler.
+
+    Implements the SMC2 tempering algorithm that anneals the
+    likelihood by a power schedule ``phi[t]`` and uses a mutation step
+    (random-walk Metropolis-Hastings) to propagate particles.
+
+    Parameters
+    ----------
+    *args, **kwargs
+        Forwarded to :class:`MonteCarlo`.
+
+    Attributes
+    ----------
+    np_list : list of str
+        Default list of array attributes saved as ``.npy`` files.
+    pkl_list : list of str
+        Default list of attributes saved as ``.pkl`` files.
+    Npt : int
+        Number of particles.
+    Nstep : int
+        Number of SMC tempering steps.
+    Nmut : int
+        Number of mutation (RWMH) steps per particle per tempering step.
+    draws : ndarray of shape ``(Nstep, Npt, Nx)``
+        Particle draws at each tempering step.
+    W : ndarray of shape ``(Nstep, Npt)``
+        Importance weights.
+    post : ndarray of shape ``(Nstep, Npt)``
+        Log-posterior evaluated at each particle.
+    phi : ndarray of shape ``(Nstep + 1,)``
+        Tempering schedule ``(t/Nstep)^lam`` for ``t = 0, ..., Nstep``.
+    jump_scales : ndarray of shape ``(Nstep,)``
+        Adaptive proposal scaling factors at each step.
+    acc_rate : ndarray of shape ``(Nstep,)``
+        Acceptance rate at each mutation step.
+    ess : ndarray of shape ``(Nstep,)``
+        Effective sample size at each correction step.
+    the_star : ndarray of shape ``(Nx,)`` or None
+        Weighted mean of particles (set by :meth:`adapt`).
+    Sig_star : ndarray of shape ``(Nx, Nx)`` or None
+        Weighted covariance of particles (set by :meth:`adapt`).
+    C_star : ndarray of shape ``(Nx, Nx)`` or None
+        Cholesky factor of :attr:`Sig_star` (set by :meth:`adapt`).
+    C_list : list of ndarray or None
+        Per-block Cholesky factors partitioned from :attr:`C_star`.
+    """
 
     def __init__(self, *args, **kwargs):
-        """Constructor -- need to finish"""
+        """Initialise the SMC sampler.
+
+        Parameters
+        ----------
+        *args, **kwargs
+            Forwarded to :class:`MonteCarlo`.
+        """
 
         MonteCarlo.__init__(self, *args, **kwargs)
         
@@ -774,6 +1595,49 @@ class SMC(MonteCarlo):
                    init_jump_scale=0.25, lam=2.0, adapt_sens=16.0,
                    adapt_range=0.1, adapt_target=0.25, parallel=False, 
                    save_intermediate=True, test_flag=False):
+        """Set up the SMC sampler before calling :meth:`sample`.
+
+        Allocates storage arrays, sets the tempering schedule, draws
+        the initial particles from the prior, and configures MPI
+        parallelism.
+
+        Parameters
+        ----------
+        Npt : int
+            Number of particles.
+        Nstep : int
+            Number of tempering steps (including step 0).
+        Nmut : int, optional
+            Number of mutation (RWMH) sub-steps per particle at each
+            tempering step.  Default is ``1``.
+        Nblock : int, optional
+            Number of parameter blocks for the mutation step.  Default
+            is ``1`` (single block).
+        blocks : list of ndarray of bool, optional
+            Fixed block structure.  If ``None``, blocks are randomised
+            at each step.
+        init_jump_scale : float, optional
+            Initial proposal scaling factor.  Default is ``0.25``.
+        lam : float, optional
+            Exponent of the tempering schedule
+            ``phi[t] = (t/Nstep)^lam``.  Default is ``2.0``.
+        adapt_sens : float, optional
+            Logistic sensitivity for adaptive jump scaling.  Default is
+            ``16.0``.
+        adapt_range : float, optional
+            Range of the adaptive scaling factor.  Default is ``0.1``.
+        adapt_target : float, optional
+            Target acceptance rate.  Default is ``0.25``.
+        parallel : bool, optional
+            If ``True``, distribute particle evaluations across MPI
+            ranks.  Default is ``False``.
+        save_intermediate : bool, optional
+            If ``True`` (default), save draws, weights, and posteriors
+            after each step.  Requires :attr:`out_dir` to be set.
+        test_flag : bool, optional
+            If ``True``, enable diagnostic checks and raise after the
+            first parallel step.  Default is ``False``.
+        """
 
         if save_intermediate and (self.out_dir is None):
             raise ValueError("SMC.initialize requires out_dir when save_intermediate=True.")
@@ -838,7 +1702,15 @@ class SMC(MonteCarlo):
         if (self.rank == 0) and self.test_flag: print("TEST FLAG ON")
         
     def set_rank(self, parallel):
-        """ Set MPI rank and save parallel flag """
+        """Initialise MPI communicator attributes or set serial defaults.
+
+        Parameters
+        ----------
+        parallel : bool
+            If ``True``, load MPI tools and record the communicator
+            size and rank.  If ``False``, set ``rank = 0`` and leave
+            MPI attributes as ``None``.
+        """
         
         self.parallel = parallel
         
@@ -853,6 +1725,17 @@ class SMC(MonteCarlo):
             self.rank = 0
 
     def sample(self, quiet=False):
+        """Run the SMC tempering algorithm from step 1 to :attr:`Nstep`.
+
+        Iterates through correction, adaptation, and mutation sub-steps.
+        On the last step, resampling is forced.  Progress is printed
+        after each step unless *quiet* is ``True``.
+
+        Parameters
+        ----------
+        quiet : bool, optional
+            If ``True``, suppress per-step output.  Default is ``False``.
+        """
         
         self.quiet = quiet
 
@@ -907,6 +1790,21 @@ class SMC(MonteCarlo):
                     self.rank_print("New mode found: {:g}".format(self.post_mode))
 
     def correct(self, istep, force_resample=False):
+        """Correction (reweighting/resampling) step of the SMC algorithm.
+
+        Updates particle weights using the incremental likelihood ratio
+        between tempering steps *istep-1* and *istep*.  Resamples if
+        the effective sample size (ESS) falls below half the particle
+        count, or if *force_resample* is ``True``.
+
+        Parameters
+        ----------
+        istep : int
+            Current SMC step index (1-based).
+        force_resample : bool, optional
+            If ``True``, always resample regardless of the ESS.  Default
+            is ``False``.
+        """
 
         if self.rank == 0:
             self.draws[istep, :, :] = self.draws[istep-1, :, :]
@@ -965,6 +1863,22 @@ class SMC(MonteCarlo):
         self.ess[istep] = ess
 
     def adapt(self, istep):
+        """Adaptation step: update the proposal covariance and jump scale.
+
+        Computes the weighted mean (:attr:`the_star`) and covariance
+        (:attr:`Sig_star`) of the current particles, takes their Cholesky
+        factor (:attr:`C_star`), partitions it into per-block matrices
+        (:attr:`C_list`), and adapts :attr:`jump_scales` based on the
+        previous acceptance rate.
+
+        On non-root ranks this method returns immediately when running in
+        parallel mode.
+
+        Parameters
+        ----------
+        istep : int
+            Current SMC step index (1-based).
+        """
         
         if self.parallel: 
             if self.rank > 0: return None
@@ -993,6 +1907,17 @@ class SMC(MonteCarlo):
             )
 
     def mutate(self, istep):
+        """Mutation step: propagate each particle with RWMH moves.
+
+        Runs :func:`rwmh` for each particle for :attr:`Nmut` sub-steps
+        using the current proposal covariance.  In parallel mode the
+        particle evaluations are distributed across MPI ranks.
+
+        Parameters
+        ----------
+        istep : int
+            Current SMC step index (1-based).
+        """
 
         e = np.random.randn(self.Npt, self.Nmut, self.Nx)
         log_u = np.log(np.random.rand(self.Npt, self.Nmut, self.Nblock))
@@ -1063,19 +1988,43 @@ class SMC(MonteCarlo):
         return None
     
     def update_blocks(self):
+        """Re-randomise parameter blocks and update :attr:`C_list`.
+
+        Generates a new random partition of parameters into
+        :attr:`Nblock` blocks and re-partitions :attr:`C_star`
+        accordingly.
+        """
         
         self.blocks = randomize_blocks(self.Nx, self.Nblock)
         self.C_list = partition_C(self.C_star, self.blocks)
         
     def rank_print(self, mesg):
+        """Print *mesg* from rank 0 only (unless *quiet* is ``True``).
+
+        Parameters
+        ----------
+        mesg : str
+            Message to print.
+        """
         if (not self.quiet) and (self.rank == 0):
             print(mesg, flush=True)
             
     def save(self):
+        """Save all standard numpy and pickle attributes to disk."""
 
         self.save_list(np_list=self.np_list, pkl_list=self.pkl_list)
 
     def load(self, parallel=False):
+        """Load all standard numpy and pickle attributes from disk.
+
+        Also re-initialises the MPI rank via :meth:`set_rank`.
+
+        Parameters
+        ----------
+        parallel : bool, optional
+            Whether to enable MPI parallelism after loading.  Default
+            is ``False``.
+        """
 
         self.load_list(np_list=self.np_list, pkl_list=self.pkl_list)
         

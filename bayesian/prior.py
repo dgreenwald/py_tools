@@ -8,6 +8,35 @@ NORM = 4
 TRUNC_NORM = 5
 
 def get_prior(prior_type, mean=None, sd=None):
+    """Return a scipy frozen distribution for a named prior type.
+
+    Parameters
+    ----------
+    prior_type : {None, int, str}
+        Identifier for the prior family.  Accepted string values are
+        ``'beta'``, ``'gamma'``, ``'inv_gamma'``, ``'norm'``, and
+        ``'trunc_norm'``.  Integer constants ``BETA``, ``GAMMA``,
+        ``INV_GAMMA``, ``NORM``, and ``TRUNC_NORM`` defined in this module
+        can be used instead.  Pass ``None`` to obtain a flat (improper)
+        prior represented by ``None``.
+    mean : float, optional
+        Prior mean.  Required when *prior_type* is not ``None``.
+    sd : float, optional
+        Prior standard deviation.  Required when *prior_type* is not ``None``.
+
+    Returns
+    -------
+    dist : scipy.stats frozen distribution or None
+        A frozen scipy distribution whose ``logpdf`` and ``rvs`` methods
+        can be used for Bayesian inference, or ``None`` for a flat prior.
+
+    Raises
+    ------
+    ValueError
+        If *prior_type* is a string that is not one of the recognised names.
+    TypeError
+        If *prior_type* is not ``None``, an ``int``, or a ``str``.
+    """
 
     prior_num_dict = {
         'beta' : BETA,
@@ -54,14 +83,42 @@ def get_prior(prior_type, mean=None, sd=None):
         raise RuntimeError("Unexpected prior code")
 
 class Prior:
-    """Bayesian prior"""
+    """Container for a collection of independent Bayesian prior distributions.
+
+    Each component is added via :meth:`add` and can be a proper
+    (non-flat) distribution or a flat (improper) prior represented by
+    ``None``.
+
+    Attributes
+    ----------
+    dists : list of scipy.stats frozen distributions or None
+        Ordered list of component distributions.
+    names : list of str
+        Parameter names corresponding to each component.
+    non_flat_names : list of str
+        Names of parameters that have a non-flat prior.
+    """
 
     def __init__(self):
+        """Initialise an empty prior with no components."""
         self.dists = []
         self.names = []
         self.non_flat_names = []
 
     def add(self, prior_type, name=None, *args, **kwargs):
+        """Add a single prior component.
+
+        Parameters
+        ----------
+        prior_type : {None, int, str}
+            Prior family identifier passed to :func:`get_prior`.
+        name : str, optional
+            Human-readable name for the parameter.  If omitted a name of
+            the form ``'param<n>'`` is generated automatically.
+        *args, **kwargs
+            Additional positional and keyword arguments forwarded to
+            :func:`get_prior` (typically *mean* and *sd*).
+        """
         this_prior = get_prior(prior_type, *args, **kwargs)
         self.dists.append(this_prior)
 
@@ -74,6 +131,23 @@ class Prior:
             self.non_flat_names.append(name)
 
     def logpdf(self, vals):
+        """Compute the total log probability density for a set of parameter values.
+
+        Flat (``None``) components are skipped; they contribute zero to the
+        sum.
+
+        Parameters
+        ----------
+        vals : array-like
+            Sequence of parameter values with the same length as
+            :attr:`dists`.
+
+        Returns
+        -------
+        float
+            Sum of ``logpdf`` values across all non-flat components, or
+            ``0.0`` if every component is flat.
+        """
         logpdf_list = [dist.logpdf(val) for dist, val in zip(self.dists, vals) if dist is not None]
         if logpdf_list:
             return np.sum(logpdf_list)
@@ -81,6 +155,24 @@ class Prior:
             return 0.0
 
     def sample(self, n_samp):
+        """Draw independent samples from all prior components.
+
+        Parameters
+        ----------
+        n_samp : int
+            Number of samples to draw from each component.
+
+        Returns
+        -------
+        ndarray of shape ``(n_components, n_samp)``
+            Array where row *i* contains *n_samp* draws from component *i*.
+
+        Raises
+        ------
+        ValueError
+            If any component is flat (``None``), because a flat prior has
+            no well-defined sampling distribution.
+        """
         if any(dist is None for dist in self.dists):
             raise ValueError("Cannot sample from Prior with flat (None) components.")
         return np.vstack([dist.rvs(n_samp) for dist in self.dists])
