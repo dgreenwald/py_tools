@@ -7,16 +7,49 @@ __author__ = "Tamas Nepusz, Denis Bzowy"
 __version__ = "27jul2011"
 
 class WalkerRandomSampling(object):
-    """Walker's alias method for random objects with different probablities.
-    
+    """Walker's alias method for random objects with different probabilities.
+
     Based on the implementation of Denis Bzowy at the following URL:
     http://code.activestate.com/recipes/576564-walkers-alias-method-for-random-objects-with-diffe/
+
+    Parameters
+    ----------
+    weights : array_like
+        Probability weights for each item.  The weights may be in any order
+        and do not need to sum to 1.
+    keys : array_like, optional
+        Labels associated with each weight.  If provided, :meth:`random`
+        returns elements from ``keys`` instead of integer indices.
+
+    Attributes
+    ----------
+    n : int
+        Number of items.
+    keys : numpy.ndarray or None
+        Array of item labels, or ``None`` when no keys were provided.
+    prob : numpy.ndarray
+        Normalised Walker probability table.
+    inx : numpy.ndarray
+        Walker alias index table.
     """
     
     def __init__(self, weights, keys=None):
-        """Builds the Walker tables ``prob`` and ``inx`` for calls to `random()`.
-        The weights (a list or tuple or iterable) can be in any order and they
-        do not even have to sum to 1."""
+        """Build the Walker tables ``prob`` and ``inx`` for calls to :meth:`random`.
+
+        Parameters
+        ----------
+        weights : array_like
+            Probability weights.  The weights can be in any order and do not
+            need to sum to 1.
+        keys : array_like, optional
+            Labels for each weight entry.  When provided, they are stored as
+            a NumPy array and returned by :meth:`random`.
+
+        Raises
+        ------
+        ValueError
+            If ``weights`` is not a 1-D array.
+        """
         n = self.n = len(weights)
         if keys is None:
             self.keys = keys
@@ -53,11 +86,20 @@ class WalkerRandomSampling(object):
         self.inx = inx
 
     def random(self, count=None):
-        """Returns a given number of random integers or keys, with probabilities
-        being proportional to the weights supplied in the constructor.
+        """Return random integers or keys with probabilities proportional to the weights.
 
-        When `count` is ``None``, returns a single integer or key, otherwise
-        returns a NumPy array with a length given in `count`.
+        Parameters
+        ----------
+        count : int, optional
+            Number of samples to draw.  If ``None`` (default), a single
+            integer or key is returned as a scalar.  Otherwise, a NumPy
+            array of length ``count`` is returned.
+
+        Returns
+        -------
+        int, object, or numpy.ndarray
+            A single sampled index (or key when ``keys`` was provided) when
+            ``count`` is ``None``, or a NumPy array of ``count`` samples.
         """
         if count is None:
             u = random()

@@ -14,7 +14,27 @@ from collections import namedtuple
 Command = namedtuple('Command', ['name', 'nargs', 'content'])
 
 def get_next_argument(text):
-    
+    """Extract the next ``{...}`` argument from the beginning of a text string.
+
+    Parameters
+    ----------
+    text : str
+        Input text.  The next ``{...}`` block (possibly preceded by
+        whitespace) is extracted from the front.
+
+    Returns
+    -------
+    argument : str
+        Content of the ``{...}`` block (without the surrounding braces).
+    after : str
+        Remainder of ``text`` following the closing brace.
+
+    Raises
+    ------
+    Exception
+        If the text does not start with optional whitespace followed by
+        ``'{'``.
+    """
     match = re.match(r'\s*{', text)
     bma_init = par.match_to_bma(match, text)
     if not bma_init.matched:
@@ -25,7 +45,23 @@ def get_next_argument(text):
     return argument, after
 
 def get_arguments(text, nargs):
-    
+    """Extract multiple consecutive ``{...}`` arguments from a text string.
+
+    Parameters
+    ----------
+    text : str
+        Input text from which ``nargs`` brace-delimited arguments are
+        extracted sequentially.
+    nargs : int
+        Number of arguments to extract.
+
+    Returns
+    -------
+    arguments : list of str
+        Extracted argument contents (without surrounding braces), in order.
+    text : str
+        Remainder of ``text`` after all extracted arguments.
+    """
     arguments = []
     for ii in range(nargs):
         argument, text = get_next_argument(text)
@@ -34,7 +70,35 @@ def get_arguments(text, nargs):
     return arguments, text
 
 def replace_content(text, command):
-    
+    """Substitute the next ``command.nargs`` arguments into a command's body.
+
+    Reads exactly ``command.nargs`` ``{...}`` arguments from the front of
+    ``text``, substitutes them into ``command.content`` (replacing ``#1``,
+    ``#2``, … placeholders), and returns the expanded content together with
+    the remaining text.
+
+    Parameters
+    ----------
+    text : str
+        Input text positioned immediately after the command name (i.e. the
+        arguments follow at the start of the string).
+    command : Command
+        Named tuple with fields ``name``, ``nargs``, and ``content``.
+
+    Returns
+    -------
+    new_content : str
+        The command body with all argument placeholders substituted.
+    text : str
+        Remainder of ``text`` after all consumed arguments.
+
+    Raises
+    ------
+    AssertionError
+        If ``command.nargs >= 10`` (double-digit argument numbers are not
+        supported) or if the number of extracted arguments does not match
+        ``command.nargs``.
+    """
     # If we go to double digits there will be issues with the regex, where #10 catches #1, etc.
     assert command.nargs < 10
     
@@ -48,7 +112,27 @@ def replace_content(text, command):
     return new_content, text
 
 def replace_command(text, command):
-    
+    """Replace all occurrences of a single LaTeX command in ``text``.
+
+    Finds the first occurrence of ``\\<command.name>`` followed by a
+    non-word character, substitutes the next ``command.nargs`` brace
+    arguments, and then recurses on the remainder until no more occurrences
+    are found.
+
+    Parameters
+    ----------
+    text : str
+        LaTeX source text to process.
+    command : Command
+        Named tuple with fields ``name``, ``nargs``, and ``content``.
+
+    Returns
+    -------
+    replaced_text : str
+        Text with all occurrences of the command replaced.
+    replaced_any : bool
+        ``True`` if at least one replacement was made.
+    """
     pattern = r'\\' + command.name + r'(?=[\W_])'
     bma = par.bma_search(pattern, text)
     if not bma.matched:
@@ -66,7 +150,25 @@ def replace_command(text, command):
     return replaced_text, replaced_any
 
 def replace_commands_static(text, commands):
-    
+    """Replace all occurrences of a list of LaTeX commands in ``text``.
+
+    Repeatedly iterates over ``commands`` calling :func:`replace_command`
+    until a full pass results in no replacements (i.e. all command
+    occurrences have been expanded).
+
+    Parameters
+    ----------
+    text : str
+        LaTeX source text to process.
+    commands : list of Command
+        Commands to replace; each is a named tuple with ``name``, ``nargs``,
+        and ``content`` fields.
+
+    Returns
+    -------
+    str
+        Text with all command occurrences fully expanded.
+    """
     # Loop through until we stop finding any commands
     done = False
     while not done:
@@ -80,7 +182,25 @@ def replace_commands_static(text, commands):
     return text
 
 def remove_comments(text, replaced_text=''):
-    
+    """Strip LaTeX comments from ``text``.
+
+    Removes everything from an unescaped ``%`` character to the end of its
+    line (inclusive).  The function is called recursively until all comment
+    regions are removed.
+
+    Parameters
+    ----------
+    text : str
+        LaTeX source text that may contain ``%`` comments.
+    replaced_text : str, optional
+        Accumulated output from previous recursive calls.  Defaults to
+        ``''``.
+
+    Returns
+    -------
+    str
+        Text with all comment regions removed.
+    """
     pattern = r'(?<!\\)%'
     bma = par.bma_search(pattern, text)
     if not bma.matched:
@@ -97,7 +217,20 @@ def remove_comments(text, replaced_text=''):
     return replaced_text
 
 def get_definitions(text):
-    
+    """Extract all ``\\def`` command definitions from LaTeX source text.
+
+    Parameters
+    ----------
+    text : str
+        LaTeX source text (typically the preamble) to search for ``\\def``
+        definitions.
+
+    Returns
+    -------
+    list of Command
+        A list of :class:`Command` named tuples (``name``, ``nargs=0``,
+        ``content``) for each ``\\def`` found.
+    """
     defn_pattern = r'^\s*\\def\s*\\(\w*)\s*{\s*'
     
     defn_list = []
@@ -112,7 +245,24 @@ def get_definitions(text):
     return defn_list
 
 def remove_command(text, command):
-    
+    """Remove a ``\\newcommand`` declaration from LaTeX source text.
+
+    Constructs a regex that matches the full ``\\newcommand{\\<name>}[nargs]{content}``
+    declaration line and removes it from ``text``.
+
+    Parameters
+    ----------
+    text : str
+        LaTeX source text.
+    command : Command
+        Named tuple with ``name``, ``nargs``, and ``content`` fields
+        describing the command declaration to remove.
+
+    Returns
+    -------
+    str
+        Text with the matching ``\\newcommand`` declaration removed.
+    """
     # Name of command
     pattern = r'\\newcommand\s*{\s*\\' + re.escape(command.name) + r'}'
     
@@ -129,14 +279,42 @@ def remove_command(text, command):
     return text
 
 def remove_commands(text, command_list):
-    
+    """Remove multiple ``\\newcommand`` definitions from LaTeX source text.
+
+    Parameters
+    ----------
+    text : str
+        LaTeX source text.
+    command_list : list of Command
+        Commands to remove; each is a named tuple with ``name``, ``nargs``,
+        and ``content`` fields.
+
+    Returns
+    -------
+    str
+        Text with all matching ``\\newcommand`` declarations removed.
+    """
     for command in command_list:
         text = remove_command(text, command)
         
     return text
 
 def remove_defn(text, command):
-    
+    """Remove a ``\\def`` definition from LaTeX source text.
+
+    Parameters
+    ----------
+    text : str
+        LaTeX source text.
+    command : Command
+        Named tuple with ``name`` and ``content`` fields describing the
+        ``\\def`` command to remove.
+
+    Returns
+    -------
+    str
+        Text with the matching ``\\def`` declaration removed.
+    """
     # Name of command
     pattern = r'\\def\s*\\' + re.escape(command.name)
     
@@ -149,14 +327,44 @@ def remove_defn(text, command):
     return text
 
 def remove_defns(text, defn_list):
-    
+    """Remove multiple ``\\def`` definitions from LaTeX source text.
+
+    Parameters
+    ----------
+    text : str
+        LaTeX source text.
+    defn_list : list of Command
+        ``\\def`` commands to remove.
+
+    Returns
+    -------
+    str
+        Text with all matching ``\\def`` declarations removed.
+    """
     for defn in defn_list:
         text = remove_defn(text, defn)
         
     return text
 
 def replace_ref(text, label, replacement):
-    
+    """Replace a single LaTeX ``\\ref`` or ``\\eqref`` with a literal string.
+
+    Parameters
+    ----------
+    text : str
+        LaTeX source text.
+    label : str
+        The label argument of ``\\ref{label}`` or ``\\eqref{label}`` to
+        replace.
+    replacement : str
+        Literal text to substitute in place of the reference command.  For
+        ``\\eqref`` the replacement is additionally wrapped in parentheses.
+
+    Returns
+    -------
+    str
+        Text with all matching reference commands replaced.
+    """
     pattern = r'\\ref\s*{\s*' + label + r'}'
     text = re.sub(pattern, replacement, text)
     
@@ -165,14 +373,41 @@ def replace_ref(text, label, replacement):
     return text
 
 def replace_refs(text, refs_to_replace):
-    
+    """Replace multiple ``\\ref`` / ``\\eqref`` labels with literal text.
+
+    Parameters
+    ----------
+    text : str
+        LaTeX source text.
+    refs_to_replace : list of tuple
+        Each entry is a ``(label, replacement)`` pair forwarded to
+        :func:`replace_ref`.
+
+    Returns
+    -------
+    str
+        Text with all specified reference commands replaced.
+    """
     for label, replacement in refs_to_replace:
         text = replace_ref(text, label, replacement)
         
     return text
 
 def get_commands(text):
-    
+    """Extract all ``\\newcommand`` definitions from LaTeX source text.
+
+    Parameters
+    ----------
+    text : str
+        LaTeX source text (typically the preamble) to search for
+        ``\\newcommand`` definitions.
+
+    Returns
+    -------
+    list of Command
+        A list of :class:`Command` named tuples (``name``, ``nargs``,
+        ``content``) for each ``\\newcommand`` found.
+    """
     command_pattern = r'^\s*\\newcommand{\s*\\'
     nargs_pattern = r'\[\s*(\d*)\s*\]'
     start_bracket_pattern = r'\s*{'
@@ -209,7 +444,18 @@ def get_commands(text):
     return command_list
     
 def read_if_exists(filepath):
-    
+    """Read the contents of a file if it exists, otherwise return ``None``.
+
+    Parameters
+    ----------
+    filepath : str
+        Path to the file to read.
+
+    Returns
+    -------
+    str or None
+        File contents as a string, or ``None`` if the file does not exist.
+    """
     if os.path.exists(filepath):
         with open(filepath, 'rt') as fid:
             return fid.read()
@@ -217,7 +463,19 @@ def read_if_exists(filepath):
         return None
     
 def remove_brackets(text):
-    
+    """Recursively strip all outermost ``{...}`` braces from a text string.
+
+    Parameters
+    ----------
+    text : str
+        Input text potentially containing ``{...}`` groups.
+
+    Returns
+    -------
+    str
+        Text with the contents of each ``{...}`` group unwrapped (i.e. the
+        braces removed and the inner text preserved).
+    """
     bma = par.bma_search(r'{', text)
     if bma.matched:
         argument, _, after = par.expand_to_target(bma.after, left_bracket='{')
@@ -228,7 +486,21 @@ def remove_brackets(text):
         return text
     
 def read_input_file(filepath):
-    
+    """Read a LaTeX ``\\input`` target file, trying with and without ``.tex``.
+
+    Parameters
+    ----------
+    filepath : str
+        File path as it appears in the ``\\input{...}`` argument.  Leading/
+        trailing whitespace should already be stripped; any surrounding
+        braces are removed via :func:`remove_brackets`.
+
+    Returns
+    -------
+    str or None
+        File contents if the file (or the file with ``.tex`` appended) is
+        found, otherwise ``None``.
+    """
     # filepath = filepath_in.strip()
     
     filepath = remove_brackets(filepath)
@@ -245,7 +517,27 @@ def read_input_file(filepath):
     return text
 
 def remove_unused_commands(text, command_list=None, defn_list=None):
-    
+    """Remove command/definition declarations that appear only once in ``text``.
+
+    A declaration is considered "unused" if the command name appears only
+    once in the text (i.e. only in the declaration itself, not in any usage
+    site).  The removal loop repeats until no more declarations can be
+    eliminated.
+
+    Parameters
+    ----------
+    text : str
+        LaTeX source text.
+    command_list : list of Command, optional
+        ``\\newcommand`` declarations to check.  Defaults to ``[]``.
+    defn_list : list of Command, optional
+        ``\\def`` declarations to check.  Defaults to ``[]``.
+
+    Returns
+    -------
+    str
+        Text with all unused command/definition declarations removed.
+    """
     if command_list is None: command_list = []
     if defn_list is None: defn_list = []
     
@@ -268,7 +560,29 @@ def remove_unused_commands(text, command_list=None, defn_list=None):
     return text
 
 def replace_commands_dynamic(text, commands_to_replace, names_to_replace=None):
-    
+    """Expand LaTeX commands in ``text``, updating definitions as they are encountered.
+
+    Processes the text in segments separated by ``\\def`` declarations.
+    Within each segment, commands in ``commands_to_replace`` are expanded
+    statically.  When a ``\\def`` for a name listed in ``names_to_replace``
+    is reached, the command list is updated before processing continues,
+    allowing later occurrences to use the new definition.
+
+    Parameters
+    ----------
+    text : str
+        LaTeX source text to process.
+    commands_to_replace : list of Command
+        Current set of commands to expand.
+    names_to_replace : list of str, optional
+        Command names whose ``\\def`` re-declarations should be tracked and
+        incorporated.  Defaults to ``[]``.
+
+    Returns
+    -------
+    str
+        Text with all tracked commands expanded.
+    """
     current_names = [cmd.name for cmd in commands_to_replace]
     if names_to_replace is None:
         names_to_replace = []
@@ -323,7 +637,20 @@ def replace_commands_dynamic(text, commands_to_replace, names_to_replace=None):
     return text_new
 
 def get_aux_labels(aux_file):
-    
+    """Parse a LaTeX ``.aux`` file and extract label-to-number mappings.
+
+    Parameters
+    ----------
+    aux_file : str
+        Path to the ``.aux`` file generated by a LaTeX compilation.
+
+    Returns
+    -------
+    list of tuple of (str, str)
+        Each entry is a ``(label, doc_number)`` pair where ``label`` is the
+        LaTeX cross-reference key and ``doc_number`` is the document-assigned
+        reference number (e.g. ``'3.2'`` for equation 3.2).
+    """
     with open(aux_file, 'rt') as fid:
         aux_lines = fid.readlines()
         
@@ -340,7 +667,21 @@ def get_aux_labels(aux_file):
     return labels_to_numbers
 
 def get_figure_labels(text):
-    
+    """Extract ``(label, image_path)`` pairs from LaTeX ``figure`` environments.
+
+    Parameters
+    ----------
+    text : str
+        LaTeX source text containing ``\\begin{figure}...\\end{figure}``
+        blocks.
+
+    Returns
+    -------
+    list of tuple of (str, str)
+        Each entry is a ``(label, image_path)`` pair extracted from a figure
+        environment that contains both an ``\\includegraphics`` and a
+        ``\\label`` command.
+    """
     figure_blocks = re.findall(r'\\begin{figure}.*?\\end{figure}', text, re.DOTALL)
     
     figures = []
@@ -354,7 +695,31 @@ def get_figure_labels(text):
     return figures
 
 def replace_figures(text, aux_file, figure_dir_in_text=None, figure_dir_actual_location=None):
-    
+    """Rename and copy figure files, updating their paths in the LaTeX source.
+
+    For each figure whose label appears in the ``.aux`` file, the image is
+    copied to ``figure_dir_actual_location`` with a sequentially numbered
+    filename (e.g. ``fig3.2.pdf``), and the ``\\includegraphics`` path in
+    ``text`` is updated accordingly.
+
+    Parameters
+    ----------
+    text : str
+        LaTeX source text.
+    aux_file : str
+        Path to the ``.aux`` file used to map labels to document numbers.
+    figure_dir_in_text : str, optional
+        Directory prefix to use for figure paths in the output LaTeX text.
+        Defaults to ``''`` (current directory).
+    figure_dir_actual_location : str, optional
+        Filesystem directory where renamed figure files are copied.
+        Defaults to ``None``; callers must supply a valid directory.
+
+    Returns
+    -------
+    str
+        Updated LaTeX source text with replaced figure paths.
+    """
     if figure_dir_in_text is None:
         figure_dir_in_text = ''
     
@@ -392,7 +757,33 @@ def replace_figures(text, aux_file, figure_dir_in_text=None, figure_dir_actual_l
 def flatten_text(text, flattened_text='', commands_to_replace=None, 
                  do_remove_comments_from_text=True, 
                  names_to_replace=None):
-    
+    """Recursively expand ``\\input{...}`` directives in a LaTeX text string.
+
+    Processes ``text`` by replacing each ``\\input{filepath}`` with the
+    contents of the referenced file (recursively).  Optionally strips
+    comments and expands user-defined commands before processing inputs.
+
+    Parameters
+    ----------
+    text : str
+        LaTeX source text to flatten.
+    flattened_text : str, optional
+        Accumulated output from previous recursive calls.  Defaults to
+        ``''``.
+    commands_to_replace : list of Command, optional
+        Commands to expand dynamically as defined in
+        :func:`replace_commands_dynamic`.  Defaults to ``[]``.
+    do_remove_comments_from_text : bool, optional
+        If ``True`` (default), strip ``%`` comments before processing.
+    names_to_replace : list of str, optional
+        Command names whose ``\\def`` re-declarations should be tracked;
+        forwarded to :func:`replace_commands_dynamic`.
+
+    Returns
+    -------
+    str
+        Fully flattened LaTeX source.
+    """
     # Replace any definitions in the body of the text
     if commands_to_replace is None:
         commands_to_replace = []
@@ -442,7 +833,52 @@ def flatten(infile=None, outfile=None, names_to_replace=None,
             aux_reference_file=None, do_remove_comments_from_text=True, 
             do_remove_comments_from_preamble=False, do_remove_unused=False,
             do_replace_figures=False, figure_dir_in_text=None, figure_dir_actual_location=None):
-    
+    """Flatten a multi-file LaTeX project into a single self-contained source file.
+
+    Reads ``infile``, recursively expands all ``\\input{...}`` directives,
+    optionally strips comments, expands user-defined commands, replaces
+    cross-references with literal numbers from an auxiliary file, removes
+    unused commands, and copies/renames figure files.
+
+    Parameters
+    ----------
+    infile : str
+        Path to the top-level ``.tex`` source file.
+    outfile : str or None
+        Path to write the flattened output.  If ``None``, the flattened text
+        is returned instead of being written to disk.
+    names_to_replace : list of str, optional
+        Command names whose ``\\newcommand``/``\\def`` definitions should be
+        expanded in the document body.  Defaults to ``[]``.
+    aux_reference_file : str, optional
+        Path to a ``.aux`` file used to replace ``\\ref``/``\\eqref``
+        commands with literal document numbers.  Defaults to ``None``
+        (no reference replacement).
+    do_remove_comments_from_text : bool, optional
+        If ``True`` (default), strip ``%`` comments from the document body.
+    do_remove_comments_from_preamble : bool, optional
+        If ``True``, also strip comments from the preamble.  Defaults to
+        ``False``.
+    do_remove_unused : bool, optional
+        If ``True``, remove ``\\newcommand``/``\\def`` declarations that are
+        not used in the flattened document.  Defaults to ``False``.
+    do_replace_figures : bool, optional
+        If ``True``, rename figure files and update their paths; requires
+        a ``.aux`` file adjacent to ``infile``.  Defaults to ``False``.
+    figure_dir_in_text : str, optional
+        Directory prefix used for figure paths in the output LaTeX text.
+        Only relevant when ``do_replace_figures`` is ``True``.
+    figure_dir_actual_location : str, optional
+        Filesystem directory where renamed figure files are copied.
+        Defaults to the directory of ``outfile`` when ``do_replace_figures``
+        is ``True``.
+
+    Returns
+    -------
+    str or None
+        The flattened LaTeX source when ``outfile`` is ``None``; otherwise
+        writes to ``outfile`` and returns ``None``.
+    """
     if names_to_replace is None:
         names_to_replace = []
         
