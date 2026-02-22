@@ -153,6 +153,7 @@ def load_collapser(filename, add_suffix=True, by_list=None, weight_var=None):
     Collapser
         The loaded :class:`Collapser` object.
     """
+    if by_list is None: by_list = []
         
     col = Collapser(by_list=by_list, weight_var=weight_var)
     col.load(filename, add_suffix=add_suffix)
@@ -201,6 +202,7 @@ def collapse(df, by_list, var_list=None, weight_var=None, weight_suffix=False):
     pandas.DataFrame
         Collapsed DataFrame indexed by *by_list*.
     """
+    if var_list is None: var_list = []
     
     coll = Collapser(df, var_list=var_list, by_list=by_list, 
                      weight_var=weight_var)
@@ -228,6 +230,7 @@ def collapse_multiweight(df, weight_dict, by_list=None):
         Collapsed DataFrame with one column per variable in *weight_dict*,
         indexed by *by_list*.
     """
+    if by_list is None: by_list = []
     
     return pd.concat(
         [collapse(df, by_list, var_list=[var], weight_var=weight_var)
@@ -528,6 +531,7 @@ class Collapser:
         Exception
             If ``method='median'`` is requested (not yet implemented).
         """
+        if by_list is None: by_list = []
         
         singleton = (not by_list)
 

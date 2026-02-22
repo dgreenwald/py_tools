@@ -197,7 +197,9 @@ def compute_binscatter(df_in, yvar, xvar, wvar=None, n_bins=10, bins=None, media
         within-bin averages (or medians), and *wvar* (normalized weights) when
         not using the median.
     """
-    
+    if control is None: control = []
+    if absorb is None: absorb = []
+
     if median:
         assert wvar is None
 
@@ -385,6 +387,7 @@ def add_bin_dummies(df, var_list, n_bins):
     dummy_list : list of str
         Names of the newly created dummy columns.
     """
+    cutoffs = np.linspace(0.0, 1.0, n_bins+1)
     dummy_list = []
 
     for var in var_list:
@@ -1458,6 +1461,7 @@ def collapse(df, method='mean', var_list=None, by=None, wvar=None):
         If *by* is empty, *method* is unsupported, *wvar* is ``None``, or
         *wvar* appears in *var_list*.
     """
+    if by is None: by = []
     
     assert by
     assert method in ['mean', 'sum']
