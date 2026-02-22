@@ -9,27 +9,79 @@ import statsmodels.formula.api as smf
 from py_tools import stats
 
 def pivot_no_hierarchical_columns(df, *args, **kwargs):
-    
+    """Pivot a DataFrame and flatten the resulting MultiIndex columns.
+
+    Wraps :func:`pandas.pivot` and immediately drops the top level of the
+    resulting hierarchical column index, returning a DataFrame with a plain
+    single-level column index.
+
+    Parameters
+    ----------
+    df : pandas.DataFrame
+        Input data to pivot.
+    *args
+        Positional arguments forwarded to :func:`pandas.pivot`.
+    **kwargs
+        Keyword arguments forwarded to :func:`pandas.pivot`.
+
+    Returns
+    -------
+    pandas.DataFrame
+        Pivoted DataFrame with single-level columns taken from the second
+        level of the pivot's MultiIndex.
+    """
     df = pd.pivot(df, *args, **kwargs)
     df.columns = df.columns.get_level_values(1)
     return df
 
 def lowercase(df):
-    
+    """Rename all DataFrame columns to lowercase.
+
+    Parameters
+    ----------
+    df : pandas.DataFrame
+        Input DataFrame.
+
+    Returns
+    -------
+    pandas.DataFrame
+        DataFrame with all column names converted to lowercase.
+    """
     return df.rename(columns={var : var.lower() for var in df.columns})
 
 def absorb(df, groups, value_var, weight_var=None, restore_mean=True, tol=1e-12,
            display=False):
-    """Remove the mean from a variable by group
+    """Remove the mean from a variable by group (alternating-projections FWL).
 
-    Arguments:
-    df -- a dataframe containing the value and group variables.
-    groups -- an iterable of variable names or iterables of names
-    value_var -- the variable to be demeaned
-    weight_var -- the weights to be used for demeaning
+    Implements a Frisch-Waugh-Lovell style within-group demeaning via the
+    alternating-projections (Gauss-Seidel) algorithm. Supports multiple
+    group dimensions and optional observation weights.
 
-    Returns:
-    x -- a Pandas Series containing the demeaned variable
+    Parameters
+    ----------
+    df : pandas.DataFrame
+        DataFrame containing the value and group variables.
+    groups : list
+        List of group variable names (str) or lists of names for
+        multi-dimensional group effects. Each element defines one set of
+        fixed effects.
+    value_var : str
+        Name of the variable to be demeaned.
+    weight_var : str or None, optional
+        Name of the weight variable. If ``None``, equal weights are used.
+    restore_mean : bool, optional
+        If ``True`` (default), add back the (weighted) grand mean so that
+        the output has the same mean as the input.
+    tol : float, optional
+        Convergence tolerance on the root-mean-square of group means of the
+        residuals. Defaults to ``1e-12``.
+    display : bool, optional
+        If ``True``, print the RMSE at each iteration. Defaults to ``False``.
+
+    Returns
+    -------
+    pandas.Series
+        Series containing the demeaned variable, aligned with *df*.
     """
 
     Ng = len(groups)
@@ -107,9 +159,44 @@ def absorb(df, groups, value_var, weight_var=None, restore_mean=True, tol=1e-12,
 
 def compute_binscatter(df_in, yvar, xvar, wvar=None, n_bins=10, bins=None, median=False, 
                        control=None, absorb=None):
+    """Compute binscatter statistics for a pair of variables.
 
-    if control is None: control = []
-    if absorb is None: absorb = []
+    Partitions *xvar* into quantile bins and computes the (weighted) mean or
+    median of both *xvar* and *yvar* within each bin. Optionally residualises
+    both variables against controls and/or absorbed fixed effects before
+    binning.
+
+    Parameters
+    ----------
+    df_in : pandas.DataFrame
+        Input data.
+    yvar : str
+        Outcome variable name.
+    xvar : str
+        Running (x-axis) variable name.
+    wvar : str or None, optional
+        Weight variable name. Cannot be combined with ``median=True``.
+    n_bins : int, optional
+        Number of quantile bins. Defaults to ``10``. Ignored when *bins* is
+        provided.
+    bins : array-like or None, optional
+        Explicit bin cut-points passed to :func:`pandas.cut`. If ``None``
+        (default), quantile bins are constructed via :func:`bin_data`.
+    median : bool, optional
+        If ``True``, compute the unweighted median within each bin instead of
+        the weighted mean. Defaults to ``False``.
+    control : list of str or None, optional
+        Additional RHS variables to partial out before binning.
+    absorb : list or None, optional
+        Group variables to absorb (fixed effects) before binning.
+
+    Returns
+    -------
+    pandas.DataFrame
+        DataFrame indexed by bin with columns *xvar* and *yvar* containing
+        within-bin averages (or medians), and *wvar* (normalized weights) when
+        not using the median.
+    """
     
     if median:
         assert wvar is None
@@ -147,12 +234,23 @@ def compute_binscatter(df_in, yvar, xvar, wvar=None, n_bins=10, bins=None, media
     return by_bin
 
 def bin_data(series, n_bins, weights=None):
-    """Group data into bins based on quantile.
-    
-    series: pandas series
-    n_bins: int
-    
-    returns series with bin indicators"""
+    """Group data into bins based on quantile boundaries.
+
+    Parameters
+    ----------
+    series : pandas.Series
+        Data to bin.
+    n_bins : int
+        Number of bins to create.
+    weights : array-like or None, optional
+        Observation weights used to compute weighted quantile boundaries.
+        If ``None``, unweighted quantiles are used.
+
+    Returns
+    -------
+    pandas.Categorical
+        Series of integer bin labels (0-indexed) aligned with *series*.
+    """
 
     quantiles = np.linspace(0.0, 1.0, n_bins+1)
     if weights is None:
@@ -169,16 +267,76 @@ def bin_data(series, n_bins, weights=None):
     return pd.cut(series, bins, labels=np.arange(len(bins) - 1))
 
 class FullResults:
-    """Regression results with index and samples"""
+    """Regression results bundled with the sample index and design matrices.
+
+    Parameters
+    ----------
+    results : statsmodels results object
+        Fitted model results.
+    ix : array-like of bool
+        Boolean index indicating which rows of the original DataFrame were
+        included in the regression sample.
+    Xs : numpy.ndarray or None
+        Design matrix used in the regression (rows correspond to *ix*).
+    zs : numpy.ndarray or None
+        Dependent variable matrix used in the regression.
+
+    Attributes
+    ----------
+    results : statsmodels results object
+        Fitted model results.
+    ix : array-like of bool
+        Sample inclusion index.
+    Xs : numpy.ndarray or None
+        Design matrix.
+    zs : numpy.ndarray or None
+        Dependent variable array/matrix.
+    """
     def __init__(self, results, ix, Xs, zs):
+        """Initialise a FullResults container.
+
+        Parameters
+        ----------
+        results : statsmodels results object
+            Fitted model results.
+        ix : array-like of bool
+            Boolean sample-inclusion index.
+        Xs : numpy.ndarray or None
+            Design matrix aligned to *ix*.
+        zs : numpy.ndarray or None
+            Dependent variable array aligned to *ix*.
+        """
         self.results = results
         self.ix = ix
         self.Xs = Xs
         self.zs = zs
 
 def winsorize(df_in, var_list, wvar=None, p_val=0.98):
-    """Replace values of var_list outside the center p_val quantile mass with
-    values at the edge of the mass"""
+    """Winsorize variables to the central *p_val* quantile mass.
+
+    Replaces values below the lower tail and above the upper tail with the
+    corresponding tail boundary values. Tail boundaries are computed as the
+    ``(1 - p_val) / 2`` and ``1 - (1 - p_val) / 2`` quantiles.
+
+    Parameters
+    ----------
+    df_in : pandas.DataFrame
+        Input data.
+    var_list : list of str
+        Column names to winsorize.
+    wvar : str or None, optional
+        Weight variable for computing weighted quantile boundaries.
+        If ``None``, unweighted quantiles are used.
+    p_val : float, optional
+        Central quantile mass to retain. For example, ``0.98`` (default)
+        trims the bottom and top 1 % of values.
+
+    Returns
+    -------
+    pandas.DataFrame
+        DataFrame with only the columns in *var_list* (and *wvar* if provided)
+        where extreme values have been replaced by the tail boundaries.
+    """
 
     tail_prob = 0.5 * (1.0 - p_val)
     p_lo = tail_prob
@@ -205,8 +363,28 @@ def winsorize(df_in, var_list, wvar=None, p_val=0.98):
     return df 
 
 def add_bin_dummies(df, var_list, n_bins):
+    """Add quantile bin dummy variables to a DataFrame.
 
-    cutoffs = np.linspace(0.0, 1.0, n_bins+1)
+    For each variable in *var_list*, creates *n_bins* binary indicator columns
+    named ``'<var>_bin1'``, ``'<var>_bin2'``, …, ``'<var>_bin<n_bins>'``.
+    Bin boundaries are determined by equal-probability quantile cut-points.
+
+    Parameters
+    ----------
+    df : pandas.DataFrame
+        DataFrame to augment (modified in place).
+    var_list : list of str
+        Variable names for which to create bin dummies.
+    n_bins : int
+        Number of quantile bins (and hence dummy columns) per variable.
+
+    Returns
+    -------
+    df : pandas.DataFrame
+        The input DataFrame with the new dummy columns appended.
+    dummy_list : list of str
+        Names of the newly created dummy columns.
+    """
     dummy_list = []
 
     for var in var_list:
@@ -233,7 +411,30 @@ def add_bin_dummies(df, var_list, n_bins):
     return df, dummy_list
 
 def demean(df_in, var_list, by_var, weight_var=None):
+    """Subtract within-group means from variables, returning means and residuals.
 
+    Computes (optionally weighted) group means and subtracts them, returning
+    both the mean and demeaned series for each variable.
+
+    Parameters
+    ----------
+    df_in : pandas.DataFrame
+        Input data.
+    var_list : list of str
+        Variables to demean.
+    by_var : str
+        Group variable used to compute means.
+    weight_var : str or None, optional
+        Weight variable. If ``None``, simple (unweighted) means are used.
+
+    Returns
+    -------
+    result_df : pandas.DataFrame
+        DataFrame with columns ``'<var>_mean'`` and ``'<var>_demeaned'`` for
+        each variable in *var_list*.
+    col_names : list of str
+        List of column names in *result_df* (means first, then demeaned).
+    """
     keep_list = var_list + [by_var]
     if weight_var is not None:
         keep_list += [weight_var]
@@ -261,7 +462,34 @@ def demean(df_in, var_list, by_var, weight_var=None):
     return (df[mean_list + demean_list], mean_list + demean_list)
 
 def match_sample(X, how='inner', ix=None):
+    """Select a sample from a matrix by handling missing values.
 
+    Parameters
+    ----------
+    X : numpy.ndarray of shape (n, p)
+        Input matrix potentially containing ``NaN`` values.
+    how : {'inner', 'outer', 'custom'}, optional
+        Sample selection rule:
+
+        - ``'inner'`` (default): keep rows where *all* columns are non-null.
+        - ``'outer'``: keep rows where *any* column is non-null.
+        - ``'custom'``: use the boolean array supplied via *ix*.
+    ix : array-like of bool or None, optional
+        Custom inclusion index. Required when ``how='custom'``.
+
+    Returns
+    -------
+    ix : numpy.ndarray of bool, shape (n,)
+        Boolean mask indicating which rows were selected.
+    Xs : numpy.ndarray
+        Sub-matrix of *X* for the selected rows, with remaining ``NaN``
+        values replaced by ``0.0``.
+
+    Raises
+    ------
+    Exception
+        If *how* is not one of ``'inner'``, ``'outer'``, or ``'custom'``.
+    """
     if how == 'inner':
         ix = np.all(pd.notnull(X), axis=1)
     elif how == 'outer':
@@ -275,7 +503,31 @@ def match_sample(X, how='inner', ix=None):
     return (ix, Xs)
 
 def match_xy(X, z, how='inner', ix=None):
+    """Select a common sample for design matrix *X* and outcome *z*.
 
+    Stacks *X* and *z* horizontally, calls :func:`match_sample`, then
+    splits the result back into design matrix and outcome.
+
+    Parameters
+    ----------
+    X : numpy.ndarray of shape (n,) or (n, p)
+        Regressor matrix.
+    z : numpy.ndarray of shape (n,) or (n, q)
+        Outcome matrix or vector.
+    how : {'inner', 'outer', 'custom'}, optional
+        Passed to :func:`match_sample`. Defaults to ``'inner'``.
+    ix : array-like of bool or None, optional
+        Custom inclusion index. Required when ``how='custom'``.
+
+    Returns
+    -------
+    ix : numpy.ndarray of bool, shape (n,)
+        Boolean sample inclusion mask.
+    Xs : numpy.ndarray
+        Selected rows of *X* with NaNs zeroed.
+    zs : numpy.ndarray
+        Selected rows of *z* with NaNs zeroed.
+    """
     if len(z.shape) == 1:
         z = z[:, np.newaxis]
         
@@ -295,7 +547,52 @@ def match_xy(X, z, how='inner', ix=None):
 
 def regression(df, lhs, rhs, fes=None, absorb_vars=None, intercept=True, formula_extra=None, ix=None, 
                trend=None, cluster_var=None, cluster_groups=None, weight_var=None, **kwargs):
-    """Run regression from pandas dataframe"""
+    """Run an OLS or WLS regression from a pandas DataFrame.
+
+    Supports categorical fixed effects, absorbed fixed effects (via
+    :func:`absorb`), time trends, clustered or Newey-West standard errors,
+    and observation weights.
+
+    Parameters
+    ----------
+    df : pandas.DataFrame
+        Input data.
+    lhs : str
+        Dependent variable name.
+    rhs : str or list of str
+        Independent variable name(s).
+    fes : list of str or None, optional
+        Categorical fixed-effect variable names added as ``C(<var>)`` in the
+        formula. Defaults to ``[]``.
+    absorb_vars : list or None, optional
+        Group variables to absorb via :func:`absorb` before fitting. Supports
+        the same syntax as :func:`absorb`'s *groups* argument.
+        Defaults to ``[]``.
+    intercept : bool, optional
+        If ``True`` (default), include a constant term.
+    formula_extra : str or None, optional
+        Additional formula string appended to the base formula.
+    ix : array-like of bool or None, optional
+        Pre-computed sample-inclusion boolean index. If ``None``, the sample
+        is determined by complete cases.
+    trend : {None, 'linear', 'quadratic'}, optional
+        Add a linear or quadratic time trend. Defaults to ``None``.
+    cluster_var : str or None, optional
+        Variable whose values define clustering groups for cluster-robust SE.
+    cluster_groups : array-like or None, optional
+        Pre-computed cluster group labels (alternative to *cluster_var*).
+    weight_var : str or None, optional
+        Weight variable for WLS estimation.
+    **kwargs
+        Additional keyword arguments forwarded to :func:`formula_regression`
+        or :func:`wls_formula`.
+
+    Returns
+    -------
+    FullResults
+        Object containing the statsmodels results, the sample index, the
+        design matrix, and the outcome vector.
+    """
 
     if fes is None: fes = []
     if absorb_vars is None: absorb_vars = []
@@ -377,7 +674,37 @@ def regression(df, lhs, rhs, fes=None, absorb_vars=None, intercept=True, formula
 
 def wls_formula(df, formula, weight_var=None, weights=None, ix=None, nw_lags=0,
                 cluster_groups=None, display=False):
+    """Fit a Weighted Least Squares model from a patsy formula string.
 
+    Normalises weights to sum to 1, fits a WLS model via statsmodels, and
+    applies robust covariance adjustments.
+
+    Parameters
+    ----------
+    df : pandas.DataFrame
+        Input data.
+    formula : str
+        Patsy formula string (e.g. ``'y ~ x1 + x2'``).
+    weight_var : str or None, optional
+        Column name of the weight variable. Mutually exclusive with *weights*.
+    weights : array-like or None, optional
+        Pre-computed weight array. Mutually exclusive with *weight_var*.
+    ix : array-like of bool or None, optional
+        Sample-inclusion boolean index. Defaults to all rows.
+    nw_lags : int, optional
+        Number of lags for Newey-West HAC standard errors. Defaults to ``0``
+        (HC3 errors).
+    cluster_groups : array-like or None, optional
+        Cluster group labels for cluster-robust standard errors.
+    display : bool, optional
+        If ``True``, print the regression summary. Defaults to ``False``.
+
+    Returns
+    -------
+    FullResults
+        Object containing statsmodels results, the sample index, and ``None``
+        for design matrix and outcome (formula-based fit).
+    """
     if ix is None:
         ix = np.ones(len(df), dtype=bool)
         
@@ -399,12 +726,54 @@ def wls_formula(df, formula, weight_var=None, weights=None, ix=None, nw_lags=0,
     return FullResults(results, ix=ix, Xs=None, zs=None)
 
 def compute_histogram(series, name='bin', **kwargs):
-   
+    """Compute a histogram and return it as a named pandas Series.
+
+    Parameters
+    ----------
+    series : array-like
+        Data to histogram.
+    name : str, optional
+        Prefix for the bin labels in the output index. Defaults to
+        ``'bin'``, producing labels ``'bin0'``, ``'bin1'``, etc.
+    **kwargs
+        Additional keyword arguments forwarded to :func:`numpy.histogram`
+        (e.g. ``bins``, ``range``).
+
+    Returns
+    -------
+    pandas.Series
+        Histogram counts with string bin labels as the index.
+    """
     this_hist, _ = np.histogram(series, **kwargs)
     return pd.Series(this_hist, index=[name + str(ii) for ii in range(len(this_hist))])
 
 def update_results_cov(results, nw_lags=0, cluster_groups=None):
+    """Apply robust covariance correction to a statsmodels results object.
 
+    Selects between cluster-robust, Newey-West HAC, and HC3 standard errors
+    depending on the provided arguments.
+
+    Parameters
+    ----------
+    results : statsmodels results object
+        Fitted model results to update.
+    nw_lags : int, optional
+        Number of lags for Newey-West HAC correction. Used only when
+        *cluster_groups* is ``None`` and ``nw_lags > 0``. Defaults to ``0``.
+    cluster_groups : array-like or None, optional
+        Group labels for cluster-robust standard errors. When provided,
+        ``nw_lags`` must be ``0``.
+
+    Returns
+    -------
+    statsmodels results object
+        Results object with updated covariance matrix.
+
+    Raises
+    ------
+    AssertionError
+        If both *cluster_groups* and *nw_lags* > 0 are supplied.
+    """
     if cluster_groups is not None:
         assert(nw_lags == 0)
         results = results.get_robustcov_results('cluster', groups=cluster_groups)
@@ -416,12 +785,47 @@ def update_results_cov(results, nw_lags=0, cluster_groups=None):
     return results
 
 def get_cluster_groups(df, cluster_var):
+    """Map cluster variable values to contiguous integer group labels.
 
+    Parameters
+    ----------
+    df : pandas.DataFrame
+        DataFrame containing *cluster_var*.
+    cluster_var : str
+        Column name whose unique values define the clusters.
+
+    Returns
+    -------
+    numpy.ndarray of int
+        Array of integer group labels aligned with *df*'s row order.
+    """
     index_dict = {val : ii for ii, val in enumerate(df[cluster_var].unique())}
     return df[cluster_var].map(index_dict).values
 
 def formula_regression(df, formula, ix=None, nw_lags=0, cluster_groups=None, display=False):
+    """Fit an OLS model from a patsy formula string with robust standard errors.
 
+    Parameters
+    ----------
+    df : pandas.DataFrame
+        Input data.
+    formula : str
+        Patsy formula string (e.g. ``'y ~ x1 + x2'``).
+    ix : array-like of bool or None, optional
+        Sample-inclusion boolean index. If ``None``, all rows are used.
+    nw_lags : int, optional
+        Number of lags for Newey-West HAC standard errors. Defaults to ``0``.
+    cluster_groups : array-like or None, optional
+        Group labels for cluster-robust standard errors.
+    display : bool, optional
+        If ``True``, print the regression summary. Defaults to ``False``.
+
+    Returns
+    -------
+    FullResults
+        Object containing statsmodels results, the sample index, and ``None``
+        for design matrix and outcome (formula-based fit).
+    """
     if ix is None:
         model = smf.ols(formula=formula, data=df)
     else:
@@ -437,7 +841,37 @@ def formula_regression(df, formula, ix=None, nw_lags=0, cluster_groups=None, dis
     return FullResults(results, ix, Xs=None, zs=None)
 
 def sm_regression(df, lhs, rhs, match='inner', ix=None, nw_lags=0, display=False):
-    """Regression using statsmodels"""
+    """Fit an OLS regression directly from numpy arrays via statsmodels.
+
+    Extracts regressor and outcome arrays from *df*, handles missing values
+    via :func:`match_xy`, and applies robust covariance correction.
+
+    Parameters
+    ----------
+    df : pandas.DataFrame
+        Input data.
+    lhs : str
+        Dependent variable column name.
+    rhs : list of str
+        Independent variable column names. Include ``'const'`` to add a
+        constant column automatically.
+    match : {'inner', 'outer', 'custom'}, optional
+        Sample selection rule forwarded to :func:`match_xy`. Defaults to
+        ``'inner'``.
+    ix : array-like of bool or None, optional
+        Custom sample-inclusion index (used when ``match='custom'``).
+    nw_lags : int, optional
+        Number of lags for Newey-West HAC standard errors. Defaults to ``0``
+        (HC0 errors).
+    display : bool, optional
+        If ``True``, print the regression summary. Defaults to ``False``.
+
+    Returns
+    -------
+    FullResults
+        Object containing statsmodels results, the sample index, the design
+        matrix, and the outcome vector.
+    """
 
     if 'const' in rhs and 'const' not in df:
         df['const'] = 1.0
@@ -460,24 +894,131 @@ def sm_regression(df, lhs, rhs, match='inner', ix=None, nw_lags=0, display=False
     return FullResults(results, ix, Xs, zs)
 
 def clean(df_in, var_list):
-    """Remove infinite and nan values from dataset"""
+    """Remove rows with infinite or NaN values from a DataFrame subset.
+
+    Parameters
+    ----------
+    df_in : pandas.DataFrame
+        Input data.
+    var_list : list of str
+        Variables to include; columns not present in *df_in* are silently
+        skipped. Infinite values are treated as NaN before dropping.
+
+    Returns
+    -------
+    pandas.DataFrame
+        Subset of *df_in* restricted to *var_list* (minus missing columns)
+        with all rows containing NaN or ±Inf removed.
+    """
 
     good_list = [var for var in var_list if var in df_in]
     df = df_in[good_list].copy().replace([np.inf, -np.inf], np.nan)
     return df.dropna()
 
 def dropna_ix(df):
+    """Drop rows with any NaN value and return both the cleaned DataFrame and a mask.
 
+    Parameters
+    ----------
+    df : pandas.DataFrame
+        Input data.
+
+    Returns
+    -------
+    df_clean : pandas.DataFrame
+        Subset of *df* with all NaN-containing rows removed.
+    ix : numpy.ndarray of bool
+        Boolean mask of shape ``(len(df),)`` indicating retained rows.
+    """
     ix = np.all(pd.notnull(df).values, axis=1)
     return df.loc[ix, :], ix
 
 class MVOLSResults:
-    """Regression object"""
+    """Results container for multivariate OLS regressions.
+
+    Stores fitted parameters, residuals, covariance matrices, and information
+    criteria for a multivariate OLS model (multiple dependent variables).
+
+    Parameters
+    ----------
+    nobs : int
+        Number of observations in the original (unfiltered) data.
+    params : numpy.ndarray of shape (k, nz)
+        Estimated coefficient matrix.
+    fittedvalues : numpy.ndarray of shape (T, nz)
+        In-sample fitted values.
+    resid : numpy.ndarray of shape (T, nz)
+        Residuals.
+    cov_e : numpy.ndarray of shape (nz, nz)
+        Homoskedastic residual covariance matrix.
+    cov_HC0 : numpy.ndarray of shape (k*nz, k*nz)
+        HC0 (homoskedastic) parameter covariance matrix.
+    HC0_se : numpy.ndarray of shape (k, nz)
+        HC0 standard errors for each parameter.
+    HC0_tstat : numpy.ndarray of shape (k, nz)
+        HC0 t-statistics for each parameter.
+    cov_HC1 : numpy.ndarray of shape (k*nz, k*nz)
+        HC1 (heteroskedasticity-robust) parameter covariance matrix.
+    HC1_se : numpy.ndarray of shape (k, nz)
+        HC1 standard errors for each parameter.
+    HC1_tstat : numpy.ndarray of shape (k, nz)
+        HC1 t-statistics for each parameter.
+    llf : float
+        Log-likelihood of the fitted model.
+    aic : float
+        Akaike information criterion.
+    bic : float
+        Bayesian information criterion.
+    hqc : float
+        Hannan-Quinn information criterion.
+
+    Attributes
+    ----------
+    nobs, params, fittedvalues, resid, cov_e : see Parameters
+    cov_HC0, HC0_se, HC0_tstat : see Parameters
+    cov_HC1, HC1_se, HC1_tstat : see Parameters
+    llf, aic, bic, hqc : see Parameters
+    """
 
     def __init__(self, nobs, params, fittedvalues, resid, cov_e,
                  cov_HC0, HC0_se, HC0_tstat,
                  cov_HC1, HC1_se, HC1_tstat,
                  llf, aic, bic, hqc):
+        """Initialise a MVOLSResults container.
+
+        Parameters
+        ----------
+        nobs : int
+            Number of observations.
+        params : numpy.ndarray
+            Coefficient matrix of shape (k, nz).
+        fittedvalues : numpy.ndarray
+            Fitted values of shape (T, nz).
+        resid : numpy.ndarray
+            Residuals of shape (T, nz).
+        cov_e : numpy.ndarray
+            Residual covariance of shape (nz, nz).
+        cov_HC0 : numpy.ndarray
+            HC0 covariance matrix of shape (k*nz, k*nz).
+        HC0_se : numpy.ndarray
+            HC0 standard errors of shape (k, nz).
+        HC0_tstat : numpy.ndarray
+            HC0 t-statistics of shape (k, nz).
+        cov_HC1 : numpy.ndarray
+            HC1 covariance matrix of shape (k*nz, k*nz).
+        HC1_se : numpy.ndarray
+            HC1 standard errors of shape (k, nz).
+        HC1_tstat : numpy.ndarray
+            HC1 t-statistics of shape (k, nz).
+        llf : float
+            Log-likelihood.
+        aic : float
+            Akaike information criterion.
+        bic : float
+            Bayesian information criterion.
+        hqc : float
+            Hannan-Quinn information criterion.
+        """
 
         self.nobs = nobs
         self.params = params
@@ -499,7 +1040,39 @@ class MVOLSResults:
         self.hqc = hqc
 
 def mv_ols(df, lhs, rhs, match='inner', ix=None, nw_lags=0):
+    """Fit a multivariate OLS model with multiple dependent variables.
 
+    Estimates a system of equations sharing the same regressor matrix.
+    Computes both HC0 (homoskedastic) and HC1 (heteroskedastic-robust)
+    covariance matrices as well as log-likelihood and information criteria.
+
+    Parameters
+    ----------
+    df : pandas.DataFrame
+        Input data.
+    lhs : list of str
+        Dependent variable column names.
+    rhs : list of str
+        Independent variable column names. Include ``'const'`` to add a
+        constant column automatically.
+    match : {'inner', 'outer', 'custom'}, optional
+        Sample selection rule. Defaults to ``'inner'``.
+    ix : array-like of bool or None, optional
+        Custom inclusion index (used when ``match='custom'``).
+    nw_lags : int, optional
+        Newey-West HAC lag order. Currently not implemented; must be ``0``.
+
+    Returns
+    -------
+    FullResults
+        Object whose ``results`` attribute is an :class:`MVOLSResults`
+        instance, together with the sample index and design matrices.
+
+    Raises
+    ------
+    Exception
+        If ``nw_lags > 0`` (not yet implemented).
+    """
     if 'const' in rhs and 'const' not in df:
         df['const'] = 1.0
 
@@ -553,13 +1126,46 @@ def mv_ols(df, lhs, rhs, match='inner', ix=None, nw_lags=0):
     return FullResults(results, ix, Xs, zs)
 
 def hc0(x, e):
-    "Homoskedastic Covariance"
+    """Compute the HC0 (homoskedastic sandwich) covariance matrix.
+
+    Parameters
+    ----------
+    x : numpy.ndarray of shape (T, k)
+        Regressor matrix.
+    e : numpy.ndarray of shape (T, nz)
+        Residual matrix.
+
+    Returns
+    -------
+    cov_HC0 : numpy.ndarray of shape (k*nz, k*nz)
+        HC0 covariance matrix computed as ``kron(cov_x_inv, cov_e)``.
+    cov_e : numpy.ndarray of shape (nz, nz)
+        Residual covariance matrix.
+    """
     cov_e, _, cov_x_inv, _, _, _ = init_cov(x, e)
     cov_HC0 = np.kron(cov_x_inv, cov_e)
     return (cov_HC0, cov_e)
 
 def hc1(x, e):
-    "Heteroskedastic Covariance"
+    """Compute the HC1 (heteroskedasticity-robust sandwich) covariance matrix.
+
+    Uses the outer-product of residuals estimator for the middle of the
+    sandwich formula.
+
+    Parameters
+    ----------
+    x : numpy.ndarray of shape (T, k)
+        Regressor matrix.
+    e : numpy.ndarray of shape (T, nz)
+        Residual matrix.
+
+    Returns
+    -------
+    cov_HC1 : numpy.ndarray of shape (k*nz, k*nz)
+        HC1 heteroskedasticity-robust covariance matrix.
+    cov_e : numpy.ndarray of shape (nz, nz)
+        Residual covariance matrix (also returned for convenience).
+    """
     cov_e, cov_x, cov_x_inv, T, nz, k = init_cov(x, e)
     cov_xeex = np.zeros((nz*k, nz*k))
     for tt in range(T):
@@ -573,7 +1179,35 @@ def hc1(x, e):
     return (cov_HC1, cov_e)
 
 def init_cov(x, e):
+    """Compute basic covariance building-blocks for multivariate OLS.
 
+    Parameters
+    ----------
+    x : numpy.ndarray of shape (T, k)
+        Regressor matrix.
+    e : numpy.ndarray of shape (T, nz)
+        Residual matrix.
+
+    Returns
+    -------
+    cov_e : numpy.ndarray of shape (nz, nz)
+        Residual cross-product matrix ``e.T @ e / T``.
+    cov_x : numpy.ndarray of shape (k, k)
+        Regressor cross-product matrix ``x.T @ x / T``.
+    cov_x_inv : numpy.ndarray of shape (k, k)
+        Inverse of *cov_x*.
+    T : int
+        Number of time periods / observations.
+    nz : int
+        Number of dependent variables.
+    k : int
+        Number of regressors.
+
+    Raises
+    ------
+    AssertionError
+        If the number of rows in *x* and *e* differ.
+    """
     T, k = x.shape
     Te, nz = e.shape
     assert(T == Te)
@@ -585,25 +1219,97 @@ def init_cov(x, e):
     return (cov_e, cov_x, cov_x_inv, T, nz, k)
 
 def standard_errors(V, T):
+    """Compute standard errors from a covariance matrix.
 
+    Parameters
+    ----------
+    V : numpy.ndarray of shape (n, n)
+        Covariance matrix.
+    T : int
+        Sample size used to scale the variance (divides the diagonal by *T*).
+
+    Returns
+    -------
+    numpy.ndarray of shape (n,)
+        Standard errors ``sqrt(diag(V) / T)``.
+    """
     se = np.sqrt(np.diagonal(V) / T)
     return se
 
 def least_sq(X, z):
+    """Solve the normal equations for OLS.
+
+    Parameters
+    ----------
+    X : numpy.ndarray of shape (T, k)
+        Design matrix.
+    z : numpy.ndarray of shape (T,) or (T, nz)
+        Outcome vector or matrix.
+
+    Returns
+    -------
+    numpy.ndarray of shape (k,) or (k, nz)
+        OLS coefficient estimate ``(X.T @ X)^{-1} X.T @ z``.
+    """
     return np.linalg.solve(np.dot(X.T, X), np.dot(X.T, z))
 
 def to_pickle(x, path):
+    """Serialize an object to a pickle file.
 
+    Parameters
+    ----------
+    x : any
+        Python object to serialize.
+    path : str
+        Destination file path.
+
+    Returns
+    -------
+    None
+    """
     with open(path, "wb") as f:
         pickle.dump(x, f)
 
 def read_pickle(path):
+    """Deserialize an object from a pickle file.
 
+    Parameters
+    ----------
+    path : str
+        Path to the pickle file.
+
+    Returns
+    -------
+    any
+        The deserialized Python object.
+    """
     with open(path, "rb") as f:
         return pickle.load(f)
 
 def demean_separate(df, var_list, group_list, **kwargs):
-    """This function demeans by each variable one at at a time"""
+    """Demean variables sequentially by each group variable.
+
+    Applies :func:`demean2` once per group in *group_list*, passing the
+    result of each call as input to the next. This corresponds to iterative
+    within-group demeaning.
+
+    Parameters
+    ----------
+    df : pandas.DataFrame
+        Input DataFrame (modified by each call to :func:`demean2`).
+    var_list : list of str
+        Variables to demean.
+    group_list : list
+        Sequence of group-by variable(s) passed one at a time to
+        :func:`demean2`.
+    **kwargs
+        Additional keyword arguments forwarded to :func:`demean2`.
+
+    Returns
+    -------
+    pandas.DataFrame
+        DataFrame with variables demeaned by each group in succession.
+    """
     
     for group in group_list:
         df = demean2(group, var_list, df, **kwargs)
@@ -611,8 +1317,26 @@ def demean_separate(df, var_list, group_list, **kwargs):
     return df
 
 def demean2(group_list, var_list, df, prefix=None):
-    """Set prefix to None to overwrite existing variables with demeaned
-    versions, otherwise demeaned versions will have specified prefix"""
+    """Subtract within-group means, optionally writing to new columns.
+
+    Parameters
+    ----------
+    group_list : str or list of str
+        Group-by variable(s) passed to :meth:`pandas.DataFrame.groupby`.
+    var_list : list of str
+        Variables to demean.
+    df : pandas.DataFrame
+        Input data (not modified in place; a new DataFrame is returned).
+    prefix : str or None, optional
+        If ``None`` (default), demeaned values overwrite the original columns.
+        If a string, demeaned values are written to ``'<prefix>_<var>'``
+        columns.
+
+    Returns
+    -------
+    pandas.DataFrame
+        DataFrame with demeaned columns (prefixed or overwritten).
+    """
 
     if prefix is None:
         full_prefix = ''
@@ -636,18 +1360,35 @@ def demean2(group_list, var_list, df, prefix=None):
     return df
 
 def weight_regression_params(weights, params=None, cov=None, results=None):
-    """Produce point estimate and standard error for weighted coefficient.
-    
-    Args:
-        weights: vector of weights, x = w'c where c are coefficients
-        params: vector of coefficients (if inputting directly)
-        cov: covariance matrix of coefficients (if inputting directly)
-        results: statsmodels results object (alternative input)
+    """Compute a weighted linear combination of regression coefficients and its SE.
 
-    Returns:
-        x: summed coefficient
-        se: standard error of summed coefficient
-    
+    Evaluates ``x = weights @ params`` and the corresponding standard error
+    using the delta method: ``se = sqrt(weights @ cov @ weights)``.
+
+    Parameters
+    ----------
+    weights : array-like of shape (k,)
+        Vector of weights defining the linear combination.
+    params : array-like of shape (k,) or None, optional
+        Coefficient vector. Required if *results* is ``None``.
+    cov : array-like of shape (k, k) or None, optional
+        Covariance matrix of the coefficients. Required if *results* is
+        ``None``.
+    results : statsmodels results object or None, optional
+        Alternative input: if provided, ``params`` and ``cov_HC0`` are
+        extracted from this object.
+
+    Returns
+    -------
+    x : float
+        Weighted sum of coefficients.
+    se : float
+        Standard error of *x*.
+
+    Raises
+    ------
+    AssertionError
+        If neither (``params`` and ``cov``) nor ``results`` is provided.
     """
 
     assert ((params is not None) and (cov is not None)) or (results is not None)
@@ -662,16 +1403,24 @@ def weight_regression_params(weights, params=None, cov=None, results=None):
     return x, se
 
 def sum_regression_params(positions, *args, **kwargs):
-    """Produce point estimate and standard error for summed coefficient.
-    
-    Args:
-        positions: indices of coefficients to sum
-        *args, **kwargs: to be passed to weight_regression_params
+    """Compute the sum of selected regression coefficients and its standard error.
 
-    Returns:
-        x: summed coefficient
-        se: standard error of summed coefficient
-    
+    Constructs a unit-weight vector with ones at *positions* and delegates to
+    :func:`weight_regression_params`.
+
+    Parameters
+    ----------
+    positions : array-like of int
+        Indices of the coefficients to sum.
+    *args, **kwargs
+        Forwarded to :func:`weight_regression_params`.
+
+    Returns
+    -------
+    x : float
+        Sum of the selected coefficients.
+    se : float
+        Standard error of the sum.
     """
 
     e_vec = np.zeros(len(positions))
@@ -680,8 +1429,35 @@ def sum_regression_params(positions, *args, **kwargs):
     return weight_regression_params(e_vec, *args, **kwargs)
 
 def collapse(df, method='mean', var_list=None, by=None, wvar=None):
+    """Collapse a DataFrame to weighted means or sums within groups.
 
-    if by is None: by = []
+    Parameters
+    ----------
+    df : pandas.DataFrame
+        Input data.
+    method : {'mean', 'sum'}, optional
+        Aggregation method. Defaults to ``'mean'``.
+    var_list : list of str or None, optional
+        Numeric columns to aggregate. If ``None``, all numeric columns not in
+        *by* or *wvar* are used.
+    by : list of str or None, optional
+        Group-by columns. Must be non-empty.
+    wvar : str or None, optional
+        Weight variable. Must be provided (use a plain ``groupby`` for
+        unweighted aggregation).
+
+    Returns
+    -------
+    pandas.DataFrame
+        Collapsed DataFrame indexed by *by* with aggregated *var_list*
+        columns and the weight sum column *wvar*.
+
+    Raises
+    ------
+    AssertionError
+        If *by* is empty, *method* is unsupported, *wvar* is ``None``, or
+        *wvar* appears in *var_list*.
+    """
     
     assert by
     assert method in ['mean', 'sum']
@@ -708,5 +1484,19 @@ def collapse(df, method='mean', var_list=None, by=None, wvar=None):
     return collapsed
     
 def safe_sum(x):
-    
+    """Sum a Series without skipping NaN values.
+
+    Unlike the default :meth:`pandas.Series.sum`, this returns ``NaN`` if any
+    element is ``NaN``, rather than treating NaNs as zero.
+
+    Parameters
+    ----------
+    x : pandas.Series
+        Input series.
+
+    Returns
+    -------
+    scalar
+        Sum of *x*, or ``NaN`` if any element is ``NaN``.
+    """
     return x.sum(skipna=False)
