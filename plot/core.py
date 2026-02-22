@@ -16,23 +16,68 @@ from py_tools import data as dt, stats
 pd.plotting.register_matplotlib_converters()
 
 def set_fontsizes(ax, fontsize):
+    """Set the font size for all text elements on a matplotlib axis.
+
+    Parameters
+    ----------
+    ax : matplotlib.axes.Axes
+        The axis whose text elements will be resized.
+    fontsize : int or float
+        The font size to apply to the title, axis labels, and tick labels.
+    """
     for item in ([ax.title, ax.xaxis.label, ax.yaxis.label] +
                  ax.get_xticklabels() + ax.get_yticklabels()):
         item.set_fontsize(fontsize)
 
 def save_hist(vals, path, **kwargs):
+    """Compute a histogram and save it as a pickle file.
 
+    Parameters
+    ----------
+    vals : array-like
+        Input data for the histogram.
+    path : str
+        Destination file path for the pickled histogram.
+    **kwargs
+        Additional keyword arguments forwarded to ``numpy.histogram``.
+    """
     h = np.histogram(vals, **kwargs)
     dt.to_pickle(h, path)
 
 def save_hist_npy(vals, base_path, **kwargs):
+    """Compute a histogram and save the counts and bin edges as .npy files.
 
+    Parameters
+    ----------
+    vals : array-like
+        Input data for the histogram.
+    base_path : str
+        Path prefix used to derive output file names.  The histogram counts
+        are saved to ``base_path + 'hist.npy'`` and the bin edges to
+        ``base_path + 'bin_edges.npy'``.
+    **kwargs
+        Additional keyword arguments forwarded to ``numpy.histogram``.
+    """
     hist, bin_edges = np.histogram(vals, **kwargs)
     np.save(base_path + 'hist.npy', hist) 
     np.save(base_path + 'bin_edges.npy', bin_edges) 
 
 def load_hist_npy(base_path):
+    """Load histogram counts and bin edges previously saved with :func:`save_hist_npy`.
 
+    Parameters
+    ----------
+    base_path : str
+        Path prefix used when the files were saved.  Reads
+        ``base_path + 'hist.npy'`` and ``base_path + 'bin_edges.npy'``.
+
+    Returns
+    -------
+    hist : numpy.ndarray
+        Array of histogram bin counts.
+    bin_edges : numpy.ndarray
+        Array of bin edge values (length ``len(hist) + 1``).
+    """
     hist = np.load(base_path + 'hist.npy') 
     bin_edges = np.load(base_path + 'bin_edges.npy') 
 
@@ -46,6 +91,85 @@ def two_axis(df_in, var1, var2, filepath=None, loc1='upper left',
              leglabels=None, drop=True, kwargs1=None, kwargs2=None, format_dates=False,
              title=None, figsize=None, style=None,
              savefig_kwargs=None, axvline=None, axvline_kwargs=None):
+    """Plot two time series on separate left and right y-axes.
+
+    Parameters
+    ----------
+    df_in : pandas.DataFrame
+        DataFrame containing both series.
+    var1 : str
+        Column name for the left-axis series.
+    var2 : str
+        Column name for the right-axis series.
+    filepath : str, optional
+        File path to save the figure.  Displays interactively when ``None``.
+    loc1 : str, optional
+        Legend location for the left-axis legend.  Default is ``'upper left'``.
+    loc2 : str, optional
+        Legend location for the right-axis legend.  Default is ``'upper right'``.
+    loc_single : str, optional
+        Legend location when ``single_legend=True``.
+    legend_font : int or float, optional
+        Font size for legend text.  Default is 10.
+    label_font : int or float, optional
+        Font size for axis labels and tick labels.  Default is 12.
+    normalize : bool, optional
+        If ``True``, rescale both axes so that their normalized ranges match,
+        making visual comparison of fluctuations easier.  Default is ``False``.
+    color1 : str, optional
+        Color for *var1*.  Falls back to ``colors[var1]`` then ``'#1f77b4'``.
+    color2 : str, optional
+        Color for *var2*.  Falls back to ``colors[var2]`` then ``'#ff7f0e'``.
+    colors : dict, optional
+        Mapping from variable name to color string, used as defaults when
+        *color1* or *color2* are not provided.
+    flip1 : bool, optional
+        If ``True``, plot ``-var1`` and prefix the legend label with
+        ``'(-1) x '``.  Default is ``False``.
+    flip2 : bool, optional
+        If ``True``, plot ``-var2`` and prefix the legend label with
+        ``'(-1) x '``.  Default is ``False``.
+    legend : bool, optional
+        Whether to draw any legend.  Default is ``True``.
+    single_legend : bool, optional
+        If ``True``, combine both series into a single legend on *ax1*.
+        Default is ``False``.
+    print_legend_axis : bool, optional
+        If ``True``, append ``' (left)'`` / ``' (right)'`` to legend labels.
+        Default is ``True``.
+    labels : dict, optional
+        Mapping from variable name to display label used on the axis and in the
+        legend.
+    leglabels : dict, optional
+        Mapping from variable name to legend-only label (overrides *labels* for
+        the legend).
+    drop : bool, optional
+        If ``True``, drop rows where either variable is ``NaN`` before
+        plotting.  Default is ``True``.
+    kwargs1 : dict, optional
+        Extra keyword arguments forwarded to the ``ax1.plot`` call for *var1*.
+    kwargs2 : dict, optional
+        Extra keyword arguments forwarded to the ``ax2.plot`` call for *var2*.
+    format_dates : bool, optional
+        If ``True``, call ``fig.autofmt_xdate()`` to rotate date labels.
+        Default is ``False``.
+    title : str, optional
+        Figure title.
+    figsize : tuple of float, optional
+        ``(width, height)`` in inches passed to ``plt.subplots``.
+    style : str, optional
+        Matplotlib style sheet name to activate before plotting.
+    savefig_kwargs : dict, optional
+        Extra keyword arguments forwarded to ``plt.savefig``.
+    axvline : scalar, optional
+        x-coordinate at which to draw a vertical line on *ax1*.
+    axvline_kwargs : dict, optional
+        Extra keyword arguments forwarded to ``ax1.axvline``.
+
+    Returns
+    -------
+    None
+    """
 
     if colors is None: colors = {}
     if labels is None: labels = {}
@@ -161,7 +285,25 @@ def two_axis(df_in, var1, var2, filepath=None, loc1='upper left',
     return None
 
 def normalized(df, var_list, filepath=None, invert_list=None):
-    
+    """Plot multiple series after standardizing each to zero mean and unit variance.
+
+    Parameters
+    ----------
+    df : pandas.DataFrame
+        DataFrame whose index will be used as the x-axis.
+    var_list : list of str
+        Column names to plot.
+    filepath : str, optional
+        File path to save the figure.  Displays interactively when ``None``.
+    invert_list : list of bool, optional
+        A bool for each variable in *var_list*.  When ``True`` the
+        standardized series is multiplied by ``-1`` and the legend entry is
+        prefixed with ``'(-1) x '``.  Defaults to all ``False``.
+
+    Returns
+    -------
+    None
+    """
     if invert_list is None:
         invert_list = len(var_list) * [False]
     
@@ -196,6 +338,51 @@ def hist(df_in, var, label=None, xlabel=None, ylabel=None, wvar=None,
          bins=None, xlim=None, ylim=None, filepath=None,
          legend_font=10, label_font=12, copy_path=None, x_vertline=None,
          vertline_kwargs=None, **kwargs):
+    """Plot a weighted, normalized histogram for a single variable.
+
+    Parameters
+    ----------
+    df_in : pandas.DataFrame
+        Input DataFrame containing the variable to plot.
+    var : str
+        Column name of the variable to histogram.
+    label : str, optional
+        Legend label for the histogram.
+    xlabel : str, optional
+        Label for the x-axis.
+    ylabel : str, optional
+        Label for the y-axis.
+    wvar : str, optional
+        Column name of observation weights.  Uses equal weights when
+        ``None``.
+    bins : int or sequence, optional
+        Bin specification forwarded to ``plt.hist``.
+    xlim : tuple of float, optional
+        ``(left, right)`` x-axis limits.
+    ylim : tuple of float, optional
+        ``(bottom, top)`` y-axis limits.
+    filepath : str, optional
+        File path to save the figure.  Displays interactively when ``None``.
+    legend_font : int or float, optional
+        Font size for legend text.  Default is 10.
+    label_font : int or float, optional
+        Font size for axis labels.  Default is 12.
+    copy_path : str, optional
+        If provided, also save the histogram data as ``.npy`` files using
+        :func:`save_hist_npy` with this path prefix.
+    x_vertline : float, optional
+        x-coordinate at which to draw a vertical line.
+    vertline_kwargs : dict, optional
+        Extra keyword arguments forwarded to ``plt.axvline``.
+    **kwargs
+        Additional keyword arguments forwarded to ``plt.hist``.
+
+    Returns
+    -------
+    bool
+        ``True`` if the plot was produced, ``False`` if *var* was not found in
+        the cleaned DataFrame or the DataFrame was empty after cleaning.
+    """
 
     if vertline_kwargs is None: vertline_kwargs = {}
 
@@ -246,6 +433,26 @@ def hist(df_in, var, label=None, xlabel=None, ylabel=None, wvar=None,
     return True
 
 def compute_hist(df, var, bins, wvar=None):
+    """Compute a normalized weighted histogram and return it as a Series.
+
+    Parameters
+    ----------
+    df : pandas.DataFrame
+        DataFrame containing the data.
+    var : str
+        Column name of the variable to bin.
+    bins : array-like
+        Monotonically increasing sequence of bin edges.
+    wvar : str, optional
+        Column name of observation weights.  Uses equal weights (all ones)
+        when ``None``.
+
+    Returns
+    -------
+    pandas.Series
+        Normalized bin weights (sums to 1) indexed by the left edge of each
+        bin.
+    """
 
     this_list = [var]
     if wvar is not None:
@@ -270,9 +477,78 @@ def multi_hist(dfs, labels=None, xvar=None, xvars=None, bins=None, wvar=None, wv
                 vertline_kwargs=None, topcode=False, bottomcode=False, 
                 density=True,
                 **kwargs):
-    """Plots double histogram overlaying var1 from df1 and var2 from df2
+    """Plot overlapping histograms for multiple datasets or variables.
 
-    Arguments:
+    Each element of *dfs* (or each variable in *xvars*) is drawn as a
+    separate histogram on the same axes.
+
+    Parameters
+    ----------
+    dfs : list of pandas.DataFrame or pandas.DataFrame
+        One DataFrame per histogram group.  May be a single DataFrame
+        (replicated for all groups via *xvars*).
+    labels : list of str, optional
+        Legend label for each histogram group.
+    xvar : str, optional
+        Fallback column name used for all groups when *xvars* is not
+        provided.
+    xvars : list of str, optional
+        Column name to histogram for each group.
+    bins : int or array-like, optional
+        Bin specification forwarded to ``plt.hist`` or ``plt.bar``.
+    wvar : str, optional
+        Fallback weight column used for all groups when *wvars* is not
+        provided.  Defaults to equal counts when ``None``.
+    wvars : list of str, optional
+        Weight column name for each group.
+    filepath : str, optional
+        File path to save the figure.  Displays interactively when ``None``.
+    xlabel : str, optional
+        Label for the x-axis.
+    ylabel : str, optional
+        Label for the y-axis.
+    xlim : tuple of float, optional
+        ``(left, right)`` x-axis limits.  Defaults to the outer bin edges
+        when *bins* is provided.
+    ylim : tuple of float, optional
+        ``(bottom, top)`` y-axis limits.
+    legend_font : int or float, optional
+        Font size for legend text.  Default is 10.
+    label_font : int or float, optional
+        Font size for axis labels.  Default is 12.
+    copy_paths : list of str, optional
+        If provided, save each histogram's data as a pickle using
+        :func:`save_hist` with the corresponding path.
+    colors : list of str, optional
+        Bar/line color for each group.
+    edgecolor : str, optional
+        Edge color for histogram bars.  Default is ``'black'``.
+    alpha : float, optional
+        Transparency of histogram bars.  Default is 0.5.
+    use_bar : bool, optional
+        If ``True``, use ``plt.bar`` instead of ``plt.hist``.  Requires
+        *bins* to be provided.  Default is ``False``.
+    kwarg_list : list of dict, optional
+        Per-group extra keyword arguments merged into the plot call.
+    x_vertline : float, optional
+        x-coordinate at which to draw a vertical line.
+    vertline_kwargs : dict, optional
+        Extra keyword arguments forwarded to ``plt.axvline``.
+    topcode : bool, optional
+        If ``True``, clip values at the last bin edge.  Default is ``False``.
+    bottomcode : bool, optional
+        If ``True``, clip values at the first bin edge.  Default is
+        ``False``.
+    density : bool, optional
+        If ``True`` (default) and ``use_bar=False``, normalize histograms so
+        that the area sums to 1.
+    **kwargs
+        Additional keyword arguments forwarded to every ``plt.hist`` call.
+
+    Returns
+    -------
+    bool
+        Always returns ``True``.
     """
 
     if vertline_kwargs is None: vertline_kwargs = {}
@@ -417,9 +693,92 @@ def double_hist(df1, df2=None, label1=None, label2=None, var=None,
                 copy_path2=None, color1=None, color2=None, edgecolor='black', 
                 alpha=0.5, use_bar=False, labels=None, kwargs1=None, kwargs2=None, x_vertline=None,
                 vertline_kwargs=None, topcode=False, bottomcode=False, **kwargs):
-    """Plots double histogram overlaying var1 from df1 and var2 from df2
+    """Plot two overlapping histograms on the same axes.
 
-    Arguments:
+    Parameters
+    ----------
+    df1 : pandas.DataFrame
+        DataFrame for the first histogram.
+    df2 : pandas.DataFrame, optional
+        DataFrame for the second histogram.  Defaults to *df1* when
+        ``None``.
+    label1 : str, optional
+        Legend label for the first histogram.
+    label2 : str, optional
+        Legend label for the second histogram.
+    var : str, optional
+        Column name used for both histograms.  Mutually exclusive with
+        *var1* and *var2*.
+    var1 : str, optional
+        Column name for the first histogram.
+    var2 : str, optional
+        Column name for the second histogram.
+    bins : int or array-like, optional
+        Bin specification forwarded to ``plt.hist`` or ``plt.bar``.
+    wvar : str, optional
+        Default weight column for both histograms.  Uses equal counts when
+        ``None``.
+    wvar1 : str, optional
+        Weight column for the first histogram.  Falls back to *wvar*.
+    wvar2 : str, optional
+        Weight column for the second histogram.  Falls back to *wvar*.
+    filepath : str, optional
+        File path to save the figure.  Displays interactively when ``None``.
+    xlabel : str, optional
+        Label for the x-axis.
+    ylabel : str, optional
+        Label for the y-axis.
+    xlim : tuple of float, optional
+        ``(left, right)`` x-axis limits.  Defaults to the outer bin edges
+        when *bins* is provided.
+    ylim : tuple of float, optional
+        ``(bottom, top)`` y-axis limits.
+    legend_font : int or float, optional
+        Font size for legend text.  Default is 10.
+    label_font : int or float, optional
+        Font size for axis labels.  Default is 12.
+    copy_path1 : str, optional
+        If provided, save the first histogram as a pickle using
+        :func:`save_hist` with this path.
+    copy_path2 : str, optional
+        If provided, save the second histogram as a pickle using
+        :func:`save_hist` with this path.
+    color1 : str, optional
+        Color for the first histogram bars.
+    color2 : str, optional
+        Color for the second histogram bars.
+    edgecolor : str, optional
+        Edge color for histogram bars.  Default is ``'black'``.
+    alpha : float, optional
+        Transparency of histogram bars.  Default is 0.5.
+    use_bar : bool, optional
+        If ``True``, use ``plt.bar`` instead of ``plt.hist``.  Requires
+        *bins* to be provided.  Default is ``False``.
+    labels : dict, optional
+        Mapping from variable name to display label, used as fallback when
+        *label1* or *label2* are not provided.
+    kwargs1 : dict, optional
+        Extra keyword arguments forwarded to the first histogram plot call.
+    kwargs2 : dict, optional
+        Extra keyword arguments forwarded to the second histogram plot call.
+    x_vertline : float, optional
+        x-coordinate at which to draw a vertical line.
+    vertline_kwargs : dict, optional
+        Extra keyword arguments forwarded to ``plt.axvline``.
+    topcode : bool, optional
+        If ``True``, clip values at the last bin edge.  Default is ``False``.
+    bottomcode : bool, optional
+        If ``True``, clip values at the first bin edge.  Default is
+        ``False``.
+    **kwargs
+        Additional keyword arguments merged into both *kwargs1* and
+        *kwargs2*.
+
+    Returns
+    -------
+    bool
+        ``True`` if the plot was produced, ``False`` if either variable was
+        missing or the cleaned DataFrames were empty.
     """
 
     if labels is None: labels = {}
@@ -563,6 +922,33 @@ def double_hist(df1, df2=None, label1=None, label2=None, var=None,
 
 def var_irfs(irfs, var_list, shock_list=None, titles=None, filepath=None,
              n_per_row=None, plot_scale=3):
+    """Plot impulse response functions (IRFs) from a posterior simulation.
+
+    Creates a grid of subplots, one per (variable, shock) pair, showing the
+    posterior median and 16th/84th percentile bands.
+
+    Parameters
+    ----------
+    irfs : numpy.ndarray, shape (Nsim, Nirf, Ny, Nshock)
+        Array of simulated impulse responses.  The axes correspond to:
+        posterior draw, horizon, response variable, and shock.
+    var_list : list of str
+        Names of the response variables (length ``Ny``).
+    shock_list : list of str, optional
+        Names of the shocks (length ``Nshock``).  Defaults to *var_list*.
+    titles : dict, optional
+        Mapping from variable/shock name to display title.
+    filepath : str, optional
+        File path to save the figure.  Displays interactively when ``None``.
+    n_per_row : int, optional
+        Number of subplot columns.  Defaults to ``Nshock``.
+    plot_scale : float, optional
+        Inches per subplot side.  Default is 3.
+
+    Returns
+    -------
+    None
+    """
 
     if titles is None: titles = {}
 
@@ -612,6 +998,64 @@ def plot_series(df_in, var_names, filepath=None, directory=None, filename=None, 
                 ylabel=None, sample='outer', title=None, 
                 single_legend=True, vertline_ix=None,
                 vertline_kwargs=None, linewidths=None, ylim=None, dpi=None):
+    """Plot one or more time series from a DataFrame.
+
+    Parameters
+    ----------
+    df_in : pandas.DataFrame
+        DataFrame whose index is used as the x-axis.
+    var_names : list of str
+        Column names to plot.
+    filepath : str, optional
+        File path to save the figure.  Displays interactively when ``None``.
+    directory : str, optional
+        Deprecated.  Raises an exception if provided.
+    filename : str, optional
+        Deprecated.  Raises an exception if provided.
+    labels : dict, optional
+        Mapping from column name to legend label.
+    linestyles : dict, optional
+        Mapping from column name to line style string.  Defaults to
+        ``'-'`` for each variable.
+    markers : dict, optional
+        Mapping from column name to marker style string.
+    colors : dict, optional
+        Mapping from column name to color string.
+    markevery : int, optional
+        Plot a marker every this many data points.  Default is 8.
+    markersize : float, optional
+        Marker size in points.  Default is 5.
+    mew : float, optional
+        Marker edge width.  Default is 2.
+    fillstyle : str, optional
+        Marker fill style.  Default is ``'none'``.
+    fontsize : int or float, optional
+        Global font size for labels and legend.  Default is 12.
+    plot_type : str, optional
+        Deprecated.  Raises an exception if provided.
+    ylabel : str, optional
+        Label for the y-axis.
+    sample : {'outer', 'inner'}, optional
+        Row selection strategy.  ``'outer'`` keeps rows where any variable is
+        non-null; ``'inner'`` keeps only rows where all variables are
+        non-null.  Default is ``'outer'``.
+    title : str, optional
+        Figure title.
+    single_legend : bool, optional
+        If ``True``, always draw a legend even when only one variable is
+        plotted.  Default is ``True``.
+    vertline_ix : int, optional
+        Integer index into ``df.index`` at which to draw a vertical line.
+    vertline_kwargs : dict, optional
+        Extra keyword arguments forwarded to ``plt.axvline``.
+    linewidths : dict, optional
+        Mapping from column name to line width.  Defaults to 2 for each
+        variable.
+    ylim : tuple of float, optional
+        ``(bottom, top)`` y-axis limits.
+    dpi : int or float, optional
+        Resolution for the saved figure.
+    """
 
     if labels is None: labels = {}
     if linestyles is None: linestyles = {}
@@ -681,16 +1125,36 @@ def projection(x, se, var_titles, shock_title, p=0.9, n_per_row=4, plot_size=3.0
                out_dir=None, label=None, shock_name=None): 
     """Plot impulse responses from a local projection estimation.
 
-    x: Ny x Nt vector of coefficients (one per LHS variable)
-    se: Ny x Nt vector of standard errors (one per LHS variable)
-    var_titles: Ny x 1 list of names of LHS variables (one per LHS variable)
-    shock_title: name of shock
-    p: probability span of confidence bands (i.e., 0.9 = 90%)
-    n_per_row: number of plots per row
-    plot_size: inches per side of each plot
-    out_dir: directory to save plots in (will display to screen if not provided)
-    label: additional title to put in plot name
-    shock_name: optional shorter name for file
+    Parameters
+    ----------
+    x : numpy.ndarray, shape (Ny, Nt)
+        Estimated coefficients, one row per response variable and one column
+        per horizon.
+    se : numpy.ndarray, shape (Ny, Nt)
+        Standard errors corresponding to *x*.
+    var_titles : list of str
+        Display names for the response variables (length ``Ny``).
+    shock_title : str
+        Display name of the shock, used in subplot titles and the output
+        filename.
+    p : float, optional
+        Probability coverage of the confidence bands (e.g. ``0.9`` gives 90%
+        bands).  Default is 0.9.
+    n_per_row : int, optional
+        Number of subplots per row.  Default is 4.
+    plot_size : float, optional
+        Inches per subplot side.  Default is 3.0.
+    out_dir : str, optional
+        Directory in which to save the figure.  Displays interactively when
+        ``None``.
+    label : str, optional
+        Optional prefix added to the output filename.
+    shock_name : str, optional
+        Shorter name used in the output filename instead of *shock_title*.
+
+    Returns
+    -------
+    None
     """
 
     Ny, Nt = x.shape
@@ -742,7 +1206,30 @@ def projection(x, se, var_titles, shock_title, p=0.9, n_per_row=4, plot_size=3.0
     return None
 
 def get_45_bounds(df, xvar, yvar, margin=0.05):
-    
+    """Compute symmetric axis bounds for a 45-degree line plot.
+
+    Finds a common lower and upper bound that covers the data range of both
+    *xvar* and *yvar*, with an optional fractional margin.
+
+    Parameters
+    ----------
+    df : pandas.DataFrame
+        DataFrame containing the two variables.
+    xvar : str
+        Column name of the x-axis variable.
+    yvar : str
+        Column name of the y-axis variable.
+    margin : float, optional
+        Fractional margin to add beyond the data range.  Default is 0.05
+        (5% on each side).
+
+    Returns
+    -------
+    plot_lb : float
+        Lower axis bound.
+    plot_ub : float
+        Upper axis bound.
+    """
     min_val = np.amin(df[[yvar, xvar]].values)
     max_val = np.amax(df[[yvar, xvar]].values)
     dist = max_val - min_val
@@ -759,6 +1246,87 @@ def binscatter(df_in, yvars, xvar, wvar=None, fit_var=None, labels=None, n_bins=
                legend_font=10, label_font=12, use_legend=True, median=False,
                restore_mean=False, title=None, include45=False, include0=False,
                **kwargs):
+    """Create a binned scatter plot with optional OLS fit line.
+
+    Bins *xvar* into *n_bins* equal-frequency bins and plots the
+    (weighted) mean of each *yvar* within each bin.  Optionally overlays
+    raw data points and a fitted regression line.
+
+    Parameters
+    ----------
+    df_in : pandas.DataFrame
+        Input DataFrame.
+    yvars : str or list of str
+        Response variable(s) to plot on the y-axis.
+    xvar : str
+        Explanatory variable to bin on the x-axis.
+    wvar : str, optional
+        Column name of observation weights.
+    fit_var : str, optional
+        Pre-computed fitted-values column.  When ``None`` the fit is
+        obtained by running an OLS regression of *yvar* on *xvar*.
+    labels : dict, optional
+        Mapping from column name to display label.
+    n_bins : int, optional
+        Number of bins.  Default is 20.
+    bins : array-like, optional
+        Explicit bin edges.  When provided, *n_bins* is ignored.
+    filepath : str, optional
+        File path to save the figure.  Displays interactively when ``None``.
+    xlim : tuple of float or 'default', optional
+        x-axis limits.
+    ylim : tuple of float or 'default', optional
+        y-axis limits.
+    plot_line : bool, optional
+        If ``True`` (default), overlay an OLS fit line.
+    control : list of str, optional
+        Control variables to partial out before binning.
+    absorb : list of str or list of list of str, optional
+        Fixed-effect variable(s) to absorb (demean) before binning.
+    bin_scale : float, optional
+        Marker size for binned scatter points.  Defaults to 50 without raw
+        data and 100 with raw data.
+    raw_scale : float, optional
+        Scale factor applied to weights when drawing raw data points.
+        Default is 10.0.
+    plot_raw_data : bool, optional
+        If ``True``, also plot the raw (unbinned) data points.  Default is
+        ``False``.
+    bin_kwargs : dict, optional
+        Extra keyword arguments forwarded to the binned scatter ``ax.scatter``
+        call.
+    raw_kwargs : dict, optional
+        Extra keyword arguments forwarded to the raw data ``ax.scatter`` call.
+    line_kwargs : dict, optional
+        Extra keyword arguments forwarded to the fit-line ``ax.plot`` call.
+    legend_font : int or float, optional
+        Font size for legend text.  Default is 10.
+    label_font : int or float, optional
+        Font size for axis labels.  Default is 12.
+    use_legend : bool, optional
+        If ``True`` (default), draw a legend.
+    median : bool, optional
+        If ``True``, use the median instead of the mean within each bin.
+        Default is ``False``.
+    restore_mean : bool, optional
+        If ``True``, restore the overall mean after absorbing fixed effects.
+        Default is ``False``.
+    title : str, optional
+        Figure title.
+    include45 : bool, optional
+        If ``True``, overlay a 45-degree line and force equal axis ranges.
+        Default is ``False``.
+    include0 : bool, optional
+        If ``True``, overlay a horizontal line at zero and expand the y-axis
+        if necessary to include it.  Default is ``False``.
+    **kwargs
+        Additional keyword arguments (currently unused).
+
+    Returns
+    -------
+    pandas.DataFrame
+        DataFrame of binned x and y values used in the scatter plot.
+    """
 
     if control is None: control = []
     if absorb is None: absorb = []
@@ -982,6 +1550,32 @@ def binscatter(df_in, yvars, xvar, wvar=None, fit_var=None, labels=None, n_bins=
 def scatter(df, yvar, xvar, labels=None,
             multicolor=False, cmap_name='plasma', color='C0', 
             include45=False, filepath=None):
+    """Create a simple scatter plot of two columns from a DataFrame.
+
+    Parameters
+    ----------
+    df : pandas.DataFrame
+        DataFrame containing the variables to plot.
+    yvar : str
+        Column name for the y-axis variable.
+    xvar : str
+        Column name for the x-axis variable.
+    labels : dict, optional
+        Mapping from column name to axis label string.
+    multicolor : bool, optional
+        If ``True``, color each point according to its position in the
+        DataFrame using *cmap_name*.  Default is ``False``.
+    cmap_name : str, optional
+        Matplotlib colormap name used when *multicolor* is ``True``.
+        Default is ``'plasma'``.
+    color : str, optional
+        Uniform color for all points when *multicolor* is ``False``.
+        Default is ``'C0'``.
+    include45 : bool, optional
+        If ``True``, overlay a 45-degree dashed line.  Default is ``False``.
+    filepath : str, optional
+        File path to save the figure.  Displays interactively when ``None``.
+    """
 
     if labels is None: labels = {}
     
@@ -1009,12 +1603,48 @@ def scatter(df, yvar, xvar, labels=None,
     plt.close(fig)
     
 def state_scatter_inner(ax, this_df, yvar, xvar):
+    """Annotate each data point with the corresponding state name.
+
+    Parameters
+    ----------
+    ax : matplotlib.axes.Axes
+        The axes on which to draw the annotations.
+    this_df : pandas.DataFrame
+        DataFrame indexed by state name with columns for *xvar* and *yvar*.
+    yvar : str
+        Column name for the y-coordinate of each annotation.
+    xvar : str
+        Column name for the x-coordinate of each annotation.
+
+    Returns
+    -------
+    None
+    """
     for ii, state in enumerate(this_df.index):
         ax.annotate(state, (this_df.loc[state, xvar], this_df.loc[state, yvar]))
     return None
 
 def get_colors(n, cmap_name, startval=0.0, endval=1.0):
-    
+    """Sample *n* evenly spaced colors from a matplotlib colormap.
+
+    Parameters
+    ----------
+    n : int
+        Number of colors to return.
+    cmap_name : str
+        Name of the matplotlib colormap (e.g. ``'viridis'``, ``'plasma'``).
+    startval : float, optional
+        Starting position in the colormap in the range [0, 1].  Default is
+        0.0.
+    endval : float, optional
+        Ending position in the colormap in the range [0, 1].  Default is
+        1.0.
+
+    Returns
+    -------
+    numpy.ndarray, shape (n, 4)
+        Array of RGBA color values.
+    """
     cmap = plt.get_cmap(cmap_name)
     colors = cmap(np.linspace(startval, endval, n))
     return colors

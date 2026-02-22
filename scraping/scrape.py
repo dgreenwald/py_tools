@@ -28,7 +28,19 @@ def get_soup(url, delay=1e-4):
         return None
 
 def strip_html(url):
-    """Strip HTML tags from a URL and return the plain text."""
+    """Strip HTML tags from a URL and return the plain text.
+
+    Parameters
+    ----------
+    url : str
+        The URL whose HTML content should be fetched and stripped.
+
+    Returns
+    -------
+    str or None
+        Plain text content of the page, or ``None`` if :func:`get_soup`
+        returns ``None`` (e.g. on a non-200 HTTP response).
+    """
 
     soup = get_soup(url)
     if soup is None:
@@ -40,7 +52,27 @@ def strip_html(url):
 stripHTML = strip_html
 
 def url_to_nltk(url, lower=False):
-    """Load URL directly into NLTK"""
+    """Fetch a URL, strip its HTML, and return an NLTK Text object.
+
+    Parameters
+    ----------
+    url : str
+        The URL to fetch and tokenize.
+    lower : bool, optional
+        If ``True``, convert the raw text to lowercase before tokenizing.
+        Default is ``False``.
+
+    Returns
+    -------
+    nltk.Text or None
+        An NLTK Text object built from the tokenized page content, or
+        ``None`` if the page could not be fetched.
+
+    Raises
+    ------
+    ImportError
+        If the ``nltk`` package is not installed.
+    """
     try:
         import nltk
     except ImportError as exc:
