@@ -6,6 +6,7 @@ Loader function for origins data. Should really be moved to origins folder.
 import numpy as np
 import os
 import pandas as pd
+import warnings
 
 import py_tools.time_series as ts
 import py_tools.utilities as ut
@@ -14,7 +15,7 @@ from py_tools.datasets import fred, nipa, origins, fof
 
 from . import config
 
-def load(dataset_list, reimport=False, no_prefix=True, master_dirs={}, **kwargs):
+def load(dataset_list, reimport=False, no_prefix=True, master_dirs=None, **kwargs):
     """Load and merge multiple named datasets from pickle cache.
 
     For each dataset name in ``dataset_list``, checks for a cached pickle file
@@ -45,6 +46,15 @@ def load(dataset_list, reimport=False, no_prefix=True, master_dirs={}, **kwargs)
     pandas.DataFrame
         Outer-merged DataFrame containing all requested datasets.
     """
+    if master_dirs is not None:
+        warnings.warn(
+            "master_dirs is deprecated and will be removed in a future version. "
+            "Set the PY_TOOLS_DATA_DIR environment variable instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+    else:
+        master_dirs = {}
     dirs = master_dirs.copy()
     if 'base' not in dirs:
         dirs['base'] = config.base_dir()
@@ -77,7 +87,7 @@ def load(dataset_list, reimport=False, no_prefix=True, master_dirs={}, **kwargs)
 
     return df
 
-def load_dataset(dataset, master_dirs={}, **kwargs):
+def load_dataset(dataset, master_dirs=None, **kwargs):
     """Load a single named dataset by dispatching to the appropriate module loader.
 
     Parameters
@@ -104,6 +114,15 @@ def load_dataset(dataset, master_dirs={}, **kwargs):
     Exception
         If ``dataset`` is not a recognised dataset name.
     """
+    if master_dirs is not None:
+        warnings.warn(
+            "master_dirs is deprecated and will be removed in a future version. "
+            "Set the PY_TOOLS_DATA_DIR environment variable instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+    else:
+        master_dirs = {}
     dirs = master_dirs.copy()
     if 'base' not in dirs:
         dirs['base'] = config.base_dir()

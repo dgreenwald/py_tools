@@ -2,6 +2,7 @@
 # import ipdb
 import numpy as np
 import pandas as pd
+import warnings
 import py_tools.time_series as ts
 # import py_tools.data
 # from py_tools.data import date_index
@@ -19,7 +20,7 @@ defaults = {
 }
 DATASET_NAME = "origins"
 DESCRIPTION = "Legacy origins/source datasets loader (stock wealth and predictability inputs)."
-def load(dataset, master_dirs={}, **kwargs):
+def load(dataset, master_dirs=None, **kwargs):
     """Load a named origins dataset.
 
     Parameters
@@ -47,6 +48,15 @@ def load(dataset, master_dirs={}, **kwargs):
         When ``dataset='cay_source'`` (directory update required).
     """
 
+    if master_dirs is not None:
+        warnings.warn(
+            "master_dirs is deprecated and will be removed in a future version. "
+            "Set the PY_TOOLS_DATA_DIR environment variable instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+    else:
+        master_dirs = {}
     dirs = master_dirs.copy()
     for var, val in defaults.items():
         if var not in dirs:

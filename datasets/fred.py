@@ -12,7 +12,7 @@ default_dir = config.base_dir() + 'fred/'
 # data_dir = '/home/dan/Dropbox/data/fred/'
 DATASET_NAME = "fred"
 DESCRIPTION = "FRED macroeconomic time series dataset loader."
-def load(codes=None, code_names={},
+def load(codes=None, code_names=None,
          start=datetime.datetime(1900, 1, 1),
          end = datetime.datetime.today(),
          reimport=False, data_dir=default_dir):
@@ -49,6 +49,8 @@ def load(codes=None, code_names={},
         series (renamed according to ``code_names`` when provided).
     """
 
+    if code_names is None:
+        code_names = {}
     if codes is None:
         codes = list(code_names.keys())
         

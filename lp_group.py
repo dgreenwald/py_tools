@@ -90,10 +90,14 @@ def get_formula(df, horizon, y_var, shock_var, control_vars, fe_vars, shock_lags
     return formula, var_list 
 
 def estimate(df_in, y_var, shock_var, control_vars,groupvars, sortvars,
-             timevar, fe_vars=[], shock_lags=2, y_lags=1,periods=20,
-             control_lags={}):
-    
-    #copy in relevant variables 
+             timevar, fe_vars=None, shock_lags=2, y_lags=1,periods=20,
+             control_lags=None):
+
+    if fe_vars is None:
+        fe_vars = []
+    if control_lags is None:
+        control_lags = {}
+    #copy in relevant variables
     df={}
     all_vars = list(set([y_var] + [shock_var] + control_vars + fe_vars+groupvars+[timevar]))
     for var in all_vars:

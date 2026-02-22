@@ -1,11 +1,12 @@
 import pandas as pd
+import warnings
 from py_tools.datasets import misc, ramey
 
 from . import config
 default_dir = config.base_dir()
 DATASET_NAME = "shocks"
 DESCRIPTION = "Merged macro shock series loader (TFP, monetary, EBP, and related shocks)."
-def load(keep_list=None, master_dirs={}):
+def load(keep_list=None, master_dirs=None):
     """Load merged macro shock series from multiple sources.
 
     Combines TFP shocks (Fernald utilization-adjusted, Ramey technology),
@@ -28,6 +29,15 @@ def load(keep_list=None, master_dirs={}):
     pandas.DataFrame
         Quarterly time-indexed DataFrame of the requested shock series.
     """
+    if master_dirs is not None:
+        warnings.warn(
+            "master_dirs is deprecated and will be removed in a future version. "
+            "Set the PY_TOOLS_DATA_DIR environment variable instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+    else:
+        master_dirs = {}
     dirs = master_dirs.copy()
     if 'base' not in dirs:
         dirs['base'] = default_dir

@@ -462,11 +462,13 @@ class BVAR:
         A = vr.companion_form(B)
         ssm = ss.StateSpaceModel(A, R, Sig, Z, H)
 
+        sse = ss.StateSpaceEstimates(ssm, self.Y_data, x_init=x_init, P_init=P_init)
+
         if sample:
-            X_samp = ssm.draw_states(self.Y_data, x_init, P_init)
+            sse.draw_states()
+            X_samp = sse.state_draw
         else:
-            sse = ss.StateSpaceEstimates(ssm, self.Y_data)
-            sse.kalman_filter(x_init, P_init)
+            sse.kalman_filter()
             sse.disturbance_smoother()
             sse.state_smoother()
             X_samp = sse.x_smooth

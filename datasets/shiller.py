@@ -7,6 +7,7 @@ Created on Mon Oct  9 16:29:33 2023
 """
 
 import pandas as pd
+import warnings
 
 from py_tools import time_series as ts
 
@@ -14,7 +15,7 @@ from . import config
 default_dir = config.base_dir()
 DATASET_NAME = "shiller"
 DESCRIPTION = "Shiller long-run asset price and valuation dataset loader."
-def load(vintage='2310', master_dirs={}, freq='Q'):
+def load(vintage='2310', master_dirs=None, freq='Q'):
     """Load Shiller long-run equity price/yield data from Excel.
 
     Reads the Shiller IE data Excel file for the specified vintage, selects
@@ -40,6 +41,15 @@ def load(vintage='2310', master_dirs={}, freq='Q'):
         Time-indexed DataFrame of Shiller equity price, dividend, earnings,
         CPI, GS10, and CAPE series at the requested frequency.
     """
+    if master_dirs is not None:
+        warnings.warn(
+            "master_dirs is deprecated and will be removed in a future version. "
+            "Set the PY_TOOLS_DATA_DIR environment variable instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+    else:
+        master_dirs = {}
     default_dir = config.base_dir()
     dirs = master_dirs.copy()
     if 'base' not in dirs:

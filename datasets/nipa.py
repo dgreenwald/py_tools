@@ -1,6 +1,7 @@
 import numpy as np
 import os
 import pandas as pd
+import warnings
 import py_tools.time_series as ts
 
 from . import config
@@ -424,7 +425,7 @@ def load_flat(nipa_table=None, data_dir=default_dir+'nipa/', var_list=None,
     return df
 
 def load_xls(nipa_table, vintage='1706', nipa_quarterly=True,
-         master_dirs={}, **kwargs):
+         master_dirs=None, **kwargs):
     """Load a NIPA table from BEA Excel files.
 
     Parameters
@@ -450,6 +451,15 @@ def load_xls(nipa_table, vintage='1706', nipa_quarterly=True,
         and any derived series appended.
     """
 
+    if master_dirs is not None:
+        warnings.warn(
+            "master_dirs is deprecated and will be removed in a future version. "
+            "Set the PY_TOOLS_DATA_DIR environment variable instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+    else:
+        master_dirs = {}
     dirs = master_dirs.copy()
     if 'base' not in dirs:
         dirs['base'] = default_dir

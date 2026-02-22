@@ -747,8 +747,8 @@ def load_zip(data_dir=default_dir, reimport=False, reimport_year=False):
 
     return df
 
-def load_zip3_from_county(data_dir=default_dir, reimport=False, county_kwargs={},
-                          crosswalk_kwargs={}):
+def load_zip3_from_county(data_dir=default_dir, reimport=False, county_kwargs=None,
+                          crosswalk_kwargs=None):
     """Aggregate IRS county data to 3-digit ZIP level using a county-to-ZIP crosswalk.
 
     Merges county-level IRS data with a county-to-ZIP3 crosswalk, scales
@@ -776,9 +776,13 @@ def load_zip3_from_county(data_dir=default_dir, reimport=False, county_kwargs={}
         ``(zip3, date)``.
     """
     
+    if county_kwargs is None:
+        county_kwargs = {}
+    if crosswalk_kwargs is None:
+        crosswalk_kwargs = {}
     parquet_file = data_dir + 'zip/irs_zip3_from_county.parquet'
     if reimport or not os.path.exists(parquet_file):
-        
+
         # Load county data and crosswalk then merge
         these_county_kwargs = {'data_dir' : data_dir}
         these_county_kwargs.update(county_kwargs)
@@ -803,7 +807,7 @@ def load_zip3_from_county(data_dir=default_dir, reimport=False, county_kwargs={}
         
     return df
 
-def load_zip3_from_zip(data_dir=default_dir, reimport=False, zip_kwargs={}):
+def load_zip3_from_zip(data_dir=default_dir, reimport=False, zip_kwargs=None):
     """Aggregate IRS ZIP-code data to 3-digit ZIP level.
 
     Loads full ZIP-level data via :func:`load_zip`, derives the 3-digit ZIP
@@ -827,9 +831,11 @@ def load_zip3_from_zip(data_dir=default_dir, reimport=False, zip_kwargs={}):
         ``(zip3, date)``.
     """
     
+    if zip_kwargs is None:
+        zip_kwargs = {}
     parquet_file = data_dir + 'zip/irs_zip3_from_zip.parquet'
     if reimport or not os.path.exists(parquet_file):
-        
+
         # Load ZIP data
         these_zip_kwargs = {'data_dir' : data_dir}
         these_zip_kwargs.update(zip_kwargs)

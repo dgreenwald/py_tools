@@ -2,6 +2,7 @@
 import numpy as np
 import os
 import pandas as pd
+import warnings
 from scipy.io import loadmat
 
 import py_tools.time_series as ts
@@ -10,7 +11,7 @@ from . import config
 default_dir = config.base_dir()
 DATASET_NAME = "misc"
 DESCRIPTION = "Miscellaneous one-off research datasets loader."
-def load(dataset, master_dirs={}, reimport=False,
+def load(dataset, master_dirs=None, reimport=False,
          save_pickle=True, **kwargs):
     """Load a one-off miscellaneous dataset from pickle cache.
 
@@ -36,6 +37,15 @@ def load(dataset, master_dirs={}, reimport=False,
     pandas.DataFrame
         DataFrame containing the requested miscellaneous dataset.
     """
+    if master_dirs is not None:
+        warnings.warn(
+            "master_dirs is deprecated and will be removed in a future version. "
+            "Set the PY_TOOLS_DATA_DIR environment variable instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+    else:
+        master_dirs = {}
     default_dir = config.base_dir()
     dirs = master_dirs.copy()
     if 'base' not in dirs:

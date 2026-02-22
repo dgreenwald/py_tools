@@ -242,7 +242,9 @@ def transform(df, var_list, lag=0, diff=0, other=None):
 
 def long_horizon_contemp(df, lhs, rhs, horizon, **kwargs):
 
-    raise Exception
+    raise NotImplementedError(
+        "long_horizon_contemp is not implemented."
+    )
 
 def long_horizon_predictive(df_in, lhs, rhs, horizon, norm_lhs=False, **kwargs):
 
@@ -258,9 +260,11 @@ def long_horizon_predictive(df_in, lhs, rhs, horizon, norm_lhs=False, **kwargs):
 
     return dt.regression(df, lhs_long, rhs, **kwargs)
 
-def MA(df, lhs_var, rhs_vars, init_lag=1, default_lags=16, 
-       lags_by_var={}, **kwargs):
+def MA(df, lhs_var, rhs_vars, init_lag=1, default_lags=16,
+       lags_by_var=None, **kwargs):
 
+    if lags_by_var is None:
+        lags_by_var = {}
     lhs = lhs_var
 
     rhs = []
@@ -413,7 +417,9 @@ class LongHorizonMA:
 
     def __init__(self, df, lhs_var, rhs_var, horizon, n_lags=16):
 
-        raise Exception
+        raise NotImplementedError(
+            "LongHorizonMA is not implemented."
+        )
 
 class LongHorizonVAR:
     """Long Horizon VAR Regression"""

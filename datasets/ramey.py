@@ -1,11 +1,12 @@
 import pandas as pd
+import warnings
 from py_tools.time_series import date_index
 
 from . import config
 default_dir = config.base_dir()
 DATASET_NAME = "ramey"
 DESCRIPTION = "Ramey macro shock datasets loader."
-def load(dataset, master_dirs={}):
+def load(dataset, master_dirs=None):
     """Load data from Ramey shocks file.
 
     Parameters
@@ -24,6 +25,15 @@ def load(dataset, master_dirs={}):
         Loaded dataset with a ``DatetimeIndex``.
     """
 
+    if master_dirs is not None:
+        warnings.warn(
+            "master_dirs is deprecated and will be removed in a future version. "
+            "Set the PY_TOOLS_DATA_DIR environment variable instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+    else:
+        master_dirs = {}
     dirs = master_dirs.copy()
     if 'base' not in dirs:
         dirs['base'] = default_dir
