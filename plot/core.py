@@ -4,7 +4,6 @@ import os
 if os.environ.get('USE_MATPLOTLIB_AGG', 0):
     matplotlib.use('Agg')
 
-import math
 import matplotlib.pyplot as plt
 import matplotlib.style as plt_style
 import numpy as np
@@ -47,13 +46,20 @@ def two_axis(df_in, var1, var2, filepath=None, loc1='upper left',
              title=None, figsize=None, style=None,
              savefig_kwargs=None, axvline=None, axvline_kwargs=None):
 
-    if colors is None: colors = {}
-    if labels is None: labels = {}
-    if leglabels is None: leglabels = {}
-    if kwargs1 is None: kwargs1 = {}
-    if kwargs2 is None: kwargs2 = {}
-    if savefig_kwargs is None: savefig_kwargs = {}
-    if axvline_kwargs is None: axvline_kwargs = {}
+    if colors is None:
+        colors = {}
+    if labels is None:
+        labels = {}
+    if leglabels is None:
+        leglabels = {}
+    if kwargs1 is None:
+        kwargs1 = {}
+    if kwargs2 is None:
+        kwargs2 = {}
+    if savefig_kwargs is None:
+        savefig_kwargs = {}
+    if axvline_kwargs is None:
+        axvline_kwargs = {}
     
     if style is not None:
         plt_style.use(style)
@@ -74,9 +80,9 @@ def two_axis(df_in, var1, var2, filepath=None, loc1='upper left',
         df = df.dropna()
 
     for these_kwargs in [kwargs1, kwargs2]:
-        if these_kwargs.get('marker', None) is not None:
-            if these_kwargs.get('markevery', None) is None:
-                these_kwargs['markevery'] = np.round(len(df) / 20)
+            if these_kwargs.get('marker', None) is not None:
+                if these_kwargs.get('markevery', None) is None:
+                    these_kwargs['markevery'] = max(1, len(df) // 20)
 
     if color1 is None:
         color1 = colors.get(var1, '#1f77b4')
@@ -197,7 +203,8 @@ def hist(df_in, var, label=None, xlabel=None, ylabel=None, wvar=None,
          legend_font=10, label_font=12, copy_path=None, x_vertline=None,
          vertline_kwargs=None, **kwargs):
 
-    if vertline_kwargs is None: vertline_kwargs = {}
+    if vertline_kwargs is None:
+        vertline_kwargs = {}
 
     df = dt.clean(df_in, [var, wvar])
 
@@ -275,7 +282,8 @@ def multi_hist(dfs, labels=None, xvar=None, xvars=None, bins=None, wvar=None, wv
     Arguments:
     """
 
-    if vertline_kwargs is None: vertline_kwargs = {}
+    if vertline_kwargs is None:
+        vertline_kwargs = {}
 
     def get_length(x):
         if isinstance(x, list):
@@ -422,10 +430,14 @@ def double_hist(df1, df2=None, label1=None, label2=None, var=None,
     Arguments:
     """
 
-    if labels is None: labels = {}
-    if kwargs1 is None: kwargs1 = {}
-    if kwargs2 is None: kwargs2 = {}
-    if vertline_kwargs is None: vertline_kwargs = {}
+    if labels is None:
+        labels = {}
+    if kwargs1 is None:
+        kwargs1 = {}
+    if kwargs2 is None:
+        kwargs2 = {}
+    if vertline_kwargs is None:
+        vertline_kwargs = {}
 
     kwargs1.update(kwargs)
     kwargs2.update(kwargs)
@@ -564,7 +576,8 @@ def double_hist(df1, df2=None, label1=None, label2=None, var=None,
 def var_irfs(irfs, var_list, shock_list=None, titles=None, filepath=None,
              n_per_row=None, plot_scale=3):
 
-    if titles is None: titles = {}
+    if titles is None:
+        titles = {}
 
     if shock_list is None:
         shock_list = var_list
@@ -613,18 +626,26 @@ def plot_series(df_in, var_names, filepath=None, directory=None, filename=None, 
                 single_legend=True, vertline_ix=None,
                 vertline_kwargs=None, linewidths=None, ylim=None, dpi=None):
 
-    if labels is None: labels = {}
-    if linestyles is None: linestyles = {}
-    if markers is None: markers = {}
-    if colors is None: colors = {}
-    if vertline_kwargs is None: vertline_kwargs = {}
-    if linewidths is None: linewidths = {}
+    if labels is None:
+        labels = {}
+    if linestyles is None:
+        linestyles = {}
+    if markers is None:
+        markers = {}
+    if colors is None:
+        colors = {}
+    if vertline_kwargs is None:
+        vertline_kwargs = {}
+    if linewidths is None:
+        linewidths = {}
 
     matplotlib.rcParams.update({'font.size' : fontsize})
     
     if (directory is not None) or (filename is not None) or (plot_type is not None):
-        print("Switch to new filepath input format")
-        raise Exception
+        raise ValueError(
+            "Deprecated arguments `directory`, `filename`, and `plot_type` are no longer supported. "
+            "Use `filepath=` instead."
+        )
 
     fig = plt.figure()
 
@@ -633,7 +654,7 @@ def plot_series(df_in, var_names, filepath=None, directory=None, filename=None, 
     elif sample == 'inner':
         ix = np.all(pd.notnull(df_in[var_names]), axis=1)
     else:
-        raise Exception
+        raise ValueError("`sample` must be 'outer' or 'inner'.")
 
     df = df_in.loc[ix, var_names].copy()
 
@@ -760,13 +781,19 @@ def binscatter(df_in, yvars, xvar, wvar=None, fit_var=None, labels=None, n_bins=
                restore_mean=False, title=None, include45=False, include0=False,
                **kwargs):
 
-    if control is None: control = []
-    if absorb is None: absorb = []
+    if control is None:
+        control = []
+    if absorb is None:
+        absorb = []
 
-    if labels is None: labels = {}
-    if bin_kwargs is None: bin_kwargs = {}
-    if raw_kwargs is None: raw_kwargs = {}
-    if line_kwargs is None: line_kwargs = {}
+    if labels is None:
+        labels = {}
+    if bin_kwargs is None:
+        bin_kwargs = {}
+    if raw_kwargs is None:
+        raw_kwargs = {}
+    if line_kwargs is None:
+        line_kwargs = {}
         
     matplotlib.rcParams.update({'font.size' : label_font})
     
@@ -983,7 +1010,8 @@ def scatter(df, yvar, xvar, labels=None,
             multicolor=False, cmap_name='plasma', color='C0', 
             include45=False, filepath=None):
 
-    if labels is None: labels = {}
+    if labels is None:
+        labels = {}
     
     if multicolor:
         cmap = plt.get_cmap(cmap_name)
@@ -998,8 +1026,8 @@ def scatter(df, yvar, xvar, labels=None,
         plot_lb, plot_ub = get_45_bounds(df, xvar, yvar)
         plt.plot([plot_lb, plot_ub], [plot_lb, plot_ub], 'k--')
     
-    plt.xlabel(labels[xvar])
-    plt.ylabel(labels[yvar])
+    plt.xlabel(labels.get(xvar, xvar))
+    plt.ylabel(labels.get(yvar, yvar))
     plt.tight_layout()
     
     if filepath is None:
