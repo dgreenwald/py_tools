@@ -388,7 +388,7 @@ def load_black_knight(yr, suffix=None):
 
     save_dir = '/nobackup1/dlg/black_knight/hd5/'
     store_file = save_dir + 'black_knight{}.hd5'.format(suffix)
-    key = 'yr_{}'.format(year)
+    key = 'yr_{}'.format(yr)
 
     return pd.read_hdf(store_file, key)
 

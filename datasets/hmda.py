@@ -25,7 +25,13 @@ def to_float(df, var):
     df[var] = pd.to_numeric(df[var], errors='coerce').astype(np.float64)
     return df
 
-def load_chunk(df):
+def load_chunk(df, drop_columns=None, obj_columns=None, categories=None):
+    if drop_columns is None:
+        drop_columns = []
+    if obj_columns is None:
+        obj_columns = []
+    if categories is None:
+        categories = {}
 
     for col in df.columns:
         if col in drop_columns:

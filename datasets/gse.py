@@ -125,7 +125,7 @@ def import_fannie_acquisition(year, q, data_dir=DEFAULT_FANNIE_DIR, **kwargs):
     else:
         return None
 
-def import_freddie_acquisition(year, q, data_dir=DEFAULT_FREDDIE_DIR):
+def import_freddie_acquisition(year, q, data_dir=DEFAULT_FREDDIE_DIR, **kwargs):
 
     col_names = ['credit_score', 'first_pay_date', 'first_time_flag', 'maturity_date', 'msa', 
             'mi_pct', 'n_units', 'occ_status', 'orig_cltv', 'orig_dti',
@@ -145,7 +145,7 @@ def import_freddie_acquisition(year, q, data_dir=DEFAULT_FREDDIE_DIR):
     else:
         return None
 
-def import_freddie_performance(year, q, data_dir=DEFAULT_FREDDIE_DIR):
+def import_freddie_performance(year, q, data_dir=DEFAULT_FREDDIE_DIR, **kwargs):
 
     col_names = ['loan_id', 'asof_date', 'current_upb', 'delinq', 'loan_age', 'months_left',
                  'repurchase', 'modification', 'zero_balance', 'zero_balance_date',
@@ -192,7 +192,7 @@ def import_freddie_performance(year, q, data_dir=DEFAULT_FREDDIE_DIR):
         return None
 
 # def load_fannie(year, q, use_pickle=True, reimport=False, **kwargs):
-def load_fannie(year, q, reimport=False, **kwargs):
+def load_fannie(year, q, reimport=False, load_parquet=False, **kwargs):
 
     data_dir = '/nobackup1/dlg/fannie/'
     parquet_dir = data_dir + '/storage/'
