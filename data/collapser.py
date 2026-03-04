@@ -183,8 +183,10 @@ def create_suffix(by_list, weight_var):
     return "_".join([""] + by_list + ["wtd_by", weight_var])
 
 
-def collapse(df, by_list, var_list=None, weight_var=None, weight_suffix=False):
-    """Collapse a DataFrame to weighted means within groups.
+def collapse(
+    df, by_list, var_list=None, weight_var=None, weight_suffix=False, as_sum=False
+):
+    """Collapse a DataFrame to weighted means (or weighted sums) within groups.
 
     Convenience wrapper around :class:`Collapser` that creates a Collapser,
     collapses it, and returns the resulting DataFrame.
@@ -203,6 +205,10 @@ def collapse(df, by_list, var_list=None, weight_var=None, weight_suffix=False):
     weight_suffix : bool, optional
         If ``True``, append ``'_<weight_var>'`` to output column names.
         Defaults to ``False``.
+    as_sum : bool, optional
+        If ``True``, return weighted sums (numerators) rather than weighted
+        means. Specifically, returns ``sum(weight * value)`` within each group
+        (summing over non-missing values). Defaults to ``False``.
 
     Returns
     -------
@@ -214,7 +220,7 @@ def collapse(df, by_list, var_list=None, weight_var=None, weight_suffix=False):
 
     coll = Collapser(df, var_list=var_list, by_list=by_list, weight_var=weight_var)
 
-    return coll.get_data(weight_suffix=weight_suffix)
+    return coll.get_data(weight_suffix=weight_suffix, as_sum=as_sum)
 
 
 def collapse_multiweight(df, weight_dict, by_list=None):
@@ -490,8 +496,8 @@ class Collapser:
         if collapse:
             return self.collapse(self.by_list, inplace=inplace)
 
-    def get_data(self, weight_suffix=False, include_denom=False):
-        """Return the collapsed weighted-mean DataFrame.
+    def get_data(self, weight_suffix=False, include_denom=False, as_sum=False):
+        """Return the collapsed weighted-mean (or weighted-sum) DataFrame.
 
         Divides numerator columns by denominator columns to produce weighted
         means, then optionally renames columns and appends denominator columns.
@@ -504,15 +510,24 @@ class Collapser:
         include_denom : bool, optional
             If ``True``, append the denominator (total weight) columns to the
             output. Defaults to ``False``.
+        as_sum : bool, optional
+            If ``True``, return the numerator columns (weighted sums) without
+            dividing by denominators. The numerator is ``sum(weight * value)``
+            within each group. Defaults to ``False``.
 
         Returns
         -------
         pandas.DataFrame
-            DataFrame of weighted means (and optionally denominators).
+            DataFrame of weighted means (or weighted sums), and optionally
+            denominators when *include_denom* is ``True``.
         """
         df_num, df_denom = self.get_numerators_and_denominators()
 
-        df_out = df_num / df_denom
+        if as_sum:
+            df_out = df_num
+        else:
+            df_out = df_num / df_denom
+
         if weight_suffix:
             df_out = df_out.rename(
                 {var: var + "_" + self.weight_var for var in self.var_list}, axis=1
