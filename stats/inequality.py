@@ -56,7 +56,7 @@ def compute_gini(df, var, wvar=None):
     return gini_coeff, c_weight, c_shares
 
 
-def get_top_shares(df, var, shares=[10], wvar=None):
+def get_top_shares(df, var, shares=None, wvar=None):
     """Compute top-share statistics for one or more percentile thresholds.
 
     Parameters
@@ -79,7 +79,7 @@ def get_top_shares(df, var, shares=[10], wvar=None):
         Top-share fractions (in ``[0, 1]``) corresponding to each threshold
         in ``shares``, in the same order.
     """
-    shares = np.atleast_1d(shares)
+    shares = np.atleast_1d([10] if shares is None else shares)
     top_shares = []
 
     if wvar is None:

@@ -292,7 +292,7 @@ def collapse_multiquantile(
     return pd.concat(dfout_list, axis=1)
 
 
-def collapse_multiweight_multiquantile(df, weight_dict, q_list, by_list=[]):
+def collapse_multiweight_multiquantile(df, weight_dict, q_list, by_list=None):
     """Collapse variables to multiple quantiles using variable-specific weights.
 
     Combines :func:`collapse_multiquantile` and :func:`collapse_multiweight`:
@@ -316,6 +316,8 @@ def collapse_multiweight_multiquantile(df, weight_dict, q_list, by_list=[]):
         DataFrame indexed by *by_list* with columns
         ``'<var>_p<q*100>'`` for each variable and quantile combination.
     """
+    if by_list is None:
+        by_list = []
     return pd.concat(
         [
             collapse_multiquantile(
