@@ -26,6 +26,12 @@ class TestCollapser:
         assert np.isclose(result.loc["a", "x"], 2.0)
         assert np.isclose(result.loc["b", "x"], 8.0)
 
+    def test_weighted_sum_by_group(self):
+        col = Collapser(make_df(), var_list=["x"], weight_var="w", by_list=["g"])
+        result = col.get_data(as_sum=True)
+        assert np.isclose(result.loc["a", "x"], 4.0)
+        assert np.isclose(result.loc["b", "x"], 16.0)
+
     def test_singleton_global_mean(self):
         col = Collapser(make_df(), var_list=["x"], weight_var="w", by_list=[])
         result = col.get_data()
@@ -79,6 +85,13 @@ class TestCollapseFunction:
         result = collapse(make_df(), by_list=["g"], var_list=["x"], weight_var="w")
         assert np.isclose(result.loc["a", "x"], 2.0)
         assert np.isclose(result.loc["b", "x"], 8.0)
+
+    def test_basic_collapse_as_sum(self):
+        result = collapse(
+            make_df(), by_list=["g"], var_list=["x"], weight_var="w", as_sum=True
+        )
+        assert np.isclose(result.loc["a", "x"], 4.0)
+        assert np.isclose(result.loc["b", "x"], 16.0)
 
 
 # --- collapse_quantile ---
