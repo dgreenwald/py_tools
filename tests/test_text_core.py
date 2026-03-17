@@ -3,6 +3,7 @@
 import io
 import os
 import pytest
+from types import SimpleNamespace
 
 from py_tools.text.core import (
     Table,
@@ -14,6 +15,7 @@ from py_tools.text.core import (
     join_vertical,
     open_latex,
     close_latex,
+    regression_table,
     to_camel_case,
     write_values_tex,
     TSTRUT,
@@ -226,6 +228,39 @@ class TestTableTable:
         assert r"\caption" not in text
 
 
+# --- Table.write ---
+
+
+class TestTableWrite:
+    def test_write_tabular_to_file(self, tmp_path):
+        out = tmp_path / "table.tex"
+        t = Table([["a", "b"]])
+
+        t.write(out)
+
+        content = out.read_text()
+        assert r"\begin{tabular}" in content
+        assert r"\end{tabular}" in content
+
+    def test_write_table_to_file(self, tmp_path):
+        out = tmp_path / "table_float.tex"
+        t = Table([["a"]])
+
+        t.write(out, kind="table", caption="My Caption")
+
+        content = out.read_text()
+        assert r"\begin{table}" in content
+        assert r"\caption{My Caption}" in content
+        assert r"\end{table}" in content
+
+    def test_write_invalid_kind_raises(self, tmp_path):
+        out = tmp_path / "bad.tex"
+        t = Table([["a"]])
+
+        with pytest.raises(ValueError):
+            t.write(out, kind="bad")
+
+
 # --- multicolumn ---
 
 
@@ -376,6 +411,193 @@ class TestOpenCloseLaTeX:
         buf = io.StringIO()
         close_latex(buf)
         assert r"\end{document}" in buf.getvalue()
+
+
+# --- regression_table ---
+
+
+class TestRegressionTable:
+    def test_adds_significance_stars_by_default(self):
+        results = SimpleNamespace(
+            params=[1.0, 2.0, 3.0, 4.0],
+            pvalues=[0.10, 0.05, 0.01, 0.20],
+            HC0_se=[0.1, 0.2, 0.3, 0.4],
+            rsquared_adj=0.9,
+        )
+
+        table = regression_table(results, var_names=["a", "b", "c", "d"])
+
+        assert table.contents[1][:4] == ["1.000*", "2.000**", "3.000***", "4.000"]
+
+    def test_can_disable_significance_stars(self):
+        results = SimpleNamespace(
+            params=[1.0],
+            pvalues=[0.01],
+            HC0_se=[0.1],
+            rsquared_adj=0.9,
+        )
+
+        table = regression_table(results, var_names=["a"], add_stars=False)
+
+        assert table.contents[1][0] == "1.000"
+
+    def test_vertical_layout_adds_significance_stars(self):
+        results = SimpleNamespace(
+            params=[1.0],
+            pvalues=[0.049],
+            HC0_se=[0.1],
+            rsquared_adj=0.9,
+        )
+
+        table = regression_table(results, vertical=True)
+
+        assert table.contents[0][0] == "1.000**"
+
+    def test_writes_tabular_file_when_path_provided(self, tmp_path):
+        out = tmp_path / "regression_tabular.tex"
+        results = SimpleNamespace(
+            params=[1.0],
+            pvalues=[0.01],
+            HC0_se=[0.1],
+            rsquared_adj=0.9,
+        )
+
+        table = regression_table(results, var_names=["a"], path=out)
+
+        content = out.read_text()
+        assert isinstance(table, Table)
+        assert r"\begin{tabular}" in content
+        assert "1.000***" in content
+
+    def test_writes_table_file_when_requested(self, tmp_path):
+        out = tmp_path / "regression_table.tex"
+        results = SimpleNamespace(
+            params=[1.0],
+            pvalues=[0.20],
+            HC0_se=[0.1],
+            rsquared_adj=0.9,
+        )
+
+        regression_table(
+            results,
+            var_names=["a"],
+            path=out,
+            write_kind="table",
+            write_kwargs={"caption": "Regression Output"},
+        )
+
+        content = out.read_text()
+        assert r"\begin{table}" in content
+        assert r"\caption{Regression Output}" in content
+
+    def test_uses_result_param_names_when_var_names_omitted(self):
+        class IndexedList(list):
+            def __init__(self, values, index):
+                super().__init__(values)
+                self.index = index
+
+        results = SimpleNamespace(
+            params=IndexedList([1.0, 2.0], ["const", "x1"]),
+            pvalues=[0.20, 0.01],
+            HC0_se=[0.1, 0.2],
+            rsquared_adj=0.9,
+        )
+
+        table = regression_table(results)
+
+        assert table.contents[0][:2] == ["const", "x1"]
+
+    def test_print_vars_can_use_result_variable_names(self):
+        results = SimpleNamespace(
+            params=[1.0, 2.0, 3.0],
+            pvalues=[0.20, 0.01, 0.20],
+            HC0_se=[0.1, 0.2, 0.3],
+            rsquared_adj=0.9,
+            model=SimpleNamespace(exog_names=["const", "x1", "x2"]),
+        )
+
+        table = regression_table(results, print_vars=["x1"])
+
+        assert table.contents[0][0] == "x1"
+        assert table.contents[1][0] == "2.000***"
+
+    def test_var_labels_replace_result_names_for_display(self):
+        results = SimpleNamespace(
+            params=[1.0, 2.0],
+            pvalues=[0.20, 0.01],
+            HC0_se=[0.1, 0.2],
+            rsquared_adj=0.9,
+            model=SimpleNamespace(exog_names=["const", "x1"]),
+        )
+
+        table = regression_table(
+            results,
+            var_labels={"const": "Constant", "x1": "Main Effect"},
+        )
+
+        assert table.contents[0][:2] == ["Constant", "Main Effect"]
+
+    def test_vertical_layout_respects_print_vars(self):
+        results = SimpleNamespace(
+            params=[1.0, 2.0],
+            pvalues=[0.20, 0.01],
+            HC0_se=[0.1, 0.2],
+            rsquared_adj=0.9,
+            model=SimpleNamespace(exog_names=["const", "x1"]),
+        )
+
+        table = regression_table(results, vertical=True, print_vars=["x1"])
+
+        assert table.contents[0][0] == "2.000***"
+        assert table.contents[1][0] == "(0.200)"
+        assert len(table.contents) == 3
+
+    def test_stat_headers_are_in_math_mode(self):
+        results = SimpleNamespace(
+            params=[1.0],
+            pvalues=[0.20],
+            HC0_se=[0.1],
+            rsquared=0.8,
+            rsquared_adj=0.75,
+        )
+
+        table = regression_table(results, var_names=["x1"], stats=["rsquared", "rsquared_adj"])
+
+        assert table.contents[0][1:] == ["$R^2$", "$\\bar{R}^2$"]
+
+    def test_stat_labels_override_default_headers(self):
+        results = SimpleNamespace(
+            params=[1.0],
+            pvalues=[0.20],
+            HC0_se=[0.1],
+            rsquared_adj=0.75,
+        )
+
+        table = regression_table(
+            results,
+            var_names=["x1"],
+            stat_labels={"rsquared_adj": r"Adj. $R^2$"},
+        )
+
+        assert table.contents[0][1] == r"Adj. $R^2$"
+
+    def test_nobs_is_formatted_as_integer_with_commas(self):
+        results = SimpleNamespace(
+            params=[1.0],
+            pvalues=[0.20],
+            HC0_se=[0.1],
+            nobs=12345.0,
+            rsquared_adj=0.75,
+        )
+
+        table = regression_table(
+            results,
+            var_names=["x1"],
+            stats=["nobs", "rsquared_adj"],
+        )
+
+        assert table.contents[1][1] == "12,345"
+        assert table.contents[0][1] == "$N$"
 
 
 # --- to_camel_case ---

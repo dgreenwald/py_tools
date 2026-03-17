@@ -408,6 +408,39 @@ class Table:
         """
         self.super_header = self.multicolumn_row(text)
 
+    def write(self, path, kind="tabular", encoding="utf-8", **kwargs):
+        """Write the rendered LaTeX table to disk.
+
+        Parameters
+        ----------
+        path : str or path-like
+            Destination filepath.
+        kind : {'tabular', 'table'}, optional
+            Render the bare tabular environment or the full table float.
+            Defaults to ``'tabular'``.
+        encoding : str, optional
+            Text encoding used when writing the file. Defaults to ``'utf-8'``.
+        **kwargs
+            Additional keyword arguments forwarded to :meth:`tabular` or
+            :meth:`table`, depending on ``kind``.
+
+        Returns
+        -------
+        None
+        """
+
+        if kind == "tabular":
+            text = self.tabular(**kwargs)
+        elif kind == "table":
+            text = self.table(**kwargs)
+        else:
+            raise ValueError("kind must be 'tabular' or 'table'")
+
+        with open(path, "w", encoding=encoding) as fid:
+            fid.write(text)
+
+        return None
+
 
 def multicolumn(n_cols, text):
     """Generate a LaTeX ``\\multicolumn`` command string.
@@ -711,8 +744,14 @@ def close_latex(fid):
 def regression_table(
     results,
     var_names=None,
+    var_labels=None,
+    stat_labels=None,
     vertical=False,
     tstat=False,
+    add_stars=True,
+    path=None,
+    write_kind="tabular",
+    write_kwargs=None,
     cov_type="HC0_se",
     floatfmt="4.3f",
     print_vars=None,
@@ -727,14 +766,35 @@ def regression_table(
         A fitted regression results instance exposing ``.params``,
         ``.tvalues``, and optionally ``.rsquared`` / ``.rsquared_adj``.
     var_names : list of str, optional
-        Variable names to use as column headers (horizontal layout) or row
-        labels.  Required when ``print_vars`` is specified.
+        Explicit variable names to use for display. When omitted,
+        names are inferred from ``results.params.index`` or
+        ``results.model.exog_names`` when available.
+    var_labels : dict, optional
+        Mapping from regression-result variable names to display labels.
+        Used only when ``var_names`` is not provided.
+    stat_labels : dict, optional
+        Mapping from summary statistic names (for example ``'rsquared_adj'``)
+        to display labels used in the table header.
     vertical : bool, optional
         If ``True``, format the table in a single-column (vertical) layout
         with each coefficient on its own row.  Defaults to ``False``.
     tstat : bool, optional
         If ``True``, report t-statistics instead of standard errors in
         parentheses.  Defaults to ``False``.
+    add_stars : bool, optional
+        If ``True``, append significance stars to coefficients using
+        ``results.pvalues`` at the 10% (``*``), 5% (``**``), and 1%
+        (``***``) levels. Defaults to ``True``.
+    path : str or path-like, optional
+        If provided, also write the rendered LaTeX output to this file.
+        Defaults to ``None``.
+    write_kind : {'tabular', 'table'}, optional
+        When ``path`` is provided, select whether to write the bare tabular
+        environment or the full table float. Defaults to ``'tabular'``.
+    write_kwargs : dict, optional
+        Additional keyword arguments forwarded to :meth:`Table.write` when
+        ``path`` is provided. This is useful for render-time options such as
+        ``caption`` when ``write_kind='table'``.
     cov_type : str, optional
         Attribute name of the results object from which standard errors are
         read (e.g. ``'HC0_se'``).  Ignored when ``tstat`` is ``True``.
@@ -743,8 +803,9 @@ def regression_table(
         Python format string for floating-point values.  Defaults to
         ``'4.3f'``.
     print_vars : list of str, optional
-        Subset of ``var_names`` to include.  All variables are included when
-        ``None`` (default).
+        Subset of variables to include. Entries may match either the
+        regression-result variable names or the displayed variable names.
+        All variables are included when ``None`` (default).
     stats : list of str, optional
         Names of scalar attributes on ``results`` to append as summary
         statistics.  Defaults to ``['rsquared_adj']``.
@@ -760,41 +821,104 @@ def regression_table(
     if stats is None:
         stats = ["rsquared_adj"]
 
-    tex_stats = {"rsquared": "R^2", "rsquared_adj": "\\bar{R}^2"}
+    tex_stats = {
+        "nobs": "$N$",
+        "rsquared": "$R^2$",
+        "rsquared_adj": "$\\bar{R}^2$",
+    }
+    if stat_labels is not None:
+        tex_stats = {**tex_stats, **stat_labels}
 
     contents = []
 
     coeffs = results.params
+    coeff_values = list(coeffs)
+    pvalues = getattr(results, "pvalues", None)
+    if pvalues is not None:
+        pvalues = list(pvalues)
+
+    coeff_index = getattr(coeffs, "index", None)
+    if coeff_index is not None and not callable(coeff_index):
+        result_var_names = list(coeff_index)
+    elif hasattr(results, "model") and hasattr(results.model, "exog_names"):
+        result_var_names = list(results.model.exog_names)
+    else:
+        result_var_names = None
+
+    n_vars = len(coeff_values)
+    if result_var_names is None:
+        result_var_names = [str(ii) for ii in range(n_vars)]
+
+    if var_names is not None:
+        display_var_names = list(var_names)
+    elif var_labels is not None:
+        display_var_names = [var_labels.get(name, name) for name in result_var_names]
+    else:
+        display_var_names = list(result_var_names)
+
+    def format_stat(stat):
+        value = getattr(results, stat)
+        if stat == "nobs":
+            return f"{int(round(value)):,}"
+        return value
+
+    def format_coeff(index):
+        coeff = coeff_values[index]
+        coeff_str = "{0:{1}}".format(coeff, floatfmt)
+
+        if (not add_stars) or (pvalues is None):
+            return coeff_str
+
+        pvalue = pvalues[index]
+        if pvalue <= 0.01:
+            stars = "***"
+        elif pvalue <= 0.05:
+            stars = "**"
+        elif pvalue <= 0.10:
+            stars = "*"
+        else:
+            stars = ""
+
+        return coeff_str + stars
 
     if tstat:
-        se_like = results.tvalues
+        se_like = list(results.tvalues)
     else:
-        se_like = getattr(results, cov_type)
+        se_like = list(getattr(results, cov_type))
 
     has_header = False
 
-    n_vars = len(coeffs)
     if print_vars is not None:
-        print_ix = [ii for ii in range(n_vars) if var_names[ii] in print_vars]
+        print_vars = set(print_vars)
+        print_ix = [
+            ii
+            for ii in range(n_vars)
+            if result_var_names[ii] in print_vars or display_var_names[ii] in print_vars
+        ]
     else:
-        print_vars = var_names
         print_ix = range(n_vars)
 
     if vertical:
-        for ii in range(n_vars):
-            contents.append([coeffs[ii]])
+        for ii in print_ix:
+            contents.append([format_coeff(ii)])
             contents.append(["({0:{1}})".format(se_like[ii], floatfmt)])
         for stat in stats:
-            this_stat = getattr(results, stat)
-            contents.append(["{0:{1}}".format(this_stat, floatfmt)])
+            this_stat = format_stat(stat)
+            if isinstance(this_stat, str):
+                contents.append([this_stat])
+            else:
+                contents.append(["{0:{1}}".format(this_stat, floatfmt)])
     else:
-        if var_names is not None:
-            header_list = print_vars + [tex_stats[stat] for stat in stats]
+        if display_var_names is not None:
+            header_list = [display_var_names[ii] for ii in print_ix] + [
+                tex_stats.get(stat, stat) for stat in stats
+            ]
             contents.append(header_list)
             has_header = True
 
         contents.append(
-            [coeffs[ii] for ii in print_ix] + [getattr(results, stat) for stat in stats]
+            [format_coeff(ii) for ii in print_ix]
+            + [format_stat(stat) for stat in stats]
         )
 
         contents.append(
@@ -802,7 +926,14 @@ def regression_table(
             + [" " for stat in stats]
         )
 
-    return Table(contents, has_header=has_header, floatfmt=floatfmt, **kwargs)
+    table = Table(contents, has_header=has_header, floatfmt=floatfmt, **kwargs)
+
+    if path is not None:
+        if write_kwargs is None:
+            write_kwargs = {}
+        table.write(path, kind=write_kind, **write_kwargs)
+
+    return table
 
 
 def to_camel_case(s: str) -> str:
