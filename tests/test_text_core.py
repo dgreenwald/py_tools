@@ -562,7 +562,9 @@ class TestRegressionTable:
             rsquared_adj=0.75,
         )
 
-        table = regression_table(results, var_names=["x1"], stats=["rsquared", "rsquared_adj"])
+        table = regression_table(
+            results, var_names=["x1"], stats=["rsquared", "rsquared_adj"]
+        )
 
         assert table.contents[0][1:] == ["$R^2$", "$\\bar{R}^2$"]
 
@@ -724,40 +726,53 @@ class TestMultiRegressionTable:
         assert table.contents[0] == ["", "OLS", "IV"]
 
     def test_significance_stars(self):
-        r1 = _make_results(params=[1.0], pvalues=[0.009], HC0_se=[0.1],
-                           model=SimpleNamespace(exog_names=["x1"]))
+        r1 = _make_results(
+            params=[1.0],
+            pvalues=[0.009],
+            HC0_se=[0.1],
+            model=SimpleNamespace(exog_names=["x1"]),
+        )
         table = multi_regression_table([r1])
         # Coeff row for x1
         assert "***" in table.contents[1][1]
 
     def test_no_stars_when_disabled(self):
-        r1 = _make_results(params=[1.0], pvalues=[0.009], HC0_se=[0.1],
-                           model=SimpleNamespace(exog_names=["x1"]))
+        r1 = _make_results(
+            params=[1.0],
+            pvalues=[0.009],
+            HC0_se=[0.1],
+            model=SimpleNamespace(exog_names=["x1"]),
+        )
         table = multi_regression_table([r1], add_stars=False)
         assert "***" not in table.contents[1][1]
 
     def test_different_variable_sets(self):
         r1 = _make_results(
-            params=[1.0], pvalues=[0.05], HC0_se=[0.1],
+            params=[1.0],
+            pvalues=[0.05],
+            HC0_se=[0.1],
             model=SimpleNamespace(exog_names=["x1"]),
         )
         r2 = _make_results(
-            params=[2.0], pvalues=[0.01], HC0_se=[0.2],
+            params=[2.0],
+            pvalues=[0.01],
+            HC0_se=[0.2],
             model=SimpleNamespace(exog_names=["x2"]),
         )
         table = multi_regression_table([r1, r2])
 
         # x1 row: present in r1, blank in r2
-        assert table.contents[1][1] != ""   # r1 has x1
-        assert table.contents[1][2] == ""   # r2 does not
+        assert table.contents[1][1] != ""  # r1 has x1
+        assert table.contents[1][2] == ""  # r2 does not
         # x2 row: blank in r1, present in r2
-        assert table.contents[3][1] == ""   # r1 does not have x2
-        assert table.contents[3][2] != ""   # r2 has x2
+        assert table.contents[3][1] == ""  # r1 does not have x2
+        assert table.contents[3][2] != ""  # r2 has x2
 
     def test_var_labels(self):
         r1 = _make_results()
         table = multi_regression_table(
-            [r1], var_labels={"x1": "Main Effect", "x2": "Control"},
+            [r1],
+            var_labels={"x1": "Main Effect", "x2": "Control"},
         )
         assert table.contents[1][0] == "Main Effect"
         assert table.contents[3][0] == "Control"
@@ -799,7 +814,10 @@ class TestMultiRegressionTable:
 
     def test_tstat_mode(self):
         r1 = _make_results(
-            params=[1.0], pvalues=[0.05], HC0_se=[0.1], tvalues=[10.0],
+            params=[1.0],
+            pvalues=[0.05],
+            HC0_se=[0.1],
+            tvalues=[10.0],
             model=SimpleNamespace(exog_names=["x1"]),
         )
         table = multi_regression_table([r1], tstat=True)
@@ -817,7 +835,8 @@ class TestMultiRegressionTable:
     def test_stat_labels_override(self):
         r1 = _make_results()
         table = multi_regression_table(
-            [r1], stat_labels={"rsquared_adj": r"Adj. $R^2$"},
+            [r1],
+            stat_labels={"rsquared_adj": r"Adj. $R^2$"},
         )
         assert table.contents[-1][0] == r"Adj. $R^2$"
 
@@ -831,7 +850,9 @@ class TestMultiRegressionTable:
 
     def test_se_in_parens(self):
         r1 = _make_results(
-            params=[1.0], pvalues=[0.20], HC0_se=[0.123],
+            params=[1.0],
+            pvalues=[0.20],
+            HC0_se=[0.123],
             model=SimpleNamespace(exog_names=["x1"]),
         )
         table = multi_regression_table([r1])

@@ -152,7 +152,7 @@ def load(
             "gross_income": ("f101", "FA156010001"),
             "personal_taxes": ("f101", "FA156210005"),
             "net_worth": ("b101", "FL152090005"),
-            "residential_mortgages_flow" : ("f101", "FA153165105"),
+            "residential_mortgages_flow": ("f101", "FA153165105"),
         }
 
     elif dataset == "financial":

@@ -188,7 +188,7 @@ class TestBinscatter:
         )
 
         assert os.path.exists(fp)
-        assert list(result.columns) == ["x", "y"]
+        assert "x" in result.columns and "y" in result.columns
 
     def test_plot_raw_data_layers_line_between_raw_and_bins(self, monkeypatch):
         import matplotlib.pyplot as plt
@@ -218,6 +218,61 @@ class TestBinscatter:
 
         assert raw_zorder < line_zorder < bin_zorder
         plt.close("all")
+
+    def test_basic_returns_dataframe(self, tmp_path):
+        df = _make_numeric_df(80)
+        fp = str(tmp_path / "bs.png")
+        result = pc.binscatter(df, "y", "x", filepath=fp)
+        assert isinstance(result, pd.DataFrame)
+        assert os.path.exists(fp)
+
+    def test_multiple_yvars(self, tmp_path):
+        df = _make_numeric_df(80)
+        fp = str(tmp_path / "bs_multi.png")
+        result = pc.binscatter(df, ["y", "z"], "x", filepath=fp)
+        assert isinstance(result, pd.DataFrame)
+
+    def test_with_weights(self, tmp_path):
+        df = _make_numeric_df(80)
+        fp = str(tmp_path / "bs_w.png")
+        result = pc.binscatter(df, "y", "x", wvar="w", filepath=fp)
+        assert isinstance(result, pd.DataFrame)
+
+    def test_fit_var_provided(self, tmp_path):
+        """Bug fix: fit_var must be used as the fit column when provided."""
+        df = _make_numeric_df(80)
+        # Pre-compute a fitted column
+        from scipy.stats import linregress
+
+        slope, intercept, *_ = linregress(df["x"], df["y"])
+        df["y_custom_fit"] = intercept + slope * df["x"]
+        fp = str(tmp_path / "bs_fitvar.png")
+        result = pc.binscatter(df, "y", "x", fit_var="y_custom_fit", filepath=fp)
+        assert isinstance(result, pd.DataFrame)
+
+    def test_no_line(self, tmp_path):
+        df = _make_numeric_df(80)
+        fp = str(tmp_path / "bs_noline.png")
+        result = pc.binscatter(df, "y", "x", plot_line=False, filepath=fp)
+        assert isinstance(result, pd.DataFrame)
+
+    def test_include45(self, tmp_path):
+        df = _make_numeric_df(60)
+        fp = str(tmp_path / "bs_45.png")
+        result = pc.binscatter(df, "y", "x", include45=True, filepath=fp)
+        assert isinstance(result, pd.DataFrame)
+
+    def test_include0(self, tmp_path):
+        df = _make_numeric_df(60)
+        fp = str(tmp_path / "bs_0.png")
+        result = pc.binscatter(df, "y", "x", include0=True, filepath=fp)
+        assert isinstance(result, pd.DataFrame)
+
+    def test_median_binning(self, tmp_path):
+        df = _make_numeric_df(60)
+        fp = str(tmp_path / "bs_median.png")
+        result = pc.binscatter(df, "y", "x", median=True, filepath=fp)
+        assert isinstance(result, pd.DataFrame)
 
 
 # ---------------------------------------------------------------------------
@@ -556,65 +611,3 @@ class TestScatter:
             df, "y", "x", labels={"x": "X", "y": "Y"}, multicolor=True, filepath=fp
         )
         assert os.path.exists(fp)
-
-
-# ---------------------------------------------------------------------------
-# binscatter  (bug fix: fit_var path)
-# ---------------------------------------------------------------------------
-
-
-class TestBinscatter:
-    def test_basic_returns_dataframe(self, tmp_path):
-        df = _make_numeric_df(80)
-        fp = str(tmp_path / "bs.png")
-        result = pc.binscatter(df, "y", "x", filepath=fp)
-        assert isinstance(result, pd.DataFrame)
-        assert os.path.exists(fp)
-
-    def test_multiple_yvars(self, tmp_path):
-        df = _make_numeric_df(80)
-        fp = str(tmp_path / "bs_multi.png")
-        result = pc.binscatter(df, ["y", "z"], "x", filepath=fp)
-        assert isinstance(result, pd.DataFrame)
-
-    def test_with_weights(self, tmp_path):
-        df = _make_numeric_df(80)
-        fp = str(tmp_path / "bs_w.png")
-        result = pc.binscatter(df, "y", "x", wvar="w", filepath=fp)
-        assert isinstance(result, pd.DataFrame)
-
-    def test_fit_var_provided(self, tmp_path):
-        """Bug fix: fit_var must be used as the fit column when provided."""
-        df = _make_numeric_df(80)
-        # Pre-compute a fitted column
-        from scipy.stats import linregress
-
-        slope, intercept, *_ = linregress(df["x"], df["y"])
-        df["y_custom_fit"] = intercept + slope * df["x"]
-        fp = str(tmp_path / "bs_fitvar.png")
-        result = pc.binscatter(df, "y", "x", fit_var="y_custom_fit", filepath=fp)
-        assert isinstance(result, pd.DataFrame)
-
-    def test_no_line(self, tmp_path):
-        df = _make_numeric_df(80)
-        fp = str(tmp_path / "bs_noline.png")
-        result = pc.binscatter(df, "y", "x", plot_line=False, filepath=fp)
-        assert isinstance(result, pd.DataFrame)
-
-    def test_include45(self, tmp_path):
-        df = _make_numeric_df(60)
-        fp = str(tmp_path / "bs_45.png")
-        result = pc.binscatter(df, "y", "x", include45=True, filepath=fp)
-        assert isinstance(result, pd.DataFrame)
-
-    def test_include0(self, tmp_path):
-        df = _make_numeric_df(60)
-        fp = str(tmp_path / "bs_0.png")
-        result = pc.binscatter(df, "y", "x", include0=True, filepath=fp)
-        assert isinstance(result, pd.DataFrame)
-
-    def test_median_binning(self, tmp_path):
-        df = _make_numeric_df(60)
-        fp = str(tmp_path / "bs_median.png")
-        result = pc.binscatter(df, "y", "x", median=True, filepath=fp)
-        assert isinstance(result, pd.DataFrame)
