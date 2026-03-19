@@ -162,6 +162,65 @@ class TestStateScatterInner:
 
 
 # ---------------------------------------------------------------------------
+# binscatter
+# ---------------------------------------------------------------------------
+
+
+class TestBinscatter:
+    def test_plot_raw_data_with_default_limits_and_weights(self, tmp_path):
+        df = pd.DataFrame(
+            {
+                "x": np.linspace(0.0, 1.0, 25),
+                "y": np.linspace(1.0, 2.0, 25),
+                "w": np.linspace(1.0, 3.0, 25),
+            }
+        )
+
+        fp = str(tmp_path / "binscatter_raw.png")
+        result = pc.binscatter(
+            df,
+            "y",
+            "x",
+            wvar="w",
+            plot_raw_data=True,
+            plot_line=False,
+            filepath=fp,
+        )
+
+        assert os.path.exists(fp)
+        assert list(result.columns) == ["x", "y"]
+
+    def test_plot_raw_data_layers_line_between_raw_and_bins(self, monkeypatch):
+        import matplotlib.pyplot as plt
+
+        df = pd.DataFrame(
+            {
+                "x": np.linspace(0.0, 1.0, 25),
+                "y": np.linspace(1.0, 2.0, 25),
+            }
+        )
+
+        monkeypatch.setattr(pc.plt, "close", lambda fig: None)
+
+        pc.binscatter(
+            df,
+            "y",
+            "x",
+            plot_raw_data=True,
+            plot_line=True,
+            filepath=None,
+        )
+
+        ax = plt.gcf().axes[0]
+        raw_zorder = ax.collections[0].get_zorder()
+        bin_zorder = ax.collections[1].get_zorder()
+        line_zorder = ax.lines[0].get_zorder()
+
+        assert raw_zorder < line_zorder < bin_zorder
+        plt.close("all")
+
+
+# ---------------------------------------------------------------------------
 # normalized  (bug fix: invert_list as boolean list)
 # ---------------------------------------------------------------------------
 

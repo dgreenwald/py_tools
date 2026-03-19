@@ -1646,6 +1646,7 @@ def binscatter(
         "color": "cornflowerblue",
         "alpha": 0.5,
         "edgecolor": "black",
+        "zorder": 0,
         "label": "Raw Data",
     }
 
@@ -1689,10 +1690,16 @@ def binscatter(
     raw_kwargs_new.update(raw_kwargs)
     line_kwargs_new.update(line_kwargs)
 
+    def _is_default_limit(limit):
+        return isinstance(limit, str) and limit == "default"
+
+    def _has_finite_limits(limit):
+        return all(np.isfinite(val) for val in limit)
+
     if wvar is None:
         weights = np.ones(len(df))
     else:
-        weights = df[wvar].astype(np.float64).values
+        weights = df[wvar].to_numpy(dtype=np.float64, copy=True)
 
     if control or absorb:
         for this_var in [xvar] + yvars:
@@ -1746,7 +1753,7 @@ def binscatter(
             ax.plot(x_line, y_line, **line_kwargs_new)
 
         if plot_raw_data:
-            weights *= raw_scale / np.mean(weights)
+            weights = weights * (raw_scale / np.mean(weights))
 
             ax.scatter(df[xvar].values, df[yvar].values, s=weights, **raw_kwargs_new)
 
@@ -1785,7 +1792,7 @@ def binscatter(
             ylim = (bin_min - 0.1 * tot_range, bin_max + 0.1 * tot_range)
 
     if include0 or include45:
-        assert (xlim != "default") and (ylim != "default")
+        assert (not _is_default_limit(xlim)) and (not _is_default_limit(ylim))
 
     if include45:
         assert not include0
@@ -1803,15 +1810,15 @@ def binscatter(
 
     if (
         (xlim is not None)
-        and (xlim != "default")
-        and all([np.isfinite(val) for val in xlim])
+        and (not _is_default_limit(xlim))
+        and _has_finite_limits(xlim)
     ):
         plt.xlim(xlim)
 
     if (
         (ylim is not None)
-        and (ylim != "default")
-        and all([np.isfinite(val) for val in ylim])
+        and (not _is_default_limit(ylim))
+        and _has_finite_limits(ylim)
     ):
         plt.ylim(ylim)
 
