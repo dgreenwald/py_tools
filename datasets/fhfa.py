@@ -86,7 +86,7 @@ def load(dataset, all_transactions=True, reimport=False, data_dir=default_dir):
                 df = pd.read_csv(data_dir + "HPI_PO_state.txt", sep="\t")
                 df = df.drop(columns=["Warning"])
 
-            df["date"] = ts.date_from_qtr(df["year"], df["qtr"])
+            df["date"] = ts.date_from_qtr(df["yr"], df["qtr"])
             df = df.set_index(["state", "date"])
             df = df.apply(pd.to_numeric, errors="coerce")
 
