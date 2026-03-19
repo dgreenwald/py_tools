@@ -16,6 +16,7 @@ from py_tools.text.core import (
     open_latex,
     close_latex,
     regression_table,
+    multi_regression_table,
     to_camel_case,
     write_values_tex,
     TSTRUT,
@@ -671,3 +672,167 @@ class TestWriteValuesTex:
         )
         content = open(out).read()
         assert "\\val " in content or "\\val\n" in content or "\\val #" in content
+
+
+# --- multi_regression_table ---
+
+
+def _make_results(**overrides):
+    """Helper to build a mock results object."""
+    defaults = dict(
+        params=[1.0, 2.0],
+        pvalues=[0.05, 0.01],
+        HC0_se=[0.1, 0.2],
+        tvalues=[10.0, 10.0],
+        rsquared_adj=0.9,
+        nobs=100.0,
+        model=SimpleNamespace(exog_names=["x1", "x2"]),
+    )
+    defaults.update(overrides)
+    return SimpleNamespace(**defaults)
+
+
+class TestMultiRegressionTable:
+    def test_basic_two_models(self):
+        r1 = _make_results()
+        r2 = _make_results(
+            params=[3.0, 4.0],
+            pvalues=[0.20, 0.001],
+            HC0_se=[0.3, 0.4],
+            rsquared_adj=0.95,
+        )
+        table = multi_regression_table([r1, r2])
+
+        # Header row
+        assert table.contents[0] == ["", "(1)", "(2)"]
+        # Two variables * 2 rows each + header + 1 stat = 6 rows
+        assert table.n_rows() == 6
+        assert table.n_cols == 3
+        assert table.alignment == "lcc"
+
+    def test_default_model_names(self):
+        r1 = _make_results()
+        r2 = _make_results()
+        r3 = _make_results()
+        table = multi_regression_table([r1, r2, r3])
+        assert table.contents[0] == ["", "(1)", "(2)", "(3)"]
+
+    def test_custom_model_names(self):
+        r1 = _make_results()
+        r2 = _make_results()
+        table = multi_regression_table([r1, r2], model_names=["OLS", "IV"])
+        assert table.contents[0] == ["", "OLS", "IV"]
+
+    def test_significance_stars(self):
+        r1 = _make_results(params=[1.0], pvalues=[0.009], HC0_se=[0.1],
+                           model=SimpleNamespace(exog_names=["x1"]))
+        table = multi_regression_table([r1])
+        # Coeff row for x1
+        assert "***" in table.contents[1][1]
+
+    def test_no_stars_when_disabled(self):
+        r1 = _make_results(params=[1.0], pvalues=[0.009], HC0_se=[0.1],
+                           model=SimpleNamespace(exog_names=["x1"]))
+        table = multi_regression_table([r1], add_stars=False)
+        assert "***" not in table.contents[1][1]
+
+    def test_different_variable_sets(self):
+        r1 = _make_results(
+            params=[1.0], pvalues=[0.05], HC0_se=[0.1],
+            model=SimpleNamespace(exog_names=["x1"]),
+        )
+        r2 = _make_results(
+            params=[2.0], pvalues=[0.01], HC0_se=[0.2],
+            model=SimpleNamespace(exog_names=["x2"]),
+        )
+        table = multi_regression_table([r1, r2])
+
+        # x1 row: present in r1, blank in r2
+        assert table.contents[1][1] != ""   # r1 has x1
+        assert table.contents[1][2] == ""   # r2 does not
+        # x2 row: blank in r1, present in r2
+        assert table.contents[3][1] == ""   # r1 does not have x2
+        assert table.contents[3][2] != ""   # r2 has x2
+
+    def test_var_labels(self):
+        r1 = _make_results()
+        table = multi_regression_table(
+            [r1], var_labels={"x1": "Main Effect", "x2": "Control"},
+        )
+        assert table.contents[1][0] == "Main Effect"
+        assert table.contents[3][0] == "Control"
+
+    def test_explicit_var_names_ordering(self):
+        r1 = _make_results()
+        table = multi_regression_table([r1], var_names=["x2", "x1"])
+        assert table.contents[1][0] == "x2"
+        assert table.contents[3][0] == "x1"
+
+    def test_print_vars_filters(self):
+        r1 = _make_results()
+        table = multi_regression_table([r1], print_vars=["x1"])
+        # header + 1 var * 2 rows + 1 stat = 4
+        assert table.n_rows() == 4
+        assert table.contents[1][0] == "x1"
+
+    def test_stats_default_rsquared_adj(self):
+        r1 = _make_results(rsquared_adj=0.912)
+        table = multi_regression_table([r1])
+        # Last row should be the stat
+        last_row = table.contents[-1]
+        assert last_row[0] == "$\\bar{R}^2$"
+        assert "0.912" in last_row[1]
+
+    def test_stats_nobs_formatted_as_int(self):
+        r1 = _make_results(nobs=12345.0)
+        table = multi_regression_table([r1], stats=["nobs"])
+        last_row = table.contents[-1]
+        assert last_row[1] == "12,345"
+
+    def test_multiple_stats(self):
+        r1 = _make_results(rsquared_adj=0.9, nobs=500.0)
+        table = multi_regression_table([r1], stats=["rsquared_adj", "nobs"])
+        stat_rows = table.contents[-2:]
+        labels = [row[0] for row in stat_rows]
+        assert "$\\bar{R}^2$" in labels
+        assert "$N$" in labels
+
+    def test_tstat_mode(self):
+        r1 = _make_results(
+            params=[1.0], pvalues=[0.05], HC0_se=[0.1], tvalues=[10.0],
+            model=SimpleNamespace(exog_names=["x1"]),
+        )
+        table = multi_regression_table([r1], tstat=True)
+        # SE row should show t-stat value
+        assert "(10.000)" in table.contents[2][1]
+
+    def test_hlines_placed_correctly(self):
+        r1 = _make_results()
+        table = multi_regression_table([r1])
+        # hline after header (0) and after last SE row
+        assert 0 in table.hlines
+        # Last SE row index: header(1) + 2 vars * 2 rows = 4, so index 4
+        assert 4 in table.hlines
+
+    def test_stat_labels_override(self):
+        r1 = _make_results()
+        table = multi_regression_table(
+            [r1], stat_labels={"rsquared_adj": r"Adj. $R^2$"},
+        )
+        assert table.contents[-1][0] == r"Adj. $R^2$"
+
+    def test_writes_file(self, tmp_path):
+        out = tmp_path / "multi_reg.tex"
+        r1 = _make_results()
+        table = multi_regression_table([r1], path=out)
+        content = out.read_text()
+        assert isinstance(table, Table)
+        assert r"\begin{tabular}" in content
+
+    def test_se_in_parens(self):
+        r1 = _make_results(
+            params=[1.0], pvalues=[0.20], HC0_se=[0.123],
+            model=SimpleNamespace(exog_names=["x1"]),
+        )
+        table = multi_regression_table([r1])
+        assert table.contents[2][1] == "(0.123)"

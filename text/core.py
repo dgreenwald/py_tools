@@ -936,6 +936,215 @@ def regression_table(
     return table
 
 
+def multi_regression_table(
+    results_list,
+    var_names=None,
+    var_labels=None,
+    stat_labels=None,
+    model_names=None,
+    tstat=False,
+    add_stars=True,
+    path=None,
+    write_kind="tabular",
+    write_kwargs=None,
+    cov_type="HC0_se",
+    floatfmt="4.3f",
+    print_vars=None,
+    stats=None,
+    **kwargs,
+):
+    """Build a multi-column regression table from several results objects.
+
+    Each column corresponds to one regression specification. Variables are
+    aligned across columns, with blanks where a variable is absent from a
+    given specification.
+
+    Parameters
+    ----------
+    results_list : list
+        Fitted regression results objects, each exposing ``.params``,
+        ``.pvalues``, and optionally ``.rsquared_adj``.
+    var_names : list of str, optional
+        Explicit ordered list of variable names to include.  When omitted,
+        the union of all regression variable names is used (first-appearance
+        ordering).
+    var_labels : dict, optional
+        Mapping from internal variable names to display labels.
+    stat_labels : dict, optional
+        Mapping from stat attribute names to display labels.
+    model_names : list of str, optional
+        Column headers.  Defaults to ``["(1)", "(2)", ...]``.
+    tstat : bool, optional
+        Report t-statistics instead of standard errors.  Defaults to ``False``.
+    add_stars : bool, optional
+        Append significance stars to coefficients.  Defaults to ``True``.
+    path : str or path-like, optional
+        Write LaTeX output to this file.
+    write_kind : {'tabular', 'table'}, optional
+        Output format when ``path`` is given.  Defaults to ``'tabular'``.
+    write_kwargs : dict, optional
+        Extra keyword arguments forwarded to :meth:`Table.write`.
+    cov_type : str, optional
+        Attribute name for standard errors.  Defaults to ``'HC0_se'``.
+    floatfmt : str, optional
+        Format string for floats.  Defaults to ``'4.3f'``.
+    print_vars : list of str, optional
+        Subset of variables to include.
+    stats : list of str, optional
+        Summary statistics to append.  Defaults to ``['rsquared_adj']``.
+    **kwargs
+        Forwarded to the :class:`Table` constructor.
+
+    Returns
+    -------
+    Table
+        Multi-column regression table.
+    """
+    if stats is None:
+        stats = ["rsquared_adj"]
+
+    n_models = len(results_list)
+
+    if model_names is None:
+        model_names = [f"({ii + 1})" for ii in range(n_models)]
+
+    tex_stats = {
+        "nobs": "$N$",
+        "rsquared": "$R^2$",
+        "rsquared_adj": "$\\bar{R}^2$",
+    }
+    if stat_labels is not None:
+        tex_stats = {**tex_stats, **stat_labels}
+
+    # --- Extract per-regression data ---
+    reg_data = []
+    all_var_names = []
+    seen = set()
+    for results in results_list:
+        coeffs = results.params
+        coeff_values = list(coeffs)
+        pvalues = getattr(results, "pvalues", None)
+        if pvalues is not None:
+            pvalues = list(pvalues)
+
+        coeff_index = getattr(coeffs, "index", None)
+        if coeff_index is not None and not callable(coeff_index):
+            result_var_names = list(coeff_index)
+        elif hasattr(results, "model") and hasattr(results.model, "exog_names"):
+            result_var_names = list(results.model.exog_names)
+        else:
+            result_var_names = [str(ii) for ii in range(len(coeff_values))]
+
+        if tstat:
+            se_like = list(results.tvalues)
+        else:
+            se_like = list(getattr(results, cov_type))
+
+        data = {}
+        for ii, name in enumerate(result_var_names):
+            pval = pvalues[ii] if pvalues is not None else None
+            data[name] = (coeff_values[ii], pval, se_like[ii])
+            if name not in seen:
+                all_var_names.append(name)
+                seen.add(name)
+
+        reg_data.append(data)
+
+    # --- Determine variable list ---
+    if var_names is not None:
+        display_vars = list(var_names)
+    else:
+        display_vars = list(all_var_names)
+
+    if print_vars is not None:
+        print_set = set(print_vars)
+        display_vars = [v for v in display_vars if v in print_set]
+
+    # --- Formatting helpers ---
+    def format_coeff(coeff, pvalue):
+        coeff_str = f"{coeff:{floatfmt}}"
+        if (not add_stars) or (pvalue is None):
+            return coeff_str
+        if pvalue <= 0.01:
+            stars = "***"
+        elif pvalue <= 0.05:
+            stars = "**"
+        elif pvalue <= 0.10:
+            stars = "*"
+        else:
+            stars = ""
+        return coeff_str + stars
+
+    def format_se(se_val):
+        return f"({se_val:{floatfmt}})"
+
+    def format_stat(results, stat):
+        value = getattr(results, stat)
+        if stat == "nobs":
+            return f"{int(round(value)):,}"
+        return f"{value:{floatfmt}}"
+
+    # --- Build contents grid ---
+    contents = []
+
+    # Header row
+    contents.append([""] + model_names)
+
+    # Coefficient / SE rows
+    for var in display_vars:
+        display_name = var
+        if var_labels is not None:
+            display_name = var_labels.get(var, var)
+
+        coeff_row = [display_name]
+        se_row = [""]
+        for data in reg_data:
+            if var in data:
+                coeff_val, pval, se_val = data[var]
+                coeff_row.append(format_coeff(coeff_val, pval))
+                se_row.append(format_se(se_val))
+            else:
+                coeff_row.append("")
+                se_row.append("")
+        contents.append(coeff_row)
+        contents.append(se_row)
+
+    # hline before stats: after the last SE row (which is the last row so far)
+    hline_row = len(contents) - 1
+
+    # Stat rows
+    for stat in stats:
+        stat_label = tex_stats.get(stat, stat)
+        stat_row = [stat_label]
+        for results in results_list:
+            if hasattr(results, stat):
+                stat_row.append(format_stat(results, stat))
+            else:
+                stat_row.append("")
+        contents.append(stat_row)
+
+    # --- Build Table ---
+    n_cols = 1 + n_models
+    alignment = "l" + "c" * n_models
+
+    table = Table(
+        contents,
+        n_cols=n_cols,
+        has_header=True,
+        alignment=alignment,
+        hlines=[0, hline_row],
+        floatfmt=floatfmt,
+        **kwargs,
+    )
+
+    if path is not None:
+        if write_kwargs is None:
+            write_kwargs = {}
+        table.write(path, kind=write_kind, **write_kwargs)
+
+    return table
+
+
 def to_camel_case(s: str) -> str:
     """Convert a ``snake_case`` string to ``camelCase``.
 
