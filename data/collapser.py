@@ -6,6 +6,9 @@ Created on Mon Feb  3 22:08:09 2020
 @author: dan
 """
 
+import json
+import warnings
+
 import numpy as np
 import pandas as pd
 
@@ -748,7 +751,8 @@ class Collapser:
             raise Exception
 
         for item in ["var_list", "weight_var", "by_list"]:
-            in_out.save_pickle(getattr(self, item), fullname + "_" + item + ".pkl")
+            with open(fullname + "_" + item + ".json", "w") as f:
+                json.dump(getattr(self, item), f)
 
         return None
 
@@ -792,7 +796,19 @@ class Collapser:
             raise Exception
 
         for item in ["var_list", "weight_var", "by_list"]:
-            setattr(self, item, in_out.load_pickle(fullname + "_" + item + ".pkl"))
+            json_path = fullname + "_" + item + ".json"
+            pkl_path = fullname + "_" + item + ".pkl"
+            try:
+                with open(json_path) as f:
+                    setattr(self, item, json.load(f))
+            except FileNotFoundError:
+                warnings.warn(
+                    f"Metadata sidecar '{json_path}' not found; falling back to pickle "
+                    f"'{pkl_path}'. Re-save this Collapser to migrate to JSON format.",
+                    DeprecationWarning,
+                    stacklevel=2,
+                )
+                setattr(self, item, in_out.load_pickle(pkl_path))
 
         return None
 
