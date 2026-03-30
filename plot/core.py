@@ -828,6 +828,8 @@ def double_hist(
     edgecolor="black",
     alpha=0.5,
     use_bar=False,
+    hatch1=None,
+    hatch2=None,
     labels=None,
     kwargs1=None,
     kwargs2=None,
@@ -898,6 +900,14 @@ def double_hist(
     use_bar : bool, optional
         If ``True``, use ``plt.bar`` instead of ``plt.hist``.  Requires
         *bins* to be provided.  Default is ``False``.
+    hatch1 : str, optional
+        Hatch pattern for the first histogram bars (e.g., ``'///'``,
+        ``'\\\\\\\\'``).  Only used when *use_bar* is ``True``.  Default is
+        ``None``.
+    hatch2 : str, optional
+        Hatch pattern for the second histogram bars (e.g., ``'///'``,
+        ``'\\\\\\\\'``).  Only used when *use_bar* is ``True``.  Default is
+        ``None``.
     labels : dict, optional
         Mapping from variable name to display label, used as fallback when
         *label1* or *label2* are not provided.
@@ -1014,10 +1024,23 @@ def double_hist(
     fig = plt.figure()
     matplotlib.rcParams.update({"font.size": label_font})
 
+    if hatch1 is not None:
+        assert use_bar, "hatch1 can only be used with use_bar=True"
+    if hatch2 is not None:
+        assert use_bar, "hatch2 can only be used with use_bar=True"
+
     if use_bar:
         assert bins is not None
 
         bin_width = bins[1] - bins[0]
+
+        if hatch1 is not None:
+            kwargs1 = kwargs1.copy()
+            kwargs1['hatch'] = hatch1
+
+        if hatch2 is not None:
+            kwargs2 = kwargs2.copy()
+            kwargs2['hatch'] = hatch2
 
         hist1 = compute_hist(_df1, var1, bins, wvar=wvar1)
         hist2 = compute_hist(_df2, var2, bins, wvar=wvar2)
