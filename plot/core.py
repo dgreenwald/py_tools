@@ -1526,6 +1526,7 @@ def binscatter(
     title=None,
     include45=False,
     include0=False,
+    figsize=None,
     **kwargs,
 ):
     """Create a binned scatter plot with optional OLS fit line.
@@ -1601,6 +1602,8 @@ def binscatter(
     include0 : bool, optional
         If ``True``, overlay a horizontal line at zero and expand the y-axis
         if necessary to include it.  Default is ``False``.
+    figsize : tuple of float, optional
+        ``(width, height)`` in inches passed to ``plt.subplots``.
     **kwargs
         Additional keyword arguments (currently unused).
 
@@ -1740,7 +1743,7 @@ def binscatter(
 
             df[this_var] += this_mean
 
-    fig, ax = plt.subplots()
+    fig, ax = plt.subplots(figsize=figsize)
     for iy, yvar in enumerate(yvars):
         if combined:
             assert not plot_raw_data
