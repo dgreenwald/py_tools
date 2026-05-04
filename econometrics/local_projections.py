@@ -191,6 +191,7 @@ def estimate(
     y_lags=1,
     periods=20,
     control_lags=None,
+    cov_type="HC3",
 ):
     """
     Estimate impulse responses via local projections.
@@ -218,6 +219,9 @@ def estimate(
     control_lags : dict, optional
         Mapping from control variable name to lag order.  Variables absent
         from the dict default to 1 lag.
+    cov_type : str, optional
+        Robust covariance type to use for horizon 0, where Newey-West is not
+        used. Defaults to ``'HC3'``.
 
     Returns
     -------
@@ -270,7 +274,7 @@ def estimate(
             control_lags,
         )
 
-        fr_list.append(dt.formula_regression(df, formula, nw_lags=jj))
+        fr_list.append(dt.formula_regression(df, formula, nw_lags=jj, cov_type=cov_type))
 
     for jj in range(periods):
         x[jj] = fr_list[jj].results.params[1]

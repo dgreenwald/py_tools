@@ -116,6 +116,7 @@ def estimate(
     y_lags=1,
     periods=20,
     control_lags=None,
+    cov_type="HC3",
 ):
 
     if fe_vars is None:
@@ -158,7 +159,9 @@ def estimate(
         )
 
         ix = np.all(np.isfinite(df[formula_var_list]), axis=1)
-        fr_list.append(dt.formula_regression(df, formula, nw_lags=jj, ix=ix))
+        fr_list.append(
+            dt.formula_regression(df, formula, nw_lags=jj, ix=ix, cov_type=cov_type)
+        )
 
     for jj in range(periods):
         x[jj] = fr_list[jj].results.params[1]

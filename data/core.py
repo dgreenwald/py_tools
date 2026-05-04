@@ -596,6 +596,7 @@ def regression(
     cluster_var=None,
     cluster_groups=None,
     weight_var=None,
+    cov_type="HC3",
     **kwargs,
 ):
     """Run an OLS or WLS regression from a pandas DataFrame.
@@ -634,6 +635,9 @@ def regression(
         Pre-computed cluster group labels (alternative to *cluster_var*).
     weight_var : str or None, optional
         Weight variable for WLS estimation.
+    cov_type : str, optional
+        Robust covariance type to use when not using clustered or Newey-West
+        standard errors. Defaults to ``'HC3'``.
     **kwargs
         Additional keyword arguments forwarded to :func:`formula_regression`
         or :func:`wls_formula`.
@@ -726,7 +730,12 @@ def regression(
 
     if weight_var is None:
         fr = formula_regression(
-            _df, formula, ix=ix, cluster_groups=these_groups, **kwargs
+            _df,
+            formula,
+            ix=ix,
+            cluster_groups=these_groups,
+            cov_type=cov_type,
+            **kwargs,
         )
     else:
         fr = wls_formula(
@@ -735,6 +744,7 @@ def regression(
             weight_var=weight_var,
             ix=ix,
             cluster_groups=these_groups,
+            cov_type=cov_type,
             **kwargs,
         )
 
@@ -749,6 +759,8 @@ def wls_formula(
     ix=None,
     nw_lags=0,
     cluster_groups=None,
+    cov_type="HC3",
+    absorb_vars=None,
     display=False,
 ):
     """Fit a Weighted Least Squares model from a patsy formula string.
@@ -770,9 +782,16 @@ def wls_formula(
         Sample-inclusion boolean index. Defaults to all rows.
     nw_lags : int, optional
         Number of lags for Newey-West HAC standard errors. Defaults to ``0``
-        (HC3 errors).
+        (*cov_type* errors).
     cluster_groups : array-like or None, optional
         Cluster group labels for cluster-robust standard errors.
+    cov_type : str, optional
+        Robust covariance type to use when *cluster_groups* is ``None`` and
+        ``nw_lags == 0``. Defaults to ``'HC3'``.
+    absorb_vars : list or None, optional
+        Group variables to absorb via :func:`absorb` before fitting. Supports
+        the same syntax as :func:`absorb`'s *groups* argument. Defaults to
+        ``[]``.
     display : bool, optional
         If ``True``, print the regression summary. Defaults to ``False``.
 
@@ -782,6 +801,9 @@ def wls_formula(
         Object containing statsmodels results, the sample index, and ``None``
         for design matrix and outcome (formula-based fit).
     """
+    if absorb_vars is None:
+        absorb_vars = []
+
     if ix is None:
         ix = np.ones(len(df), dtype=bool)
 
@@ -796,15 +818,50 @@ def wls_formula(
     if weight_var is not None:
         assert weights is None
         weights = df.loc[ix, weight_var].copy()
-
-    weights /= np.sum(weights)
+    elif not hasattr(weights, "loc"):
+        weights = pd.Series(weights, index=df.index[ix])
 
     y, X = patsy.dmatrices(formula, df.loc[ix, :], return_type="dataframe")
+    weights = weights.loc[y.index]
+
+    if absorb_vars:
+        absorb_df = df.loc[y.index, :].copy()
+        if weight_var is None:
+            absorb_weight_var = "_absorb_weight"
+            absorb_df[absorb_weight_var] = weights
+        else:
+            absorb_weight_var = weight_var
+
+        for ii, col in enumerate(y.columns):
+            absorb_var = "_absorb_y_{0:d}".format(ii)
+            absorb_df[absorb_var] = y[col]
+            y[col] = absorb(
+                absorb_df,
+                absorb_vars,
+                absorb_var,
+                weight_var=absorb_weight_var,
+                restore_mean=True,
+            )
+
+        for ii, col in enumerate(X.columns):
+            if np.allclose(X[col], X[col].iloc[0]):
+                continue
+
+            absorb_var = "_absorb_x_{0:d}".format(ii)
+            absorb_df[absorb_var] = X[col]
+            X[col] = absorb(
+                absorb_df,
+                absorb_vars,
+                absorb_var,
+                weight_var=absorb_weight_var,
+                restore_mean=True,
+            )
+
+    weights /= np.sum(weights)
     results = sm.WLS(y, X, weights=weights).fit()
-    results = results.get_robustcov_results("HC3")
 
     results = update_results_cov(
-        results, nw_lags=nw_lags, cluster_groups=cluster_groups
+        results, nw_lags=nw_lags, cluster_groups=cluster_groups, cov_type=cov_type
     )
 
     if display:
@@ -836,10 +893,10 @@ def compute_histogram(series, name="bin", **kwargs):
     return pd.Series(this_hist, index=[name + str(ii) for ii in range(len(this_hist))])
 
 
-def update_results_cov(results, nw_lags=0, cluster_groups=None):
+def update_results_cov(results, nw_lags=0, cluster_groups=None, cov_type="HC3"):
     """Apply robust covariance correction to a statsmodels results object.
 
-    Selects between cluster-robust, Newey-West HAC, and HC3 standard errors
+    Selects between cluster-robust, Newey-West HAC, and robust standard errors
     depending on the provided arguments.
 
     Parameters
@@ -852,6 +909,9 @@ def update_results_cov(results, nw_lags=0, cluster_groups=None):
     cluster_groups : array-like or None, optional
         Group labels for cluster-robust standard errors. When provided,
         ``nw_lags`` must be ``0``.
+    cov_type : str, optional
+        Robust covariance type to use when *cluster_groups* is ``None`` and
+        ``nw_lags == 0``. Defaults to ``'HC3'``.
 
     Returns
     -------
@@ -869,7 +929,7 @@ def update_results_cov(results, nw_lags=0, cluster_groups=None):
     elif nw_lags > 0:
         results = results.get_robustcov_results("HAC", maxlags=nw_lags)
     else:
-        results = results.get_robustcov_results("HC3")
+        results = results.get_robustcov_results(cov_type)
 
     return results
 
@@ -894,7 +954,13 @@ def get_cluster_groups(df, cluster_var):
 
 
 def formula_regression(
-    df, formula, ix=None, nw_lags=0, cluster_groups=None, display=False
+    df,
+    formula,
+    ix=None,
+    nw_lags=0,
+    cluster_groups=None,
+    cov_type="HC3",
+    display=False,
 ):
     """Fit an OLS model from a patsy formula string with robust standard errors.
 
@@ -910,6 +976,9 @@ def formula_regression(
         Number of lags for Newey-West HAC standard errors. Defaults to ``0``.
     cluster_groups : array-like or None, optional
         Group labels for cluster-robust standard errors.
+    cov_type : str, optional
+        Robust covariance type to use when *cluster_groups* is ``None`` and
+        ``nw_lags == 0``. Defaults to ``'HC3'``.
     display : bool, optional
         If ``True``, print the regression summary. Defaults to ``False``.
 
@@ -927,7 +996,7 @@ def formula_regression(
     results = model.fit()
 
     results = update_results_cov(
-        results, nw_lags=nw_lags, cluster_groups=cluster_groups
+        results, nw_lags=nw_lags, cluster_groups=cluster_groups, cov_type=cov_type
     )
 
     if display:
