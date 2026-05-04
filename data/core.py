@@ -583,6 +583,54 @@ def match_xy(X, z, how="inner", ix=None):
     return (ix, Xs, zs)
 
 
+def _formula_from_terms(lhs, rhs, fes=None, intercept=True, formula_extra=None):
+    formula = "{0} ~ {1}".format(lhs, " + ".join(rhs))
+    if fes:
+        formula += " + ".join([""] + ["C({})".format(fe) for fe in fes])
+    if formula_extra is not None:
+        formula += " + " + formula_extra
+    if not intercept:
+        formula += " -1"
+    return formula
+
+
+def _extend_list_with_item_or_list(var_list, items):
+    for item in items:
+        if isinstance(item, str):
+            var_list.append(item)
+        elif isinstance(item, list):
+            var_list += item
+        else:
+            raise Exception
+    return var_list
+
+
+def _select_existing_vars(df, var_list):
+    this_list = []
+    for var in set(var_list):
+        if var in df:
+            this_list.append(var)
+        else:
+            assert var in df.index.names
+    return this_list
+
+
+def _slice_cluster_groups(df, cluster_var, cluster_groups, ix):
+    if cluster_var is not None:
+        cluster_groups = get_cluster_groups(df, cluster_var)
+
+    if cluster_groups is None:
+        return None
+
+    return cluster_groups[ix]
+
+
+def _update_fit_cov(results, nw_lags=0, cluster_groups=None, cov_type="HC3"):
+    return update_results_cov(
+        results, nw_lags=nw_lags, cluster_groups=cluster_groups, cov_type=cov_type
+    )
+
+
 def regression(
     df,
     lhs,
@@ -657,31 +705,13 @@ def regression(
     if isinstance(rhs, str):
         rhs = [rhs]
 
-    formula = "{0} ~ {1}".format(lhs, " + ".join(rhs))
-    if fes:
-        formula += " + ".join([""] + ["C({})".format(fe) for fe in fes])
-
     var_list = [lhs] + rhs + fes
     if weight_var is not None:
         var_list += [weight_var]
     if cluster_var is not None:
         var_list += [cluster_var]
-    for group in absorb_vars:
-        if isinstance(group, str):
-            var_list.append(group)
-        elif isinstance(group, list):
-            var_list += group
-        else:
-            raise Exception
-
-    var_list = list(set(var_list))
-
-    this_list = []
-    for var in var_list:
-        if var in df:
-            this_list.append(var)
-        else:
-            assert var in df.index.names
+    var_list = _extend_list_with_item_or_list(var_list, absorb_vars)
+    this_list = _select_existing_vars(df, var_list)
 
     _df = df[this_list].copy()
 
@@ -707,26 +737,25 @@ def regression(
     if trend is not None:
         if trend in ["linear", "quadratic"]:
             _df["t"] = np.arange(len(_df))
-            formula += " + t "
         if trend == "quadratic":
             _df["t2"] = np.arange(len(_df)) ** 2
-            formula += " + t2 "
+    trend_vars = []
+    if trend in ["linear", "quadratic"]:
+        trend_vars.append("t")
+    if trend == "quadratic":
+        trend_vars.append("t2")
+    formula = _formula_from_terms(
+        lhs,
+        rhs + trend_vars,
+        fes=fes,
+        intercept=intercept,
+        formula_extra=formula_extra,
+    )
 
-    if formula_extra is not None:
-        formula += " + " + formula_extra
-
-    if not intercept:
-        formula += " -1"
-    else:
+    if intercept:
         Xs = np.hstack((np.ones((Xs.shape[0], 1)), Xs))
 
-    if cluster_var is not None:
-        cluster_groups = get_cluster_groups(_df, cluster_var)
-
-    if cluster_groups is not None:
-        these_groups = cluster_groups[ix_both]
-    else:
-        these_groups = None
+    these_groups = _slice_cluster_groups(_df, cluster_var, cluster_groups, ix_both)
 
     if weight_var is None:
         fr = formula_regression(
@@ -879,7 +908,7 @@ def wls_formula(
 
     results = sm.WLS(y, X, weights=weights).fit()
 
-    results = update_results_cov(
+    results = _update_fit_cov(
         results, nw_lags=nw_lags, cluster_groups=cluster_groups, cov_type=cov_type
     )
 
@@ -1014,7 +1043,7 @@ def formula_regression(
 
     results = model.fit()
 
-    results = update_results_cov(
+    results = _update_fit_cov(
         results, nw_lags=nw_lags, cluster_groups=cluster_groups, cov_type=cov_type
     )
 
