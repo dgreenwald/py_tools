@@ -3,6 +3,8 @@
 import numpy as np
 import pandas as pd
 import pytest
+import patsy
+import statsmodels.api as sm
 
 from py_tools.data.core import (
     lowercase,
@@ -15,6 +17,10 @@ from py_tools.data.core import (
     dropna_ix,
     compute_histogram,
     get_cluster_groups,
+    update_results_cov,
+    formula_regression,
+    regression,
+    wls_formula,
     least_sq,
     standard_errors,
     to_pickle,
@@ -25,6 +31,22 @@ from py_tools.data.core import (
     collapse,
     safe_sum,
 )
+
+
+def make_regression_df(seed=123, n=240):
+    rng = np.random.default_rng(seed)
+    df = pd.DataFrame(
+        {
+            "x": rng.normal(size=n),
+            "z": rng.normal(size=n),
+            "g": rng.integers(0, 24, size=n),
+            "w": rng.uniform(0.5, 2.0, size=n),
+        }
+    )
+    group_effect = 0.4 * df["g"].to_numpy()
+    df["y"] = 1.0 + 2.0 * df["x"] - 0.5 * df["z"] + group_effect
+    df["y"] += rng.normal(scale=1.5, size=n)
+    return df
 
 
 # --- lowercase ---
@@ -201,6 +223,121 @@ class TestGetClusterGroups:
         groups = get_cluster_groups(df, "g")
         assert groups[0] == groups[2]
         assert groups[0] != groups[1]
+
+
+# --- regression covariance plumbing ---
+
+
+class TestRegressionCovariance:
+    def test_update_results_cov_defaults_to_hc3(self):
+        df = make_regression_df()
+        y, X = patsy.dmatrices("y ~ x + z", df, return_type="dataframe")
+        actual = update_results_cov(sm.OLS(y, X).fit())
+
+        assert actual.cov_type == "HC3"
+
+    def test_update_results_cov_respects_cov_type(self):
+        df = make_regression_df()
+        y, X = patsy.dmatrices("y ~ x + z", df, return_type="dataframe")
+        actual = update_results_cov(sm.OLS(y, X).fit(), cov_type="HC0")
+
+        assert actual.cov_type == "HC0"
+
+    def test_update_results_cov_hac_overrides_cov_type(self):
+        df = make_regression_df()
+        y, X = patsy.dmatrices("y ~ x + z", df, return_type="dataframe")
+        actual = update_results_cov(sm.OLS(y, X).fit(), nw_lags=2, cov_type="HC0")
+
+        assert actual.cov_type == "HAC"
+
+    def test_update_results_cov_cluster_overrides_cov_type(self):
+        df = make_regression_df()
+        y, X = patsy.dmatrices("y ~ x + z", df, return_type="dataframe")
+        actual = update_results_cov(
+            sm.OLS(y, X).fit(), cluster_groups=df["g"], cov_type="HC0"
+        )
+
+        assert actual.cov_type == "cluster"
+
+    def test_formula_regression_matches_statsmodels_covariance(self):
+        df = make_regression_df()
+        y, X = patsy.dmatrices("y ~ x + z", df, return_type="dataframe")
+        expected = sm.OLS(y, X).fit().get_robustcov_results("HC0")
+
+        actual = formula_regression(df, "y ~ x + z", cov_type="HC0").results
+
+        assert actual.cov_type == "HC0"
+        assert np.allclose(actual.params, expected.params)
+        assert np.allclose(actual.bse, expected.bse)
+        assert np.allclose(actual.cov_params(), expected.cov_params())
+
+    def test_regression_passes_cov_type_to_formula_path(self):
+        df = make_regression_df()
+        expected = formula_regression(df, "y ~ x + z", cov_type="HC0").results
+
+        actual = regression(df, "y", ["x", "z"], cov_type="HC0").results
+
+        assert actual.cov_type == "HC0"
+        assert np.allclose(actual.params, expected.params)
+        assert np.allclose(actual.bse, expected.bse)
+        assert np.allclose(actual.cov_params(), expected.cov_params())
+
+    def test_wls_formula_matches_statsmodels_covariance(self):
+        df = make_regression_df()
+        y, X = patsy.dmatrices("y ~ x + z", df, return_type="dataframe")
+        weights = df.loc[y.index, "w"]
+        weights = weights / weights.sum()
+        expected = sm.WLS(y, X, weights=weights).fit().get_robustcov_results("HC0")
+
+        actual = wls_formula(df, "y ~ x + z", weight_var="w", cov_type="HC0").results
+
+        assert actual.cov_type == "HC0"
+        assert np.allclose(actual.params, expected.params)
+        assert np.allclose(actual.bse, expected.bse)
+        assert np.allclose(actual.cov_params(), expected.cov_params())
+
+    def test_regression_weighted_path_matches_wls_formula(self):
+        df = make_regression_df()
+        expected = wls_formula(df, "y ~ x + z", weight_var="w").results
+
+        actual = regression(df, "y", ["x", "z"], weight_var="w").results
+
+        assert actual.cov_type == expected.cov_type
+        assert np.allclose(actual.params, expected.params)
+        assert np.allclose(actual.bse, expected.bse)
+        assert np.allclose(actual.cov_params(), expected.cov_params())
+
+    def test_wls_formula_absorb_matches_regression_absorb(self):
+        df = make_regression_df()
+        expected = regression(
+            df, "y", ["x", "z"], weight_var="w", absorb_vars=["g"]
+        ).results
+
+        actual = wls_formula(
+            df, "y ~ x + z", weight_var="w", absorb_vars=["g"]
+        ).results
+
+        assert actual.cov_type == expected.cov_type
+        assert np.allclose(actual.params, expected.params)
+        assert np.allclose(actual.bse, expected.bse)
+        assert np.allclose(actual.cov_params(), expected.cov_params())
+
+    def test_regression_cluster_path_with_missing_data(self):
+        df = make_regression_df()
+        df.loc[[0, 5, 11], "x"] = np.nan
+
+        actual = regression(df, "y", ["x", "z"], cluster_var="g").results
+
+        assert actual.cov_type == "cluster"
+        assert np.all(np.isfinite(actual.bse))
+
+    def test_regression_hac_path_passes_through_kwargs(self):
+        df = make_regression_df()
+
+        actual = regression(df, "y", ["x", "z"], nw_lags=2).results
+
+        assert actual.cov_type == "HAC"
+        assert np.all(np.isfinite(actual.bse))
 
 
 # --- least_sq ---

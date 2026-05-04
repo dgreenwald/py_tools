@@ -751,6 +751,64 @@ def regression(
     return FullResults(fr.results, ix=ix, Xs=Xs, zs=zs)
 
 
+def _prepare_formula_weights(df, ix, y_index, weight_var=None, weights=None):
+    """Return formula weights aligned to the patsy output index."""
+    if weight_var is not None:
+        assert weights is None
+        weights = df.loc[ix, weight_var].copy()
+    elif weights is None:
+        weights = pd.Series(1.0, index=df.index[ix])
+    elif not hasattr(weights, "loc"):
+        weights = pd.Series(weights, index=df.index[ix])
+
+    weights = weights.loc[y_index].copy()
+    weights /= np.sum(weights)
+    return weights
+
+
+def _apply_absorb_to_design(df, y, X, weights, absorb_vars, weight_var=None):
+    """Absorb fixed effects from formula design matrices."""
+    if not absorb_vars:
+        return y, X
+
+    y = y.copy()
+    X = X.copy()
+    absorb_df = df.loc[y.index, :].copy()
+
+    if weight_var is None:
+        absorb_weight_var = "_absorb_weight"
+        absorb_df[absorb_weight_var] = weights
+    else:
+        absorb_weight_var = weight_var
+
+    for ii, col in enumerate(y.columns):
+        absorb_var = "_absorb_y_{0:d}".format(ii)
+        absorb_df[absorb_var] = y[col]
+        y[col] = absorb(
+            absorb_df,
+            absorb_vars,
+            absorb_var,
+            weight_var=absorb_weight_var,
+            restore_mean=True,
+        )
+
+    for ii, col in enumerate(X.columns):
+        if np.allclose(X[col], X[col].iloc[0]):
+            continue
+
+        absorb_var = "_absorb_x_{0:d}".format(ii)
+        absorb_df[absorb_var] = X[col]
+        X[col] = absorb(
+            absorb_df,
+            absorb_vars,
+            absorb_var,
+            weight_var=absorb_weight_var,
+            restore_mean=True,
+        )
+
+    return y, X
+
+
 def wls_formula(
     df,
     formula,
@@ -815,49 +873,10 @@ def wls_formula(
             "Install it with: pip install py_tools[ml]"
         ) from e
 
-    if weight_var is not None:
-        assert weights is None
-        weights = df.loc[ix, weight_var].copy()
-    elif not hasattr(weights, "loc"):
-        weights = pd.Series(weights, index=df.index[ix])
-
     y, X = patsy.dmatrices(formula, df.loc[ix, :], return_type="dataframe")
-    weights = weights.loc[y.index]
+    weights = _prepare_formula_weights(df, ix, y.index, weight_var, weights)
+    y, X = _apply_absorb_to_design(df, y, X, weights, absorb_vars, weight_var)
 
-    if absorb_vars:
-        absorb_df = df.loc[y.index, :].copy()
-        if weight_var is None:
-            absorb_weight_var = "_absorb_weight"
-            absorb_df[absorb_weight_var] = weights
-        else:
-            absorb_weight_var = weight_var
-
-        for ii, col in enumerate(y.columns):
-            absorb_var = "_absorb_y_{0:d}".format(ii)
-            absorb_df[absorb_var] = y[col]
-            y[col] = absorb(
-                absorb_df,
-                absorb_vars,
-                absorb_var,
-                weight_var=absorb_weight_var,
-                restore_mean=True,
-            )
-
-        for ii, col in enumerate(X.columns):
-            if np.allclose(X[col], X[col].iloc[0]):
-                continue
-
-            absorb_var = "_absorb_x_{0:d}".format(ii)
-            absorb_df[absorb_var] = X[col]
-            X[col] = absorb(
-                absorb_df,
-                absorb_vars,
-                absorb_var,
-                weight_var=absorb_weight_var,
-                restore_mean=True,
-            )
-
-    weights /= np.sum(weights)
     results = sm.WLS(y, X, weights=weights).fit()
 
     results = update_results_cov(
