@@ -16,7 +16,7 @@ def load(dataset, all_transactions=True, reimport=False, data_dir=default_dir):
     ----------
     dataset : str
         Geographic level of the index. One of ``'metro'``/``'msa'``,
-        ``'state'``, ``'county'``, or ``'zip3'``.
+        ``'state'``, ``'county'``, ``'zip3'``, or ``'zip5'``.
     all_transactions : bool, optional
         If ``True``, load the all-transactions index; if ``False``, load
         the purchase-only index.  Not all dataset/index combinations are
@@ -131,6 +131,31 @@ def load(dataset, all_transactions=True, reimport=False, data_dir=default_dir):
             df = df.rename({var: var.lower() for var in df.columns}, axis=1)
 
             df = df.set_index(["zip3", "date"])
+
+        elif dataset == "zip5":
+            assert all_transactions
+
+            df = pd.read_excel(data_dir + "hpi_at_zip5.xlsx", skiprows=5)
+            df = df.rename({var: var.lower() for var in df.columns}, axis=1)
+
+            for var in df.columns:
+                if var not in ["five-digit zip code", "warning"]:
+                    df[var] = pd.to_numeric(df[var], errors="coerce")
+
+            df = df.rename(
+                {
+                    "five-digit zip code": "zip5",
+                    "hpi": "hpi",
+                    "hpi with 1990 base": "hpi_1990_base",
+                    "hpi with 2000 base": "hpi_2000_base",
+                    "annual change (%)": "annual_change_pct",
+                },
+                axis=1,
+            )
+
+            df["date"] = ts.date_from_year(df["year"])
+            df = df.set_index(["zip5", "date"])
+            df = df.drop(columns=[c for c in ["warning"] if c in df.columns])
 
         df.to_pickle(pkl_file)
 
