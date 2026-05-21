@@ -34,6 +34,7 @@ datasets = [
     "pandas-datareader>=0.10",
     "python-dotenv>=1.0",
     "pandas<3",
+    "pyarrow>=12.0",
 ]
 scraping = [
     "requests>=2.28",
@@ -53,6 +54,7 @@ all = [
     "pandas-datareader>=0.10",
     "python-dotenv>=1.0",
     "pandas<3",
+    "pyarrow>=12.0",
     "requests>=2.28",
     "beautifulsoup4>=4.11",
     "lxml>=4.9",
