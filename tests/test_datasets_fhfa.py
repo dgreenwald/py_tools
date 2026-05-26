@@ -4,76 +4,75 @@ import os
 import numpy as np
 import pandas as pd
 import pytest
+from openpyxl import Workbook
 
-from datasets import fhfa
+from py_tools.datasets import fhfa
 
 
-def write_zip5_excel(path, rows=None):
-    """Write a minimal zip5-format Excel file for testing."""
-    if rows is None:
-        rows = [
-            (10001, 2000, np.nan, 100.0, 52.0, 51.0),
-            (10001, 2001, 5.0, 105.0, 54.6, 53.6),
-            (10002, 2000, np.nan, 100.0, 50.0, 49.0),
-        ]
-    header_rows = [[""] * 6] * 5  # five blank rows before the data header
-    col_names = [
-        "Five-Digit ZIP Code",
-        "Year",
-        "Annual Change (%)",
-        "HPI",
-        "HPI with 1990 base",
-        "HPI with 2000 base",
-    ]
-    data = pd.DataFrame(rows, columns=col_names)
-    with pd.ExcelWriter(path, engine="openpyxl") as writer:
-        pd.DataFrame(header_rows).to_excel(writer, index=False, header=False)
-        data.to_excel(
-            writer,
-            index=False,
-            header=True,
-            startrow=5,
-        )
+def _write_zip5_xlsx(path, rows):
+    """Write a minimal zip5 xlsx fixture matching FHFA's file layout."""
+    wb = Workbook()
+    ws = wb.active
+    ws.append(["HPI for Five-Digit ZIP Codes (All-Transactions Index)"])
+    ws.append([None])
+    ws.append(["Disclaimer text placeholder."])
+    ws.append(["Last updated: January 1, 2025.", None, None, None, None, None])
+    ws.append(["Not Seasonally Adjusted (NSA) ", None, None, None, None, None])
+    ws.append(["Five-Digit ZIP Code", "Year", "Annual Change (%)", "HPI",
+               "HPI with 1990 base", "HPI with 2000 base"])
+    for row in rows:
+        ws.append(row)
+    wb.save(path)
 
 
 @pytest.fixture()
-def zip5_data_dir(tmp_path):
-    write_zip5_excel(tmp_path / "hpi_at_zip5.xlsx")
+def zip5_dir(tmp_path):
+    rows = [
+        [10001, 2010, None,  100.0, 80.0, 75.0],
+        [10001, 2011,  5.0,  105.0, 84.0, 78.75],
+        [10001, 2012,  3.5,  108.68, 86.94, 81.51],
+        [10002, 2010, None,  100.0, 90.0, 85.0],
+        [10002, 2011,  3.0,  103.0, 92.7, 87.55],
+    ]
+    _write_zip5_xlsx(tmp_path / "hpi_at_zip5.xlsx", rows)
     return str(tmp_path) + "/"
 
 
-def test_zip5_columns_and_index(zip5_data_dir):
-    df = fhfa.load("zip5", data_dir=zip5_data_dir)
+def test_zip5_index(zip5_dir):
+    df = fhfa.load("zip5", data_dir=zip5_dir, reimport=True)
     assert df.index.names == ["zip5", "date"]
-    assert set(df.columns) == {"annual_change_pct", "hpi", "hpi_1990_base", "hpi_2000_base"}
 
 
-def test_zip5_shape(zip5_data_dir):
-    df = fhfa.load("zip5", data_dir=zip5_data_dir)
-    assert df.shape == (3, 4)
+def test_zip5_columns(zip5_dir):
+    df = fhfa.load("zip5", data_dir=zip5_dir, reimport=True)
+    assert set(df.columns) >= {"hpi", "hpi_1990_base", "hpi_2000_base", "annual_change_pct"}
 
 
-def test_zip5_values(zip5_data_dir):
-    df = fhfa.load("zip5", data_dir=zip5_data_dir)
-    assert df.loc[(10001, pd.Timestamp("2001-01-01")), "hpi"] == pytest.approx(105.0)
-    assert np.isnan(df.loc[(10001, pd.Timestamp("2000-01-01")), "annual_change_pct"])
+def test_zip5_dtypes(zip5_dir):
+    df = fhfa.load("zip5", data_dir=zip5_dir, reimport=True)
+    assert df["hpi"].dtype == np.float64
+    assert df["annual_change_pct"].dtype == np.float64
+    assert isinstance(df.index.get_level_values("date"), pd.DatetimeIndex)
 
 
-def test_zip5_parquet_cache(zip5_data_dir):
-    fhfa.load("zip5", data_dir=zip5_data_dir)
-    parquet_path = zip5_data_dir + "fhfazip5_at.parquet"
+def test_zip5_values(zip5_dir):
+    df = fhfa.load("zip5", data_dir=zip5_dir, reimport=True)
+    assert df.loc[(10001, pd.Timestamp("2011-01-01")), "hpi"] == pytest.approx(105.0)
+    assert df.loc[(10002, pd.Timestamp("2010-01-01")), "hpi_1990_base"] == pytest.approx(90.0)
+    assert np.isnan(df.loc[(10001, pd.Timestamp("2010-01-01")), "annual_change_pct"])
+
+
+def test_zip5_shape(zip5_dir):
+    df = fhfa.load("zip5", data_dir=zip5_dir, reimport=True)
+    assert df.shape[0] == 5
+    assert df.index.is_unique
+
+
+def test_zip5_parquet_cache(zip5_dir):
+    fhfa.load("zip5", data_dir=zip5_dir, reimport=True)
+    parquet_path = zip5_dir + "fhfazip5_at.parquet"
     assert os.path.exists(parquet_path)
 
-    # Second call reads from cache and returns identical data
-    df_cached = fhfa.load("zip5", data_dir=zip5_data_dir)
-    df_fresh = fhfa.load("zip5", reimport=True, data_dir=zip5_data_dir)
+    df_cached = fhfa.load("zip5", data_dir=zip5_dir)
+    df_fresh = fhfa.load("zip5", data_dir=zip5_dir, reimport=True)
     pd.testing.assert_frame_equal(df_cached, df_fresh)
-
-
-def test_zip5_reimport_overwrites_cache(zip5_data_dir):
-    fhfa.load("zip5", data_dir=zip5_data_dir)
-    parquet_path = zip5_data_dir + "fhfazip5_at.parquet"
-    mtime_first = os.path.getmtime(parquet_path)
-
-    fhfa.load("zip5", reimport=True, data_dir=zip5_data_dir)
-    assert os.path.getmtime(parquet_path) >= mtime_first

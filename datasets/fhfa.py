@@ -136,24 +136,26 @@ def load(dataset, all_transactions=True, reimport=False, data_dir=default_dir):
             assert all_transactions
 
             df = pd.read_excel(data_dir + "hpi_at_zip5.xlsx", skiprows=5)
+            df = df.rename({var: var.lower() for var in df.columns}, axis=1)
+
+            for var in df.columns:
+                if var not in ["five-digit zip code", "warning"]:
+                    df[var] = pd.to_numeric(df[var], errors="coerce")
+
             df = df.rename(
                 {
-                    "Five-Digit ZIP Code": "zip5",
-                    "Year": "year",
-                    "Annual Change (%)": "annual_change_pct",
-                    "HPI": "hpi",
-                    "HPI with 1990 base": "hpi_1990_base",
-                    "HPI with 2000 base": "hpi_2000_base",
+                    "five-digit zip code": "zip5",
+                    "hpi": "hpi",
+                    "hpi with 1990 base": "hpi_1990_base",
+                    "hpi with 2000 base": "hpi_2000_base",
+                    "annual change (%)": "annual_change_pct",
                 },
                 axis=1,
             )
-            for var in df.columns:
-                if var != "zip5":
-                    df[var] = pd.to_numeric(df[var], errors="coerce")
 
             df["date"] = ts.date_from_year(df["year"])
-            df = df.drop(columns=["year"])
             df = df.set_index(["zip5", "date"])
+            df = df.drop(columns=[c for c in ["warning"] if c in df.columns])
 
         df.to_parquet(parquet_file)
 
