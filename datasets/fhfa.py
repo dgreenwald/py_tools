@@ -16,14 +16,14 @@ def load(dataset, all_transactions=True, reimport=False, data_dir=default_dir):
     ----------
     dataset : str
         Geographic level of the index. One of ``'metro'``/``'msa'``,
-        ``'state'``, ``'county'``, or ``'zip3'``.
+        ``'state'``, ``'county'``, ``'zip3'``, or ``'zip5'``.
     all_transactions : bool, optional
         If ``True``, load the all-transactions index; if ``False``, load
         the purchase-only index.  Not all dataset/index combinations are
         supported (e.g. ``'metro'`` requires ``all_transactions=True``).
     reimport : bool, optional
         If ``True``, re-read the raw source file and overwrite any cached
-        pickle.  If ``False``, use the cached pickle when available.
+        parquet.  If ``False``, use the cached parquet when available.
     data_dir : str, optional
         Path to the directory containing the FHFA source files.
 
@@ -48,9 +48,9 @@ def load(dataset, all_transactions=True, reimport=False, data_dir=default_dir):
         suffix += "_purch"
 
     basepath = data_dir + "fhfa" + suffix
-    pkl_file = basepath + ".pkl"
+    parquet_file = basepath + ".parquet"
 
-    if reimport or not os.path.exists(pkl_file):
+    if reimport or not os.path.exists(parquet_file):
         if dataset in ["metro", "msa"]:
             if not all_transactions:
                 raise Exception
@@ -132,10 +132,33 @@ def load(dataset, all_transactions=True, reimport=False, data_dir=default_dir):
 
             df = df.set_index(["zip3", "date"])
 
-        df.to_pickle(pkl_file)
+        elif dataset == "zip5":
+            assert all_transactions
+
+            df = pd.read_excel(data_dir + "hpi_at_zip5.xlsx", skiprows=5)
+            df = df.rename(
+                {
+                    "Five-Digit ZIP Code": "zip5",
+                    "Year": "year",
+                    "Annual Change (%)": "annual_change_pct",
+                    "HPI": "hpi",
+                    "HPI with 1990 base": "hpi_1990_base",
+                    "HPI with 2000 base": "hpi_2000_base",
+                },
+                axis=1,
+            )
+            for var in df.columns:
+                if var != "zip5":
+                    df[var] = pd.to_numeric(df[var], errors="coerce")
+
+            df["date"] = ts.date_from_year(df["year"])
+            df = df.drop(columns=["year"])
+            df = df.set_index(["zip5", "date"])
+
+        df.to_parquet(parquet_file)
 
     else:
-        df = pd.read_pickle(pkl_file)
+        df = pd.read_parquet(parquet_file)
 
     if reimport:
         stata_file = basepath + ".dta"
