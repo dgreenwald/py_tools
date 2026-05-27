@@ -493,7 +493,7 @@ def check_nan_var(var, data_augmentation_vars):
     """
 
     for da in data_augmentation_vars:
-        if re.match("(L\d*_)?" + da, var) is not None:
+        if re.match(r"(L\d*_)?" + da, var) is not None:
             return False
 
     return True
