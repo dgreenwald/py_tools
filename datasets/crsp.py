@@ -112,7 +112,10 @@ def load_new(data_dir=default_dir, vintage="2017", freq="Q", **kwargs):
         raise Exception
 
     infile = "crsp_{}.csv".format(version)
-    df = pd.read_csv(data_dir + infile, parse_dates=["caldt"])
+    df = pd.read_csv(data_dir + infile)
+    if "caldt" not in df.columns and "MthCalDt" in df.columns:
+        df = df.rename(columns={"MthCalDt": "caldt"})
+    df["caldt"] = pd.to_datetime(df["caldt"])
     df["date"] = df["caldt"] + pd.tseries.frequencies.to_offset(freq + "S")
     df = df.set_index("date")
 
