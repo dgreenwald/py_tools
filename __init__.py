@@ -7,7 +7,7 @@ from importlib import import_module
 from importlib.metadata import PackageNotFoundError, version
 
 try:
-    __version__ = version("py_tools")
+    __version__ = version("dgreenwald-py-tools")
 except PackageNotFoundError:
     __version__ = "0.0.0+local"
 
