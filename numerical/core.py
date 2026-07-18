@@ -378,7 +378,16 @@ def robust_cholesky(A, min_eig=1e-12):
         Matrix ``L`` of shape ``(n, n)`` such that ``L @ L.T`` is a
         positive semi-definite approximation to *A*.
     """
-    vals, vecs = np.linalg.eig(A)
+    A = np.real_if_close(np.asarray(A))
+    if np.iscomplexobj(A):
+        raise ValueError("robust_cholesky requires a real symmetric matrix")
+
+    # Covariance and inverse-Hessian matrices are symmetric, but floating-point
+    # calculations can introduce slight asymmetry.  Symmetrizing and using
+    # ``eigh`` keeps the factor real for real inputs, including arrays with a
+    # numerically zero complex component.
+    A = 0.5 * (A + A.T)
+    vals, vecs = np.linalg.eigh(A)
     vals = np.maximum(vals, min_eig)
     Dhalf = np.diag(np.sqrt(vals))
     return vecs @ Dhalf

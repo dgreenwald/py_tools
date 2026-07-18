@@ -222,6 +222,12 @@ class TestRobustCholesky:
         L = robust_cholesky(A)
         assert np.all(np.linalg.eigvalsh(L @ L.T) >= 0)
 
+    def test_numerically_real_complex_input_returns_real_factor(self):
+        A = np.array([[1.0 + 0.0j, 0.25 + 0.0j], [0.25 + 0.0j, 2.0 + 0.0j]])
+        L = robust_cholesky(A)
+        assert not np.iscomplexobj(L)
+        assert np.allclose(L @ L.T, A.real, atol=1e-10)
+
 
 # --- my_chol ---
 

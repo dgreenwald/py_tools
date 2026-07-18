@@ -40,6 +40,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Support the current FHFA state-data column names and annual file formats.
 - Support CRSP monthly files that provide `MthCalDt` instead of `caldt`.
 - Correct the BVAR data-augmentation regular expression.
+- Keep robust covariance factors real when numerical calculations produce a
+  zero-imaginary complex dtype, preventing RWMC and SMC casting failures.
 - Install dataset dependencies in CI so FHFA tests can import `openpyxl`.
 - Report the installed package version using the `dgreenwald-py-tools`
   distribution metadata.
