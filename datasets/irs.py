@@ -1,14 +1,256 @@
 import os
 import glob
+import io
 import numpy as np
 import pandas as pd
 import re
+import tempfile
+import urllib.request
+import zipfile
+from pathlib import Path
 
 from . import config, crosswalk
 
 default_dir = config.base_dir() + "irs/"
 DATASET_NAME = "irs"
 DESCRIPTION = "IRS tax statistics dataset loader."
+IRS_ZIP_BASE_URL = "https://www.irs.gov/pub/irs-soi"
+ZIP_DATA_YEARS = tuple([1998, 2001, 2002] + list(range(2004, 2023)))
+COUNTY_DATA_YEARS = tuple(range(1989, 2023))
+_RAW_DATA_CONFIG = {
+    "zip": {
+        "display_name": "ZIP",
+        "years": ZIP_DATA_YEARS,
+        "filename_rules": (
+            (2012, "{year}zipcode.zip"),
+            (2022, "zipcode{year}.zip"),
+        ),
+        "download_function": "download_zip_raw",
+    },
+    "county": {
+        "display_name": "county",
+        "years": COUNTY_DATA_YEARS,
+        "filename_rules": (
+            (2010, "{year}countyincome.zip"),
+            (2012, "{year}countydata.zip"),
+            (2022, "county{year}.zip"),
+        ),
+        "download_function": "download_county_raw",
+    },
+}
+
+
+def _raw_data_config(geography):
+    """Return download configuration for a supported geography."""
+    try:
+        return _RAW_DATA_CONFIG[geography]
+    except KeyError as exc:
+        supported = ", ".join(sorted(_RAW_DATA_CONFIG))
+        raise ValueError(
+            f"Unsupported IRS geography {geography!r}. "
+            f"Supported geographies are: {supported}."
+        ) from exc
+
+
+def _normalize_raw_years(geography, years):
+    """Return supported raw-data years in caller-specified order."""
+    raw_config = _raw_data_config(geography)
+    supported_years = raw_config["years"]
+    if years is None:
+        requested = list(supported_years)
+    elif isinstance(years, (int, np.integer)):
+        requested = [int(years)]
+    else:
+        try:
+            requested = [int(year) for year in years]
+        except (TypeError, ValueError) as exc:
+            raise ValueError("years must be an integer or an iterable of integers") from exc
+
+    unsupported = [year for year in requested if year not in supported_years]
+    if unsupported:
+        supported = ", ".join(str(year) for year in supported_years)
+        raise ValueError(
+            f"Unsupported IRS {raw_config['display_name']}-data year(s): "
+            f"{unsupported}. "
+            f"Supported years are: {supported}"
+        )
+
+    return list(dict.fromkeys(requested))
+
+
+def _raw_download_url(geography, year):
+    """Return the IRS annual archive URL for a geography and year."""
+    raw_config = _raw_data_config(geography)
+    if year not in raw_config["years"]:
+        raise ValueError(
+            f"Unsupported IRS {raw_config['display_name']}-data year: {year}"
+        )
+    for final_year, template in raw_config["filename_rules"]:
+        if year <= final_year:
+            return f"{IRS_ZIP_BASE_URL}/{template.format(year=year)}"
+    raise ValueError(
+        f"No IRS {raw_config['display_name']} URL rule exists for {year}"
+    )
+
+
+def _raw_archive_path(geography, year, data_dir=default_dir):
+    """Return the local path for an annual raw-data archive."""
+    _raw_data_config(geography)
+    return Path(data_dir) / geography / "raw" / f"{year}.zip"
+
+
+def download_raw(geography, years=None, data_dir=default_dir, overwrite=False):
+    """Download annual IRS source archives without extracting them.
+
+    Parameters
+    ----------
+    geography : {"county", "zip"}
+        Geographic dataset to download.
+    years : int or iterable of int, optional
+        Tax year or years to download.  By default, download every year
+        available for the selected geography.
+    data_dir : str or path-like, optional
+        Root directory for IRS data files.
+    overwrite : bool, optional
+        Replace valid archives that are already present.
+
+    Returns
+    -------
+    list of pathlib.Path
+        Local archive paths in requested order.  Duplicate years appear once.
+
+    Raises
+    ------
+    ValueError
+        If any requested year is unsupported.
+    RuntimeError
+        If a download fails or does not produce a valid ZIP archive.
+    """
+    raw_config = _raw_data_config(geography)
+    requested = _normalize_raw_years(geography, years)
+    archive_dir = Path(data_dir) / geography / "raw"
+    archive_dir.mkdir(parents=True, exist_ok=True)
+    paths = []
+
+    for year in requested:
+        destination = _raw_archive_path(geography, year, data_dir=data_dir)
+        paths.append(destination)
+        if destination.exists() and zipfile.is_zipfile(destination) and not overwrite:
+            continue
+
+        url = _raw_download_url(geography, year)
+        temporary = None
+        try:
+            with tempfile.NamedTemporaryFile(
+                mode="wb",
+                prefix=f".{year}.",
+                suffix=".part",
+                dir=archive_dir,
+                delete=False,
+            ) as output:
+                temporary = Path(output.name)
+                with urllib.request.urlopen(url) as response:
+                    while True:
+                        chunk = response.read(1024 * 1024)
+                        if not chunk:
+                            break
+                        output.write(chunk)
+
+            if not zipfile.is_zipfile(temporary):
+                raise RuntimeError("downloaded content is not a valid ZIP archive")
+            os.replace(temporary, destination)
+        except Exception as exc:
+            if temporary is not None:
+                temporary.unlink(missing_ok=True)
+            raise RuntimeError(
+                f"Failed to download IRS {raw_config['display_name']} data "
+                f"for {year} from {url}: {exc}"
+            ) from exc
+
+    return paths
+
+
+def download_zip_raw(years=None, data_dir=default_dir, overwrite=False):
+    """Download IRS ZIP-code archives through :func:`download_raw`."""
+    return download_raw(
+        "zip", years=years, data_dir=data_dir, overwrite=overwrite
+    )
+
+
+def download_county_raw(years=None, data_dir=default_dir, overwrite=False):
+    """Download IRS county archives through :func:`download_raw`."""
+    return download_raw(
+        "county", years=years, data_dir=data_dir, overwrite=overwrite
+    )
+
+
+def _find_archive_member(archive, basename):
+    """Find one archive member by case-insensitive basename."""
+    matches = [
+        name
+        for name in archive.namelist()
+        if Path(name).name.lower() == basename.lower()
+    ]
+    if len(matches) != 1:
+        raise RuntimeError(
+            f"Expected one member named {basename!r}, found {len(matches)}"
+        )
+    return matches[0]
+
+
+def _missing_raw_error(geography, year, data_dir):
+    """Create an actionable error for absent raw geography data."""
+    raw_config = _raw_data_config(geography)
+    archive = _raw_archive_path(geography, year, data_dir=data_dir)
+    return FileNotFoundError(
+        f"IRS {raw_config['display_name']} raw data for {year} were not found "
+        f"at {archive} or in the "
+        "legacy extracted layout. Run "
+        f"{raw_config['download_function']}(years={year}, "
+        f"data_dir={str(data_dir)!r}) first."
+    )
+
+
+def _read_raw_csv(geography, year, basename, data_dir):
+    """Read a CSV from an archive or the legacy extracted location."""
+    archive_path = _raw_archive_path(geography, year, data_dir=data_dir)
+    legacy_path = Path(data_dir) / geography / basename
+    if archive_path.exists():
+        with zipfile.ZipFile(archive_path) as archive:
+            member = _find_archive_member(archive, basename)
+            with archive.open(member) as source:
+                return pd.read_csv(source, encoding="latin1")
+    if legacy_path.exists():
+        return pd.read_csv(legacy_path, encoding="latin1")
+    raise _missing_raw_error(geography, year, data_dir)
+
+
+def _raw_excel_sources(
+    geography, year, data_dir, legacy_sources, basename=None
+):
+    """Return Excel sources from an archive or legacy extracted files."""
+    archive_path = _raw_archive_path(geography, year, data_dir=data_dir)
+    if archive_path.exists():
+        with zipfile.ZipFile(archive_path) as archive:
+            if basename is not None:
+                members = [_find_archive_member(archive, basename)]
+            else:
+                members = sorted(
+                    name
+                    for name in archive.namelist()
+                    if name.lower().endswith(".xls")
+                )
+            if not members:
+                raise RuntimeError(
+                    f"IRS {geography} archive for {year} contains no .xls "
+                    f"files: {archive_path}"
+                )
+            return [io.BytesIO(archive.read(member)) for member in members]
+
+    sources = [Path(source) for source in legacy_sources if Path(source).exists()]
+    if not sources:
+        raise _missing_raw_error(geography, year, data_dir)
+    return sources
 
 
 def load(data_dir=None, **kwargs):
@@ -302,9 +544,8 @@ def import_geo_year_from_2011(year, geo, data_dir=default_dir):
     final_map = {key.lower(): val for key, val in col_map.items()}
 
     short_year = str(year)[2:]
-    df_by_cat = pd.read_csv(
-        data_dir + geo + "/" + short_year + file_stub + ".csv", encoding="latin1"
-    )
+    basename = short_year + file_stub + ".csv"
+    df_by_cat = _read_raw_csv(geo, year, basename, data_dir)
     df_by_cat = df_by_cat.rename(
         columns={col: col.lower() for col in df_by_cat.columns}
     )
@@ -343,7 +584,7 @@ def import_county_year_2010(year, data_dir=default_dir):
         County-level IRS data for 2010 with a ``fips`` column and a
         ``date`` column set to ``'2010-01-01'``.
     """
-    year_dir = data_dir + "county/" + str(year) + "CountyIncome/"
+    year_dir = Path(data_dir) / "county" / f"{year}CountyIncome"
 
     names = [
         "statefips",
@@ -397,7 +638,15 @@ def import_county_year_2010(year, data_dir=default_dir):
 
     skiprows = 6
 
-    df_t = pd.read_excel(year_dir + "10incyall.xls", skiprows=skiprows, header=None)
+    legacy_path = year_dir / "10incyall.xls"
+    source = _raw_excel_sources(
+        "county",
+        year,
+        data_dir,
+        [legacy_path],
+        basename="10incyall.xls",
+    )[0]
+    df_t = pd.read_excel(source, skiprows=skiprows, header=None)
     df_t = df_t.rename(columns={ii: name for ii, name in enumerate(names)})
 
     df_t = compute_fips(df_t)
@@ -426,7 +675,7 @@ def import_county_year_to_2009(year, data_dir=default_dir):
         County-level IRS data for the requested year with a ``fips`` column
         and a ``date`` column.
     """
-    year_dir = data_dir + "county/" + str(year) + "CountyIncome/"
+    year_dir = Path(data_dir) / "county" / f"{year}CountyIncome"
 
     names = [
         "DROP",
@@ -445,7 +694,7 @@ def import_county_year_to_2009(year, data_dir=default_dir):
 
     if year in [1989, 2007]:
         short_year = str(year)[2:]
-        year_dir += short_year + "xls/"
+        year_dir = year_dir / f"{short_year}xls"
 
     if year <= 2007:
         skiprows = 9
@@ -455,13 +704,17 @@ def import_county_year_to_2009(year, data_dir=default_dir):
         drop_list = []
 
     target_cols = len(names)
-    df_t = pd.concat(
-        [
-            #            pd.read_excel(filename, skiprows=9, header=None, names=names)
-            load_state_county_year(filename, skiprows, target_cols)
-            for filename in glob.glob(year_dir + "*.xls")
-        ]
-    ).rename(columns={ii: name for ii, name in enumerate(names)})
+    sources = _raw_excel_sources(
+        "county", year, data_dir, sorted(year_dir.glob("*.xls"))
+    )
+    frames = [
+        load_state_county_year(source, skiprows, target_cols)
+        for source in sources
+    ]
+
+    df_t = pd.concat(frames).rename(
+        columns={ii: name for ii, name in enumerate(names)}
+    )
 
     df_t = df_t.drop(drop_list, axis=1)
     df_t = compute_fips(df_t)
@@ -498,7 +751,9 @@ def load_county(data_dir=default_dir, reimport=False, reimport_year=False):
     if reimport or not os.path.exists(parquet_file):
         df = pd.concat(
             (
-                load_county_year(year, reimport=reimport_year)
+                load_county_year(
+                    year, data_dir=data_dir, reimport=reimport_year
+                )
                 for year in range(1989, 2017)
             ),
             sort=True,
@@ -781,12 +1036,12 @@ def import_zip_year_to_2010(year, data_dir=default_dir):
             ]
         )
 
-    df_t = pd.concat(
-        [
-            load_state_zip_year(filename, year)
-            for filename in glob.glob(year_dir + "*.xls")
-        ]
+    sources = _raw_excel_sources(
+        "zip", year, data_dir, sorted(glob.glob(year_dir + "*.xls"))
     )
+    frames = [load_state_zip_year(source, year) for source in sources]
+
+    df_t = pd.concat(frames)
 
     df_t = df_t.loc[:, : len(names) - 1]
     df_t.columns = names
@@ -832,9 +1087,9 @@ def load_zip_year(year, data_dir=default_dir, reimport=False):
     if reimport or not os.path.exists(parquet_file):
         print("Loading year {}".format(year))
         if year <= 2010:
-            df_t = import_zip_year_to_2010(year, data_dir=default_dir)
+            df_t = import_zip_year_to_2010(year, data_dir=data_dir)
         elif year <= 2016:
-            df_t = import_geo_year_from_2011(year, "zip", data_dir=default_dir)
+            df_t = import_geo_year_from_2011(year, "zip", data_dir=data_dir)
         else:
             raise Exception
 
@@ -898,7 +1153,10 @@ def load_zip(data_dir=default_dir, reimport=False, reimport_year=False):
     parquet_file = data_dir + "zip/irs_zip.parquet"
     if reimport or not os.path.exists(parquet_file):
         df = pd.concat(
-            (load_zip_year(year, reimport=reimport_year) for year in zip_years),
+            (
+                load_zip_year(year, data_dir=data_dir, reimport=reimport_year)
+                for year in zip_years
+            ),
             sort=True,
         )
         df["date"] = pd.to_datetime(df["date"])
