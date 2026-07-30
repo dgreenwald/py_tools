@@ -1,4 +1,9 @@
 import os
+import tempfile
+import urllib.request
+import zipfile
+from pathlib import Path
+
 import pandas as pd
 from py_tools import time_series as ts
 
@@ -7,6 +12,165 @@ from . import config
 default_dir = config.base_dir() + "fhfa/"
 DATASET_NAME = "fhfa"
 DESCRIPTION = "FHFA house price index dataset loader."
+FHFA_BASE_URL = "https://www.fhfa.gov"
+FHFA_RAW_DATASETS = ("county", "zip3", "state", "zip5")
+_RAW_DATA_CONFIG = {
+    "county": {
+        "url": f"{FHFA_BASE_URL}/hpi/download/annual/hpi_at_county.xlsx",
+        "filename": "HPI_AT_BDL_county.xlsx",
+        "format": "xlsx",
+    },
+    "zip3": {
+        "url": (
+            f"{FHFA_BASE_URL}/hpi/download/quarterly_datasets/"
+            "hpi_at_3zip.xlsx"
+        ),
+        "filename": "HPI_AT_3zip.xlsx",
+        "format": "xlsx",
+    },
+    "state": {
+        "url": (
+            f"{FHFA_BASE_URL}/hpi/download/quarterly_datasets/"
+            "hpi_po_state.txt"
+        ),
+        "filename": "HPI_PO_state.txt",
+        "format": "txt",
+    },
+    "zip5": {
+        "url": f"{FHFA_BASE_URL}/hpi/download/annual/hpi_at_zip5.xlsx",
+        "filename": "hpi_at_zip5.xlsx",
+        "format": "xlsx",
+    },
+}
+
+
+def _normalize_raw_datasets(datasets):
+    """Return supported raw datasets in caller-specified order."""
+    if datasets is None:
+        requested = list(FHFA_RAW_DATASETS)
+    elif isinstance(datasets, str):
+        requested = [datasets]
+    else:
+        try:
+            requested = list(datasets)
+        except TypeError as exc:
+            raise ValueError(
+                "datasets must be a string or an iterable of strings"
+            ) from exc
+
+    unsupported = [
+        dataset for dataset in requested if dataset not in _RAW_DATA_CONFIG
+    ]
+    if unsupported:
+        supported = ", ".join(FHFA_RAW_DATASETS)
+        raise ValueError(
+            f"Unsupported FHFA raw dataset(s): {unsupported}. "
+            f"Supported datasets are: {supported}."
+        )
+
+    return list(dict.fromkeys(requested))
+
+
+def _validate_raw_file(path, file_format):
+    """Return whether a downloaded FHFA file matches its expected format."""
+    if file_format == "xlsx":
+        return zipfile.is_zipfile(path)
+    if file_format == "txt":
+        try:
+            with Path(path).open(encoding="utf-8-sig") as source:
+                columns = set(source.readline().strip().split("\t"))
+        except (OSError, UnicodeError):
+            return False
+        expected = {"state", "yr", "qtr", "index_nsa", "index_sa"}
+        return expected.issubset(columns)
+    raise ValueError(f"Unsupported FHFA raw file format: {file_format}")
+
+
+def download_raw(datasets=None, data_dir=default_dir, overwrite=False):
+    """Download current FHFA source files for selected datasets.
+
+    Parameters
+    ----------
+    datasets : str or iterable of str, optional
+        One or more of ``'county'``, ``'zip3'``, ``'state'``, and ``'zip5'``.
+        By default, download all four datasets.
+    data_dir : str or path-like, optional
+        Directory where source files are stored.
+    overwrite : bool, optional
+        Replace valid source files that are already present.
+
+    Returns
+    -------
+    list of pathlib.Path
+        Local source paths in requested order. Duplicate datasets appear once.
+
+    Raises
+    ------
+    ValueError
+        If an unsupported dataset is requested.
+    RuntimeError
+        If a download fails or its content has the wrong format.
+    """
+    requested = _normalize_raw_datasets(datasets)
+    destination_dir = Path(data_dir)
+    destination_dir.mkdir(parents=True, exist_ok=True)
+    paths = []
+
+    for dataset in requested:
+        raw_config = _RAW_DATA_CONFIG[dataset]
+        destination = destination_dir / raw_config["filename"]
+        paths.append(destination)
+        if (
+            destination.exists()
+            and _validate_raw_file(destination, raw_config["format"])
+            and not overwrite
+        ):
+            continue
+
+        temporary = None
+        try:
+            with tempfile.NamedTemporaryFile(
+                mode="wb",
+                prefix=f".{dataset}.",
+                suffix=".part",
+                dir=destination_dir,
+                delete=False,
+            ) as output:
+                temporary = Path(output.name)
+                with urllib.request.urlopen(raw_config["url"]) as response:
+                    while True:
+                        chunk = response.read(1024 * 1024)
+                        if not chunk:
+                            break
+                        output.write(chunk)
+
+            if not _validate_raw_file(temporary, raw_config["format"]):
+                raise RuntimeError(
+                    f"downloaded content is not valid {raw_config['format']}"
+                )
+            os.replace(temporary, destination)
+        except Exception as exc:
+            if temporary is not None:
+                temporary.unlink(missing_ok=True)
+            raise RuntimeError(
+                f"Failed to download FHFA {dataset} data from "
+                f"{raw_config['url']}: {exc}"
+            ) from exc
+
+    return paths
+
+
+def _read_excel_table(path, first_column):
+    """Read an FHFA workbook by locating its table-header row."""
+    preview = pd.read_excel(path, header=None, nrows=20)
+    first_values = preview.iloc[:, 0].astype(str).str.strip()
+    matches = preview.index[first_values == first_column].tolist()
+    if len(matches) != 1:
+        raise ValueError(
+            f"Expected one FHFA header row beginning with {first_column!r} "
+            f"in {path}, found {len(matches)}"
+        )
+    return pd.read_excel(path, skiprows=matches[0])
 
 
 def load(
@@ -121,7 +285,9 @@ def load(
 
         elif dataset == "county":
             if all_transactions:
-                df = pd.read_excel(data_dir + "HPI_AT_BDL_county.xlsx", skiprows=6)
+                df = _read_excel_table(
+                    data_dir + "HPI_AT_BDL_county.xlsx", "State"
+                )
                 df = df.rename({var: var.lower() for var in df.columns}, axis=1)
 
                 for var in df.columns:
@@ -150,7 +316,10 @@ def load(
                 raise ValueError("ZIP3 FHFA data require all_transactions=True")
 
             if annual:
-                df = pd.read_excel(data_dir + "hpi_at_zip3_annual.xlsx", skiprows=5)
+                df = _read_excel_table(
+                    data_dir + "hpi_at_zip3_annual.xlsx",
+                    "Three-Digit ZIP Code",
+                )
                 df = df.rename({var: var.lower() for var in df.columns}, axis=1)
 
                 for var in df.columns:
@@ -173,7 +342,9 @@ def load(
             else:
                 filename = "HPI_AT_3zip"
                 excel_file = data_dir + filename + ".xlsx"
-                df = pd.read_excel(excel_file, skiprows=4)
+                df = _read_excel_table(
+                    excel_file, "Three-Digit ZIP Code"
+                )
                 df["date"] = ts.date_from_qtr(df["Year"], df["Quarter"])
                 df = df.drop(columns=["Index Type"]).rename(columns={"Index (NSA)": "hpi"})
 
@@ -186,7 +357,9 @@ def load(
             if not all_transactions:
                 raise ValueError("ZIP5 FHFA data require all_transactions=True")
 
-            df = pd.read_excel(data_dir + "hpi_at_zip5.xlsx", skiprows=5)
+            df = _read_excel_table(
+                data_dir + "hpi_at_zip5.xlsx", "Five-Digit ZIP Code"
+            )
             df = df.rename({var: var.lower() for var in df.columns}, axis=1)
 
             for var in df.columns:

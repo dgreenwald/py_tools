@@ -1,5 +1,6 @@
 """Tests for datasets.fhfa loader."""
 
+import io
 import os
 import numpy as np
 import pandas as pd
@@ -59,6 +60,34 @@ def _write_zip5_xlsx(path, rows):
     for row in rows:
         ws.append(row)
     wb.save(path)
+
+
+def _write_county_xlsx(path, rows):
+    """Write a current-layout county workbook."""
+    wb = Workbook()
+    ws = wb.active
+    ws.append(["HPI for Counties (All-Transactions Index)"])
+    ws.append([None])
+    ws.append(["Disclaimer text placeholder."])
+    ws.append(["Last updated: January 1, 2025."])
+    ws.append(["Not Seasonally Adjusted (NSA)"])
+    ws.append([
+        "State",
+        "County",
+        "FIPS code",
+        "Year",
+        "Annual Change (%)",
+        "HPI",
+        "HPI with 1990 base",
+        "HPI with 2000 base",
+    ])
+    for row in rows:
+        ws.append(row)
+    wb.save(path)
+
+
+def _file_bytes(path):
+    return path.read_bytes()
 
 
 @pytest.fixture()
@@ -173,3 +202,131 @@ def test_zip5_parquet_cache(zip5_dir):
     df_cached = fhfa.load("zip5", data_dir=zip5_dir)
     df_fresh = fhfa.load("zip5", data_dir=zip5_dir, reimport=True)
     pd.testing.assert_frame_equal(df_cached, df_fresh)
+
+
+def test_download_raw_selected_products_and_filenames(tmp_path, monkeypatch):
+    xlsx = io.BytesIO()
+    Workbook().save(xlsx)
+    state = b"state\tyr\tqtr\tindex_nsa\tindex_sa\tWarning\n"
+    requested_urls = []
+
+    def fake_urlopen(url):
+        requested_urls.append(url)
+        if url.endswith(".txt"):
+            return io.BytesIO(state)
+        return io.BytesIO(xlsx.getvalue())
+
+    monkeypatch.setattr(fhfa.urllib.request, "urlopen", fake_urlopen)
+
+    paths = fhfa.download_raw(
+        ["county", "state", "county"], data_dir=tmp_path
+    )
+
+    assert paths == [
+        tmp_path / "HPI_AT_BDL_county.xlsx",
+        tmp_path / "HPI_PO_state.txt",
+    ]
+    assert requested_urls == [
+        fhfa._RAW_DATA_CONFIG["county"]["url"],
+        fhfa._RAW_DATA_CONFIG["state"]["url"],
+    ]
+    assert fhfa._validate_raw_file(paths[0], "xlsx")
+    assert fhfa._validate_raw_file(paths[1], "txt")
+
+
+def test_download_raw_skips_valid_file_and_can_overwrite(tmp_path, monkeypatch):
+    original = io.BytesIO()
+    Workbook().save(original)
+    replacement = io.BytesIO()
+    replacement_workbook = Workbook()
+    replacement_workbook.active["A1"] = "replacement"
+    replacement_workbook.save(replacement)
+    destination = tmp_path / "HPI_AT_3zip.xlsx"
+    destination.write_bytes(original.getvalue())
+    calls = []
+
+    def fake_urlopen(url):
+        calls.append(url)
+        return io.BytesIO(replacement.getvalue())
+
+    monkeypatch.setattr(fhfa.urllib.request, "urlopen", fake_urlopen)
+
+    fhfa.download_raw("zip3", data_dir=tmp_path)
+    assert calls == []
+    assert destination.read_bytes() == original.getvalue()
+
+    fhfa.download_raw("zip3", data_dir=tmp_path, overwrite=True)
+    assert calls == [fhfa._RAW_DATA_CONFIG["zip3"]["url"]]
+    assert destination.read_bytes() == replacement.getvalue()
+
+
+@pytest.mark.parametrize("dataset", ["county", "state"])
+def test_download_raw_rejects_invalid_content(tmp_path, monkeypatch, dataset):
+    monkeypatch.setattr(
+        fhfa.urllib.request, "urlopen", lambda url: io.BytesIO(b"invalid")
+    )
+
+    with pytest.raises(RuntimeError, match=dataset):
+        fhfa.download_raw(dataset, data_dir=tmp_path)
+
+    destination = tmp_path / fhfa._RAW_DATA_CONFIG[dataset]["filename"]
+    assert not destination.exists()
+    assert list(tmp_path.glob("*.part")) == []
+
+
+def test_download_raw_rejects_unknown_product(tmp_path):
+    with pytest.raises(ValueError, match="Unsupported FHFA"):
+        fhfa.download_raw("metro", data_dir=tmp_path)
+
+
+def test_downloaded_files_feed_all_requested_loaders(tmp_path, monkeypatch):
+    source_dir = tmp_path / "source"
+    source_dir.mkdir()
+    _write_county_xlsx(
+        source_dir / "county.xlsx",
+        [["AL", "Autauga", 1001, 2020, 2.0, 110.0, 105.0, 100.0]],
+    )
+    _write_zip3_quarterly_xlsx(
+        source_dir / "zip3.xlsx",
+        [[100, 2020, 1, 110.0, "Native 3-Digit ZIP index"]],
+    )
+    _write_zip5_xlsx(
+        source_dir / "zip5.xlsx",
+        [[10001, 2020, 2.0, 110.0, 105.0, 100.0]],
+    )
+    state = (
+        b"state\tyr\tqtr\tindex_nsa\tindex_sa\tWarning\n"
+        b"AL\t2020\t1\t110.0\t108.0\t\n"
+    )
+    payloads = {
+        fhfa._RAW_DATA_CONFIG["county"]["url"]: _file_bytes(
+            source_dir / "county.xlsx"
+        ),
+        fhfa._RAW_DATA_CONFIG["zip3"]["url"]: _file_bytes(
+            source_dir / "zip3.xlsx"
+        ),
+        fhfa._RAW_DATA_CONFIG["zip5"]["url"]: _file_bytes(
+            source_dir / "zip5.xlsx"
+        ),
+        fhfa._RAW_DATA_CONFIG["state"]["url"]: state,
+    }
+    monkeypatch.setattr(
+        fhfa.urllib.request,
+        "urlopen",
+        lambda url: io.BytesIO(payloads[url]),
+    )
+    data_dir = tmp_path / "download"
+
+    fhfa.download_raw(data_dir=data_dir)
+    loader_dir = str(data_dir) + "/"
+    county = fhfa.load("county", data_dir=loader_dir)
+    zip3 = fhfa.load("zip3", data_dir=loader_dir)
+    state_df = fhfa.load(
+        "state", all_transactions=False, data_dir=loader_dir
+    )
+    zip5 = fhfa.load("zip5", data_dir=loader_dir)
+
+    assert county.loc[(1001, pd.Timestamp("2020-01-01")), "hpi"] == 110.0
+    assert zip3.loc[(100, pd.Timestamp("2020-01-01")), "hpi"] == 110.0
+    assert state_df.loc[("AL", pd.Timestamp("2020-01-01")), "index_sa"] == 108.0
+    assert zip5.loc[(10001, pd.Timestamp("2020-01-01")), "hpi"] == 110.0
