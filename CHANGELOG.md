@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.1] - 2026-08-04
+
+### Added
+
+- Add direct downloads of current FHFA raw source files for county, ZIP3,
+  state, and ZIP5 house price index datasets.
+- Add direct downloads of raw IRS ZIP-code and county tax-statistics archives,
+  with supported-year validation and compatibility with existing loaders.
+
 ## [0.2.0] - 2026-07-18
 
 ### Added
