@@ -1,3 +1,9 @@
+import os
+import tempfile
+import urllib.request
+import zipfile
+from pathlib import Path
+
 import numpy as np
 import pandas as pd
 
@@ -6,6 +12,139 @@ from . import config
 default_dir = config.base_dir() + "hmda/"
 DATASET_NAME = "hmda"
 DESCRIPTION = "Home Mortgage Disclosure Act (HMDA) dataset loader."
+SNAPSHOT_LAR_YEARS = tuple(range(2025, 2016, -1))
+_SNAPSHOT_LAR_CONFIG = {
+    year: {
+        "url": (
+            f"https://files.ffiec.cfpb.gov/static-data/snapshot/{year}/"
+            f"{year}_public_lar_csv.zip"
+        ),
+        "filename": f"{year}_public_lar_csv.zip",
+    }
+    for year in SNAPSHOT_LAR_YEARS
+}
+
+
+def _normalize_snapshot_lar_years(years):
+    """Return configured snapshot LAR years in caller-specified order."""
+    supported_years = tuple(_SNAPSHOT_LAR_CONFIG)
+    if years is None:
+        requested = list(supported_years)
+    elif isinstance(years, (int, np.integer)):
+        requested = [int(years)]
+    else:
+        try:
+            requested = [int(year) for year in years]
+        except (TypeError, ValueError) as exc:
+            raise ValueError(
+                "years must be an integer or an iterable of integers"
+            ) from exc
+
+    unsupported = [year for year in requested if year not in supported_years]
+    if unsupported:
+        supported = ", ".join(str(year) for year in supported_years)
+        raise ValueError(
+            f"Unsupported HMDA snapshot LAR year(s): {unsupported}. "
+            f"Supported years are: {supported}."
+        )
+
+    return list(dict.fromkeys(requested))
+
+
+def _snapshot_lar_archive_path(year, data_dir=default_dir):
+    """Return the canonical local path for a snapshot LAR archive."""
+    try:
+        filename = _SNAPSHOT_LAR_CONFIG[year]["filename"]
+    except KeyError as exc:
+        raise ValueError(f"Unsupported HMDA snapshot LAR year: {year}") from exc
+    return Path(data_dir) / "snapshot" / str(year) / filename
+
+
+def _validate_snapshot_lar_archive(path):
+    """Return whether an archive is a ZIP with a nonempty CSV member."""
+    if not zipfile.is_zipfile(path):
+        return False
+    try:
+        with zipfile.ZipFile(path) as archive:
+            return any(
+                not member.is_dir()
+                and member.file_size > 0
+                and Path(member.filename).suffix.lower() == ".csv"
+                for member in archive.infolist()
+            )
+    except (OSError, zipfile.BadZipFile):
+        return False
+
+
+def download_snapshot_lar(years=None, data_dir=default_dir, overwrite=False):
+    """Download annual HMDA snapshot LAR CSV archives without extracting them.
+
+    Parameters
+    ----------
+    years : int or iterable of int, optional
+        Snapshot year or years to download. By default, download every
+        configured snapshot year.
+    data_dir : str or path-like, optional
+        Root directory for HMDA data files.
+    overwrite : bool, optional
+        Replace valid archives that are already present.
+
+    Returns
+    -------
+    list of pathlib.Path
+        Local archive paths in requested order. Duplicate years appear once.
+
+    Raises
+    ------
+    ValueError
+        If any requested year is unsupported.
+    RuntimeError
+        If a download fails or does not contain a nonempty CSV member.
+    """
+    requested = _normalize_snapshot_lar_years(years)
+    paths = []
+
+    for year in requested:
+        destination = _snapshot_lar_archive_path(year, data_dir=data_dir)
+        paths.append(destination)
+        if (
+            destination.exists()
+            and _validate_snapshot_lar_archive(destination)
+            and not overwrite
+        ):
+            continue
+
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        url = _SNAPSHOT_LAR_CONFIG[year]["url"]
+        temporary = None
+        try:
+            with tempfile.NamedTemporaryFile(
+                mode="wb",
+                prefix=f".{year}_public_lar.",
+                suffix=".part",
+                dir=destination.parent,
+                delete=False,
+            ) as output:
+                temporary = Path(output.name)
+                with urllib.request.urlopen(url) as response:
+                    while chunk := response.read(1024 * 1024):
+                        output.write(chunk)
+
+            if not _validate_snapshot_lar_archive(temporary):
+                raise RuntimeError(
+                    "downloaded content is not a ZIP archive containing "
+                    "a nonempty CSV member"
+                )
+            os.replace(temporary, destination)
+        except Exception as exc:
+            if temporary is not None:
+                temporary.unlink(missing_ok=True)
+            raise RuntimeError(
+                f"Failed to download HMDA snapshot LAR data for {year} "
+                f"from {url}: {exc}"
+            ) from exc
+
+    return paths
 
 
 def load(data_dir=None, **kwargs):
