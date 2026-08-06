@@ -344,7 +344,7 @@ def se99(A_in):
 
 def gchol(A):
 
-    """Return `(L, e)`: the Schnabel-Eskow generalized Cholesky
+    r"""Return `(L, e)`: the Schnabel-Eskow generalized Cholesky
     decomposition of `M = A + diag(e) = dot(L, L.T)` where
 
     1) `M` is safely symmetric positive definite (SPD) and well
