@@ -1,4 +1,5 @@
 import os
+import sys
 import tempfile
 import urllib.request
 import zipfile
@@ -20,29 +21,105 @@ _SNAPSHOT_LAR_CONFIG = {
             f"{year}_public_lar_csv.zip"
         ),
         "filename": f"{year}_public_lar_csv.zip",
-        "source_dir": "snapshot",
+        "format": "zip_csv",
     }
     for year in SNAPSHOT_LAR_YEARS
 }
-HISTORIC_LAR_YEARS = tuple(range(2016, 2006, -1))
-_HISTORIC_LAR_CONFIG = {
+THREE_YEAR_LAR_YEARS = tuple(range(2022, 2016, -1))
+_THREE_YEAR_LAR_CONFIG = {
+    year: {
+        "url": (
+            f"https://files.ffiec.cfpb.gov/static-data/three-year/{year}/"
+            f"{year}_public_lar_three_year_csv.zip"
+        ),
+        "filename": f"{year}_public_lar_three_year_csv.zip",
+        "format": "zip_csv",
+    }
+    for year in THREE_YEAR_LAR_YEARS
+}
+CFPB_LAR_YEARS = tuple(range(2017, 2006, -1))
+_CFPB_LAR_CONFIG = {
     year: {
         "url": (
             "https://files.consumerfinance.gov/hmda-historic-loan-data/"
             f"hmda_{year}_nationwide_all-records_codes.zip"
         ),
         "filename": f"hmda_{year}_nationwide_all-records_codes.zip",
-        "source_dir": "historic",
+        "format": "zip_csv",
     }
-    for year in HISTORIC_LAR_YEARS
+    for year in CFPB_LAR_YEARS
 }
-LAR_YEARS = SNAPSHOT_LAR_YEARS + HISTORIC_LAR_YEARS
-_LAR_CONFIG = {**_SNAPSHOT_LAR_CONFIG, **_HISTORIC_LAR_CONFIG}
+NATIONAL_ARCHIVES_LAR_YEARS = tuple(range(1989, 1980, -1))
+_NATIONAL_ARCHIVES_LAR_CONFIG = {
+    year: {
+        "url": (
+            "https://catalog.archives.gov/medialz/electronic-records/"
+            f"rg-082/hmda/HMD_FACDSB{year % 100:02d}.txt"
+        ),
+        "filename": f"HMD_FACDSB{year % 100:02d}.txt",
+        "format": "txt",
+    }
+    for year in NATIONAL_ARCHIVES_LAR_YEARS
+}
+_NATIONAL_ARCHIVES_ZIP_PATHS = {
+    **{year: f"HMS.U{year}.LARS.zip" for year in range(1990, 2001)},
+    2001: "ULAR01/HMS.U2001.LARS.PUBLIC.DATA.zip",
+    2002: "HMS.U2002.LARS.zip",
+    2003: "HMS.U2003.LARS.zip",
+    2004: "ULAR04/u2004lar.public.dat.zip",
+    2005: "ULAR0506/LARS.ULTIMATE.2005.DAT.zip",
+    2006: "ULAR0506/LARS.ULTIMATE.2006.DAT.zip",
+    2007: "ULAR0708/lars.ultimate.2007.dat.zip",
+    2008: "ULAR0708/lars.ultimate.2008.dat.zip",
+    2009: "ULAR09/2009_Ultimate_PUBLIC_LAR.dat.zip",
+    2010: "UTL10/Lars.ultimate.2010.dat.zip",
+    2011: "UTL11/Lars.ultimate.2011.dat.zip",
+    2012: "2012/Lars.ultimate.2012.dat.zip",
+    2013: "2013/Lars.ultimate.2013.dat.zip",
+    2014: "2014/ULAR_2014.zip",
+}
+_NATIONAL_ARCHIVES_LAR_CONFIG.update(
+    {
+        year: {
+            "url": (
+                "https://catalog.archives.gov/medialz/electronic-records/"
+                f"rg-082/hmda/{relative_path}"
+            ),
+            "filename": Path(relative_path).name,
+            "format": "zip",
+        }
+        for year, relative_path in _NATIONAL_ARCHIVES_ZIP_PATHS.items()
+    }
+)
+NATIONAL_ARCHIVES_LAR_YEARS = tuple(range(2014, 1980, -1))
+LAR_SOURCES = ("ffiec_three_year", "ffiec_snapshot", "cfpb", "nara")
+_LAR_SOURCE_CONFIG = {
+    "ffiec_three_year": _THREE_YEAR_LAR_CONFIG,
+    "ffiec_snapshot": _SNAPSHOT_LAR_CONFIG,
+    "cfpb": _CFPB_LAR_CONFIG,
+    "nara": _NATIONAL_ARCHIVES_LAR_CONFIG,
+}
+LAR_YEARS = tuple(range(2025, 1980, -1))
+_AUTO_LAR_SOURCE = {
+    **{year: "nara" for year in range(1981, 2007)},
+    **{year: "cfpb" for year in range(2007, 2017)},
+    **{year: "ffiec_three_year" for year in range(2017, 2023)},
+    **{year: "ffiec_snapshot" for year in range(2023, 2026)},
+}
 
 
-def _normalize_lar_years(years):
-    """Return configured LAR years in caller-specified order."""
-    supported_years = tuple(_LAR_CONFIG)
+def _normalize_lar_years(years, source="auto"):
+    """Return source-supported LAR years in caller-specified order."""
+    if source == "auto":
+        supported_years = LAR_YEARS
+    elif source in _LAR_SOURCE_CONFIG:
+        supported_years = tuple(sorted(_LAR_SOURCE_CONFIG[source], reverse=True))
+    else:
+        supported = ", ".join(("auto", *LAR_SOURCES))
+        raise ValueError(
+            f"Unsupported HMDA LAR source {source!r}. "
+            f"Supported sources are: {supported}."
+        )
     if years is None:
         requested = list(supported_years)
     elif isinstance(years, (int, np.integer)):
@@ -59,26 +136,42 @@ def _normalize_lar_years(years):
     if unsupported:
         supported = ", ".join(str(year) for year in supported_years)
         raise ValueError(
-            f"Unsupported HMDA LAR year(s): {unsupported}. "
-            f"Supported years are: {supported}."
+            f"HMDA LAR year(s) {unsupported} are unavailable from "
+            f"source {source!r}. Supported years are: {supported}."
         )
 
     return list(dict.fromkeys(requested))
 
 
-def _lar_archive_path(year, data_dir=default_dir):
-    """Return the canonical local path for an annual LAR archive."""
-    try:
-        year_config = _LAR_CONFIG[year]
-    except KeyError as exc:
-        raise ValueError(f"Unsupported HMDA LAR year: {year}") from exc
+def _resolve_lar_source(year, source="auto"):
+    """Resolve an explicit source name for a requested year."""
+    if source == "auto":
+        try:
+            return _AUTO_LAR_SOURCE[year]
+        except KeyError as exc:
+            raise ValueError(f"Unsupported HMDA LAR year: {year}") from exc
+    if source not in _LAR_SOURCE_CONFIG:
+        supported = ", ".join(("auto", *LAR_SOURCES))
+        raise ValueError(
+            f"Unsupported HMDA LAR source {source!r}. "
+            f"Supported sources are: {supported}."
+        )
+    if year not in _LAR_SOURCE_CONFIG[source]:
+        raise ValueError(f"HMDA LAR year {year} is unavailable from source {source!r}.")
+    return source
+
+
+def _lar_file_path(year, data_dir=default_dir, source="auto"):
+    """Return the canonical local path for an annual LAR source file."""
+    resolved_source = _resolve_lar_source(year, source)
+    year_config = _LAR_SOURCE_CONFIG[resolved_source][year]
     return (
-        Path(data_dir) / year_config["source_dir"] / str(year) / year_config["filename"]
+        Path(data_dir) / "raw" / resolved_source / str(year) / year_config["filename"]
     )
 
 
-def _validate_lar_archive(path):
-    """Return whether an archive is a ZIP with a nonempty CSV member."""
+def _validate_lar_zip(path, require_csv=False):
+    """Return whether a ZIP has a suitable nonempty data member."""
     if not zipfile.is_zipfile(path):
         return False
     try:
@@ -86,54 +179,140 @@ def _validate_lar_archive(path):
             return any(
                 not member.is_dir()
                 and member.file_size > 0
-                and Path(member.filename).suffix.lower() == ".csv"
+                and (not require_csv or Path(member.filename).suffix.lower() == ".csv")
                 for member in archive.infolist()
             )
     except (OSError, zipfile.BadZipFile):
         return False
 
 
-def download_lar(years=None, data_dir=default_dir, overwrite=False):
-    """Download annual HMDA LAR archives from the source for each year.
+def _validate_lar_text(path):
+    """Return whether a file begins with uniform ASCII fixed-width records."""
+    try:
+        with Path(path).open("rb") as source:
+            sample = source.read(8192)
+        text = sample.decode("ascii")
+    except (OSError, UnicodeDecodeError):
+        return False
+
+    complete_lines = text.splitlines()[:-1]
+    return (
+        len(complete_lines) >= 2
+        and len({len(line) for line in complete_lines}) == 1
+        and len(complete_lines[0]) >= 50
+        and all(line.isprintable() and line.strip() for line in complete_lines)
+    )
+
+
+def _validate_lar_file(path, file_format):
+    """Return whether a downloaded LAR file has its configured format."""
+    if file_format == "zip":
+        return _validate_lar_zip(path)
+    if file_format == "zip_csv":
+        return _validate_lar_zip(path, require_csv=True)
+    if file_format == "txt":
+        return _validate_lar_text(path)
+    raise ValueError(f"Unsupported HMDA LAR file format: {file_format}")
+
+
+def _response_content_length(response):
+    """Return a response's byte length when supplied by the server."""
+    headers = getattr(response, "headers", None)
+    value = headers.get("Content-Length") if headers is not None else None
+    if value is None and hasattr(response, "getheader"):
+        value = response.getheader("Content-Length")
+    try:
+        return int(value) if value is not None else None
+    except (TypeError, ValueError):
+        return None
+
+
+def _write_progress(label, downloaded, total, finished=False):
+    """Write one in-place terminal progress update to stderr."""
+    downloaded_mib = downloaded / (1024 * 1024)
+    if total:
+        fraction = min(downloaded / total, 1.0)
+        completed = round(30 * fraction)
+        bar = "=" * completed + "-" * (30 - completed)
+        total_mib = total / (1024 * 1024)
+        status = (
+            f"{label} [{bar}] {fraction:6.1%} "
+            f"{downloaded_mib:,.1f}/{total_mib:,.1f} MiB"
+        )
+    else:
+        status = f"{label} {downloaded_mib:,.1f} MiB"
+    print(status, end="\n" if finished else "\r", file=sys.stderr, flush=True)
+
+
+def _stream_response(response, output, label=None):
+    """Copy a response to an output stream, optionally reporting progress."""
+    total = _response_content_length(response)
+    downloaded = 0
+    try:
+        while chunk := response.read(1024 * 1024):
+            output.write(chunk)
+            downloaded += len(chunk)
+            if label is not None:
+                _write_progress(label, downloaded, total)
+    finally:
+        if label is not None:
+            _write_progress(label, downloaded, total, finished=True)
+
+
+def download_lar(
+    years=None,
+    source="auto",
+    data_dir=default_dir,
+    overwrite=False,
+    progress=False,
+):
+    """Download annual HMDA LAR files from the source for each year.
 
     Parameters
     ----------
     years : int or iterable of int, optional
         Year or years to download. By default, download every configured year.
-        Years from 2017 onward use FFIEC snapshots; earlier years use CFPB
-        nationwide, all-records, codes-only archives.
+    source : {"auto", "ffiec_three_year", "ffiec_snapshot", "cfpb", "nara"}, optional
+        Data release to download. ``"auto"`` prefers FFIEC three-year files
+        for 2017--2022, FFIEC snapshots for 2023 onward, CFPB files for
+        2007--2016, and National Archives files for earlier years. With an
+        explicit source and no ``years``, download every year from that source.
     data_dir : str or path-like, optional
         Root directory for HMDA data files.
     overwrite : bool, optional
         Replace valid archives that are already present.
+    progress : bool, optional
+        Display download progress on standard error. Defaults to ``False``.
 
     Returns
     -------
     list of pathlib.Path
-        Local archive paths in requested order. Duplicate years appear once.
+        Local source paths in requested order. Duplicate years appear once.
 
     Raises
     ------
     ValueError
         If any requested year is unsupported.
     RuntimeError
-        If a download fails or does not contain a nonempty CSV member.
+        If a download fails or has the wrong file format.
     """
-    requested = _normalize_lar_years(years)
+    requested = _normalize_lar_years(years, source=source)
     paths = []
 
     for year in requested:
-        destination = _lar_archive_path(year, data_dir=data_dir)
+        resolved_source = _resolve_lar_source(year, source)
+        destination = _lar_file_path(year, data_dir=data_dir, source=resolved_source)
+        year_config = _LAR_SOURCE_CONFIG[resolved_source][year]
         paths.append(destination)
         if (
             destination.exists()
-            and _validate_lar_archive(destination)
+            and _validate_lar_file(destination, year_config["format"])
             and not overwrite
         ):
             continue
 
         destination.parent.mkdir(parents=True, exist_ok=True)
-        url = _LAR_CONFIG[year]["url"]
+        url = year_config["url"]
         temporary = None
         try:
             with tempfile.NamedTemporaryFile(
@@ -145,13 +324,12 @@ def download_lar(years=None, data_dir=default_dir, overwrite=False):
             ) as output:
                 temporary = Path(output.name)
                 with urllib.request.urlopen(url) as response:
-                    while chunk := response.read(1024 * 1024):
-                        output.write(chunk)
+                    label = f"HMDA {year} ({resolved_source})" if progress else None
+                    _stream_response(response, output, label=label)
 
-            if not _validate_lar_archive(temporary):
+            if not _validate_lar_file(temporary, year_config["format"]):
                 raise RuntimeError(
-                    "downloaded content is not a ZIP archive containing "
-                    "a nonempty CSV member"
+                    f"downloaded content is not valid {year_config['format']} data"
                 )
             os.replace(temporary, destination)
         except Exception as exc:
