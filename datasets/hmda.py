@@ -447,8 +447,6 @@ _INTEGER_PREFIXES = (
     "co_applicant_race_",
 )
 _NULL_TOKENS = {"", "NA", "N/A", "NULL", "null"}
-
-
 def _normalize_lar_years(years, source="auto"):
     """Return source-supported LAR years in caller-specified order."""
     if source == "auto":
@@ -770,10 +768,20 @@ def _coerce_lar_chunk(frame, year, source):
 
         values = _null_numeric_tokens(values)
         try:
-            numeric = pd.to_numeric(values, errors="raise")
+            # The pre-2004 NARA files contain sparse malformed bytes in
+            # otherwise numeric fields (for example ``B`` in applicant race
+            # and ``N`` in applicant sex). The downloaded archive remains the
+            # lossless representation; parquet stores those artifacts as null.
+            tolerate_archival_artifacts = source == "nara" and int(year) <= 2003
+            numeric = pd.to_numeric(
+                values, errors="coerce" if tolerate_archival_artifacts else "raise"
+            )
             if kind == "integer":
                 nonnull = numeric.dropna()
-                if not np.equal(nonnull, np.floor(nonnull)).all():
+                integral = np.equal(nonnull, np.floor(nonnull))
+                if tolerate_archival_artifacts:
+                    numeric = numeric.mask(numeric.notna() & numeric.mod(1).ne(0))
+                elif not integral.all():
                     raise ValueError("contains a non-integral value")
                 converted[column] = numeric.astype("Int64")
             else:

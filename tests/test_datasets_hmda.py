@@ -482,6 +482,34 @@ def test_convert_nara_fixed_width_cohorts(tmp_path, year, widths, names, cohort)
     )
 
 
+def test_convert_nulls_legacy_nara_nonnumeric_numeric_artifacts(tmp_path):
+    values = {index: "1" for index in range(len(hmda._NARA_1990_2003_WIDTHS))}
+    values[1] = "00001234"
+    values[12] = "B"
+    values[13] = "."
+    values[14] = "N"
+    values[15] = "/"
+    values[16] = "23.7"
+    record = _fixed_width_record(hmda._NARA_1990_2003_WIDTHS, values).encode(
+        "latin-1"
+    )
+    _install_raw_zip(tmp_path, 1990, "nara", "lar_1990.dat", record)
+
+    [output] = hmda.convert_lar(1990, source="nara", data_dir=tmp_path)
+    frame = pd.read_parquet(output)
+
+    assert frame["app_race"].dtype == pd.Int64Dtype()
+    assert frame["co_app_race"].dtype == pd.Int64Dtype()
+    assert frame["app_sex"].dtype == pd.Int64Dtype()
+    assert frame["co_app_sex"].dtype == pd.Int64Dtype()
+    assert frame["app_income"].dtype == pd.Int64Dtype()
+    assert pd.isna(frame.loc[0, "app_race"])
+    assert pd.isna(frame.loc[0, "co_app_race"])
+    assert pd.isna(frame.loc[0, "app_sex"])
+    assert pd.isna(frame.loc[0, "co_app_sex"])
+    assert pd.isna(frame.loc[0, "app_income"])
+
+
 def test_convert_uses_documented_numeric_types_for_cfpb(tmp_path):
     csv = (
         b"as_of_year,respondent_id,state_code,msamd,census_tract_number,"
