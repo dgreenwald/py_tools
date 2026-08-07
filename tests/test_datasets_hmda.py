@@ -3,6 +3,7 @@
 import io
 import zipfile
 
+import pandas as pd
 import pytest
 
 from py_tools.datasets import hmda
@@ -289,3 +290,214 @@ def test_national_archives_download_rejects_invalid_text(
     destination = hmda._lar_file_path(1989, tmp_path)
     assert not destination.exists()
     assert list(destination.parent.glob("*.part")) == []
+
+
+def _install_raw_zip(tmp_path, year, source, member, contents):
+    path = hmda._lar_file_path(year, tmp_path, source=source)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(_archive_bytes({member: contents}))
+    return path
+
+
+def _fixed_width_record(widths, values=None):
+    values = values or {}
+    fields = []
+    for index, width in enumerate(widths):
+        value = str(values.get(index, ""))
+        assert len(value) <= width
+        fields.append(value.ljust(width))
+    return "".join(fields)
+
+
+def test_convert_csv_to_source_specific_parquet(tmp_path):
+    csv = (
+        b"activity_year,lei,state_code,county_code,action_taken,loan_amount,"
+        b"interest_rate,unknown_field\n"
+        b"2023,00ABC,06,001,1,250000,Exempt,alpha\n"
+        b"2023,00DEF,12,003,,300000,4.25,beta\n"
+    )
+    _install_raw_zip(
+        tmp_path,
+        2023,
+        "ffiec_snapshot",
+        "2023_public_lar.csv",
+        csv,
+    )
+
+    paths = hmda.convert_lar(
+        2023, source="ffiec_snapshot", data_dir=tmp_path, chunksize=1
+    )
+
+    expected = tmp_path / "parquet" / "ffiec_snapshot" / "2023" / "lar.parquet"
+    assert paths == [expected]
+    frame = pd.read_parquet(expected)
+    assert frame["activity_year"].dtype == pd.Int64Dtype()
+    assert frame["action_taken"].dtype == pd.Int64Dtype()
+    assert frame["loan_amount"].dtype == pd.Int64Dtype()
+    assert frame["lei"].tolist() == ["00ABC", "00DEF"]
+    assert frame["county_code"].tolist() == ["001", "003"]
+    assert frame["interest_rate"].tolist() == ["Exempt", "4.25"]
+    assert frame["unknown_field"].tolist() == ["alpha", "beta"]
+
+    import pyarrow.parquet as pq
+
+    parquet = pq.ParquetFile(expected)
+    assert parquet.num_row_groups == 2
+    metadata = parquet.schema_arrow.metadata
+    assert metadata[b"hmda.source"] == b"ffiec_snapshot"
+    assert metadata[b"hmda.year"] == b"2023"
+    assert metadata[b"hmda.schema_cohort"] == b"csv"
+
+
+@pytest.mark.parametrize(
+    "year,widths,names,cohort",
+    [
+        (1981, hmda._NARA_PRE_1990_WIDTHS, hmda._NARA_PRE_1990_NAMES, "1981-1989"),
+        (
+            1990,
+            hmda._NARA_1990_2003_WIDTHS,
+            hmda._NARA_1990_2003_NAMES,
+            "1990-2003",
+        ),
+        (
+            2004,
+            hmda._NARA_2004_2014_WIDTHS,
+            hmda._NARA_2004_2014_NAMES,
+            "2004-2014",
+        ),
+    ],
+)
+def test_convert_nara_fixed_width_cohorts(tmp_path, year, widths, names, cohort):
+    values = {index: "1" for index in range(len(widths))}
+    values[1] = "00001234"
+    records = "\r\n".join(
+        [_fixed_width_record(widths, values), _fixed_width_record(widths, values)]
+    ).encode("latin-1")
+    if year < 1990:
+        raw_path = hmda._lar_file_path(year, tmp_path, source="nara")
+        raw_path.parent.mkdir(parents=True)
+        raw_path.write_bytes(records + b"\r\n")
+    else:
+        _install_raw_zip(tmp_path, year, "nara", f"lar_{year}.dat", records)
+
+    [output] = hmda.convert_lar(year, source="nara", data_dir=tmp_path)
+    frame = pd.read_parquet(output)
+
+    assert frame.columns.tolist() == names
+    assert len(frame) == 2
+    assert frame["respondent_id"].iloc[0] == "00001234"
+    assert frame["state_code"].iloc[0] == "1"
+    import pyarrow.parquet as pq
+
+    assert pq.ParquetFile(output).schema_arrow.metadata[b"hmda.schema_cohort"] == (
+        cohort.encode()
+    )
+
+
+def test_convert_uses_documented_numeric_types_for_cfpb(tmp_path):
+    csv = (
+        b"as_of_year,respondent_id,state_code,loan_amount_000s,"
+        b"applicant_income_000s,action_taken\n"
+        b"2016,0000123456,06,250,75.5,1\n"
+    )
+    _install_raw_zip(tmp_path, 2016, "cfpb", "hmda_2016.csv", csv)
+
+    [output] = hmda.convert_lar(2016, source="cfpb", data_dir=tmp_path)
+    frame = pd.read_parquet(output)
+
+    assert frame["as_of_year"].dtype == pd.Int64Dtype()
+    assert frame["loan_amount_000s"].dtype == pd.Int64Dtype()
+    assert frame["applicant_income_000s"].dtype == pd.Float64Dtype()
+    assert frame["respondent_id"].iloc[0] == "0000123456"
+    assert frame["state_code"].iloc[0] == "06"
+
+
+def test_load_lar_projects_and_filters_parquet(tmp_path):
+    csv = b"activity_year,action_taken,lei\n2023,1,A\n2023,3,B\n"
+    _install_raw_zip(tmp_path, 2023, "ffiec_snapshot", "2023_public_lar.csv", csv)
+    hmda.convert_lar(2023, source="ffiec_snapshot", data_dir=tmp_path)
+
+    frame = hmda.load_lar(
+        2023,
+        source="ffiec_snapshot",
+        data_dir=tmp_path,
+        columns=["lei", "action_taken"],
+        filters=[("action_taken", "==", 1)],
+    )
+    registry_frame = hmda.load(
+        yr=2023, source="ffiec_snapshot", data_dir=tmp_path, columns=["lei"]
+    )
+
+    assert frame.to_dict("records") == [{"lei": "A", "action_taken": 1}]
+    assert registry_frame["lei"].tolist() == ["A", "B"]
+
+
+def test_load_lar_converts_downloaded_raw_file_if_missing(tmp_path):
+    csv = b"activity_year,action_taken,lei\n2023,1,A\n"
+    _install_raw_zip(tmp_path, 2023, "ffiec_snapshot", "2023_public_lar.csv", csv)
+
+    with pytest.raises(FileNotFoundError, match="convert_lar"):
+        hmda.load_lar(2023, source="ffiec_snapshot", data_dir=tmp_path)
+
+    frame = hmda.load_lar(
+        2023,
+        source="ffiec_snapshot",
+        data_dir=tmp_path,
+        convert_if_missing=True,
+    )
+
+    assert frame.to_dict("records") == [
+        {"activity_year": 2023, "action_taken": 1, "lei": "A"}
+    ]
+    assert hmda._lar_parquet_path(2023, tmp_path, source="ffiec_snapshot").exists()
+
+
+def test_conversion_keeps_overlapping_sources_separate(tmp_path):
+    _install_raw_zip(
+        tmp_path,
+        2017,
+        "cfpb",
+        "hmda_2017.csv",
+        b"as_of_year,respondent_id\n2017,OLD\n",
+    )
+    _install_raw_zip(
+        tmp_path,
+        2017,
+        "ffiec_snapshot",
+        "2017_public_lar.csv",
+        b"activity_year,lei\n2017,NEW\n",
+    )
+
+    [cfpb] = hmda.convert_lar(2017, source="cfpb", data_dir=tmp_path)
+    [snapshot] = hmda.convert_lar(2017, source="ffiec_snapshot", data_dir=tmp_path)
+
+    assert cfpb != snapshot
+    assert cfpb.parts[-3] == "cfpb"
+    assert snapshot.parts[-3] == "ffiec_snapshot"
+    assert pd.read_parquet(cfpb)["respondent_id"].tolist() == ["OLD"]
+    assert pd.read_parquet(snapshot)["lei"].tolist() == ["NEW"]
+
+
+def test_conversion_failure_preserves_existing_parquet(tmp_path):
+    good = b"activity_year,action_taken\n2023,1\n"
+    raw_path = _install_raw_zip(
+        tmp_path, 2023, "ffiec_snapshot", "2023_public_lar.csv", good
+    )
+    [output] = hmda.convert_lar(2023, data_dir=tmp_path)
+    original = output.read_bytes()
+    raw_path.write_bytes(
+        _archive_bytes(
+            {"2023_public_lar.csv": b"activity_year,action_taken\n2023,bad\n"}
+        )
+    )
+
+    with pytest.raises(RuntimeError, match=r"2023.*action_taken"):
+        hmda.convert_lar(2023, data_dir=tmp_path, overwrite=True)
+
+    assert output.read_bytes() == original
+    assert list(output.parent.glob("*.part")) == []
+
+
+def test_convert_requires_downloaded_raw_file(tmp_path):
+    with pytest.raises(FileNotFoundError, match="download_lar"):
+        hmda.convert_lar(2023, data_dir=tmp_path)

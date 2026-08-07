@@ -2,7 +2,9 @@ import os
 import sys
 import tempfile
 import urllib.request
+import warnings
 import zipfile
+from contextlib import contextmanager
 from pathlib import Path
 
 import numpy as np
@@ -107,6 +109,327 @@ _AUTO_LAR_SOURCE = {
     **{year: "ffiec_snapshot" for year in range(2023, 2026)},
 }
 
+_NARA_PRE_1990_WIDTHS = [
+    28,
+    8,
+    4,
+    6,
+    2,
+    3,
+    1,
+    2,
+    1,
+    4,
+    9,
+    1,
+    4,
+    9,
+    1,
+    4,
+    9,
+    1,
+    4,
+    9,
+    1,
+    4,
+    9,
+    1,
+    1,
+]
+_NARA_PRE_1990_NAMES = [
+    "respondent_name",
+    "respondent_id",
+    "msa_of_report",
+    "census_tract",
+    "state_code",
+    "county_code",
+    "agency_code",
+    "census_validity_flag",
+    "government_loan_validity_flag",
+    "government_loan_count",
+    "government_loan_amount_000s",
+    "conventional_loan_validity_flag",
+    "conventional_loan_count",
+    "conventional_loan_amount_000s",
+    "home_improvement_validity_flag",
+    "home_improvement_loan_count",
+    "home_improvement_loan_amount_000s",
+    "multifamily_validity_flag",
+    "multifamily_loan_count",
+    "multifamily_loan_amount_000s",
+    "nonoccupant_validity_flag",
+    "nonoccupant_loan_count",
+    "nonoccupant_loan_amount_000s",
+    "record_quality_flag",
+    "filler",
+]
+_NARA_1990_2003_WIDTHS = [
+    4,
+    10,
+    1,
+    1,
+    1,
+    1,
+    5,
+    1,
+    4,
+    2,
+    3,
+    7,
+    1,
+    1,
+    1,
+    1,
+    4,
+    1,
+    1,
+    1,
+    1,
+    1,
+    7,
+]
+_NARA_1990_2003_NAMES = [
+    "asof_date",
+    "respondent_id",
+    "agency_code",
+    "loan_type",
+    "loan_purp",
+    "occupancy",
+    "loan_amt",
+    "action_taken",
+    "prop_msa",
+    "state_code",
+    "county_code",
+    "census_tract",
+    "app_race",
+    "co_app_race",
+    "app_sex",
+    "co_app_sex",
+    "app_income",
+    "purchaser_type",
+    "denial_reason_1",
+    "denial_reason_2",
+    "denial_reason_3",
+    "edit_status",
+    "seq_num",
+]
+_NARA_2004_2014_WIDTHS = [
+    4,
+    10,
+    1,
+    1,
+    1,
+    1,
+    5,
+    1,
+    5,
+    2,
+    3,
+    7,
+    1,
+    1,
+    4,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    5,
+    1,
+    1,
+    7,
+]
+_NARA_2004_2014_NAMES = [
+    "asof_date",
+    "respondent_id",
+    "agency_code",
+    "loan_type",
+    "loan_purp",
+    "occupancy",
+    "loan_amt",
+    "action_taken",
+    "prop_msa",
+    "state_code",
+    "county_code",
+    "census_tract",
+    "app_sex",
+    "co_app_sex",
+    "app_income",
+    "purchaser_type",
+    "denial_reason_1",
+    "denial_reason_2",
+    "denial_reason_3",
+    "edit_status",
+    "prop_type",
+    "preapprovals",
+    "app_ethnicity",
+    "co_app_ethnicity",
+    "app_race_1",
+    "app_race_2",
+    "app_race_3",
+    "app_race_4",
+    "app_race_5",
+    "co_app_race_1",
+    "co_app_race_2",
+    "co_app_race_3",
+    "co_app_race_4",
+    "co_app_race_5",
+    "rate_spread",
+    "hoepa_status",
+    "lien_status",
+    "seq_num",
+]
+
+_IDENTIFIER_COLUMNS = {
+    "lei",
+    "respondent_id",
+    "respondent_id_ts",
+    "sequence_number",
+    "seq_num",
+    "uli",
+}
+_GEOGRAPHY_COLUMNS = {
+    "census_tract",
+    "county_code",
+    "derived_msa_md",
+    "msa_md",
+    "msa_of_property",
+    "msa_of_report",
+    "prop_msa",
+    "state_code",
+    "zip_code",
+}
+_INTEGER_COLUMNS = {
+    "activity_year",
+    "action_taken",
+    "app_ethnicity",
+    "app_income",
+    "app_race",
+    "app_sex",
+    "applicant_credit_score_type",
+    "applicant_ethnicity_observed",
+    "applicant_sex_observed",
+    "as_of_year",
+    "asof_date",
+    "aus_1",
+    "aus_2",
+    "aus_3",
+    "aus_4",
+    "aus_5",
+    "balloon_payment",
+    "business_or_commercial_purpose",
+    "census_validity_flag",
+    "co_app_ethnicity",
+    "co_app_income",
+    "co_app_race",
+    "co_app_sex",
+    "co_applicant_credit_score_type",
+    "co_applicant_ethnicity_observed",
+    "co_applicant_sex_observed",
+    "construction_method",
+    "conventional_loan_amount_000s",
+    "conventional_loan_count",
+    "conventional_loan_validity_flag",
+    "denial_reason_1",
+    "denial_reason_2",
+    "denial_reason_3",
+    "denial_reason_4",
+    "edit_status",
+    "ffiec_msa_md_median_family_income",
+    "government_loan_amount_000s",
+    "government_loan_count",
+    "government_loan_validity_flag",
+    "hoepa_status",
+    "home_improvement_loan_amount_000s",
+    "home_improvement_loan_count",
+    "home_improvement_validity_flag",
+    "initially_payable_to_institution",
+    "interest_only_payment",
+    "lien_status",
+    "loan_amt",
+    "loan_amount",
+    "loan_amount_000s",
+    "loan_purp",
+    "loan_purpose",
+    "loan_term",
+    "loan_type",
+    "manufactured_home_land_property_interest",
+    "manufactured_home_secured_property_type",
+    "multifamily_affordable_units",
+    "multifamily_loan_amount_000s",
+    "multifamily_loan_count",
+    "multifamily_validity_flag",
+    "negative_amortization",
+    "nonoccupant_loan_amount_000s",
+    "nonoccupant_loan_count",
+    "nonoccupant_validity_flag",
+    "occupancy",
+    "occupancy_type",
+    "open_end_line_of_credit",
+    "other_nonamortizing_features",
+    "preapprovals",
+    "preapproval",
+    "prop_type",
+    "purchaser_type",
+    "record_quality_flag",
+    "reverse_mortgage",
+    "submission_of_application",
+    "total_units",
+    "tract_median_age_of_housing_units",
+    "tract_one_to_four_family_homes",
+    "tract_owner_occupied_units",
+    "tract_population",
+}
+_FLOAT_COLUMNS = {
+    "applicant_income_000s",
+    "income",
+    "loan_to_value_ratio",
+    "minority_population_percent",
+    "population",
+    "rate_spread",
+    "tract_minority_population_percent",
+    "tract_to_msa_income_percentage",
+}
+_MIXED_VALUE_COLUMNS = {
+    "combined_loan_to_value_ratio",
+    "debt_to_income_ratio",
+    "discount_points",
+    "income",
+    "interest_rate",
+    "intro_rate_period",
+    "lender_credits",
+    "loan_term",
+    "multifamily_affordable_units",
+    "origination_charges",
+    "prepayment_penalty_term",
+    "property_value",
+    "rate_spread",
+    "total_loan_costs",
+    "total_points_and_fees",
+    "total_units",
+}
+_INTEGER_PREFIXES = (
+    "applicant_ethnicity_",
+    "applicant_race_",
+    "co_applicant_ethnicity_",
+    "co_applicant_race_",
+)
+_NULL_TOKENS = {"", "NA", "N/A", "NULL", "null"}
+
 
 def _normalize_lar_years(years, source="auto"):
     """Return source-supported LAR years in caller-specified order."""
@@ -195,7 +518,9 @@ def _validate_lar_text(path):
     except (OSError, UnicodeDecodeError):
         return False
 
-    complete_lines = text.splitlines()[:-1]
+    complete_lines = text.splitlines()
+    if sample and not sample.endswith((b"\n", b"\r")):
+        complete_lines = complete_lines[:-1]
     return (
         len(complete_lines) >= 2
         and len({len(line) for line in complete_lines}) == 1
@@ -342,31 +667,385 @@ def download_lar(
     return paths
 
 
-def load(data_dir=None, **kwargs):
-    """Load HMDA data from the local HDF store.
+def _lar_parquet_path(year, data_dir=default_dir, source="auto"):
+    """Return the canonical parquet path for one source and year."""
+    resolved_source = _resolve_lar_source(year, source)
+    return Path(data_dir) / "parquet" / resolved_source / str(year) / "lar.parquet"
 
-    Backward-compatible wrapper around ``load_hmda``; expects ``yr`` in
-    ``kwargs``.
+
+def _normalized_column_name(column):
+    """Return a source-column name in the form used by dtype maps."""
+    return (
+        str(column)
+        .strip()
+        .lower()
+        .replace(" ", "_")
+        .replace("-", "_")
+        .replace("/", "_")
+    )
+
+
+def _column_kind(column):
+    """Return the storage kind for a source column."""
+    name = _normalized_column_name(column)
+    if name in _IDENTIFIER_COLUMNS or name in _GEOGRAPHY_COLUMNS:
+        return "string"
+    if name in _MIXED_VALUE_COLUMNS:
+        return "string"
+    if name in _INTEGER_COLUMNS or name.startswith(_INTEGER_PREFIXES):
+        return "integer"
+    if name in _FLOAT_COLUMNS:
+        return "float"
+    return "string"
+
+
+def _null_numeric_tokens(series):
+    """Replace documented empty/null tokens before numeric conversion."""
+    values = series.astype("string").str.strip()
+    is_null = values.str.upper().isin({token.upper() for token in _NULL_TOKENS})
+    return values.mask(is_null)
+
+
+def _coerce_lar_chunk(frame, year, source):
+    """Apply stable, analysis-oriented dtypes to a raw LAR chunk."""
+    converted = frame.copy()
+    for column in converted.columns:
+        kind = _column_kind(column)
+        values = converted[column].astype("string")
+        if kind == "string":
+            converted[column] = values.mask(values == "")
+            continue
+
+        values = _null_numeric_tokens(values)
+        try:
+            numeric = pd.to_numeric(values, errors="raise")
+            if kind == "integer":
+                nonnull = numeric.dropna()
+                if not np.equal(nonnull, np.floor(nonnull)).all():
+                    raise ValueError("contains a non-integral value")
+                converted[column] = numeric.astype("Int64")
+            else:
+                converted[column] = numeric.astype("Float64")
+        except (TypeError, ValueError) as exc:
+            raise ValueError(
+                f"Invalid {kind} data in HMDA {year} ({source}) "
+                f"column {column!r}: {exc}"
+            ) from exc
+    return converted
+
+
+def _nara_layout(year):
+    """Return names, widths, and cohort label for a NARA LAR year."""
+    if year < 1990:
+        return _NARA_PRE_1990_NAMES, _NARA_PRE_1990_WIDTHS, "1981-1989"
+    if year < 2004:
+        return _NARA_1990_2003_NAMES, _NARA_1990_2003_WIDTHS, "1990-2003"
+    return _NARA_2004_2014_NAMES, _NARA_2004_2014_WIDTHS, "2004-2014"
+
+
+def _zip_data_member(archive, source):
+    """Return the single data member from an HMDA source ZIP."""
+    members = [member for member in archive.infolist() if not member.is_dir()]
+    if source in {"cfpb", "ffiec_snapshot", "ffiec_three_year"}:
+        candidates = [
+            member
+            for member in members
+            if member.file_size > 0 and Path(member.filename).suffix.lower() == ".csv"
+        ]
+    else:
+        data_suffixes = {"", ".dat", ".data", ".txt"}
+        candidates = [
+            member
+            for member in members
+            if member.file_size > 0
+            and Path(member.filename).suffix.lower() in data_suffixes
+            and not Path(member.filename).name.lower().startswith("readme")
+        ]
+    if len(candidates) != 1:
+        names = ", ".join(member.filename for member in candidates) or "none"
+        raise ValueError(
+            f"Expected exactly one HMDA data member for source {source!r}; "
+            f"found {len(candidates)}: {names}."
+        )
+    return candidates[0]
+
+
+@contextmanager
+def _open_lar_data(path, source):
+    """Yield the binary data stream inside a raw HMDA file."""
+    path = Path(path)
+    if zipfile.is_zipfile(path):
+        with zipfile.ZipFile(path) as archive:
+            member = _zip_data_member(archive, source)
+            with archive.open(member) as data:
+                yield data
+    else:
+        with path.open("rb") as data:
+            yield data
+
+
+def _validate_nara_record_width(data, expected_width, year):
+    """Check an initial sample of fixed-width NARA records."""
+    position = data.tell()
+    lengths = []
+    for _ in range(20):
+        line = data.readline()
+        if not line:
+            break
+        record = line.rstrip(b"\r\n")
+        if record:
+            lengths.append(len(record))
+    data.seek(position)
+    invalid = sorted({length for length in lengths if length != expected_width})
+    if not lengths or invalid:
+        observed = ", ".join(str(length) for length in invalid) or "no records"
+        raise ValueError(
+            f"Invalid NARA HMDA {year} fixed-width data: expected "
+            f"{expected_width}-byte records, observed {observed}."
+        )
+
+
+def _lar_chunk_reader(path, year, source, chunksize):
+    """Yield raw DataFrame chunks for one annual HMDA file."""
+    with _open_lar_data(path, source) as data:
+        if source == "nara":
+            names, widths, _ = _nara_layout(year)
+            _validate_nara_record_width(data, sum(widths), year)
+            yield from pd.read_fwf(
+                data,
+                widths=widths,
+                names=names,
+                dtype=str,
+                keep_default_na=False,
+                chunksize=chunksize,
+                encoding="latin-1",
+            )
+        else:
+            yield from pd.read_csv(
+                data,
+                dtype=str,
+                keep_default_na=False,
+                na_filter=False,
+                chunksize=chunksize,
+                encoding="utf-8-sig",
+            )
+
+
+def _valid_parquet(path):
+    """Return whether a path contains readable parquet metadata."""
+    try:
+        import pyarrow.parquet as pq
+
+        pq.ParquetFile(path)
+        return True
+    except Exception:
+        return False
+
+
+def convert_lar(
+    years=None,
+    source="auto",
+    data_dir=default_dir,
+    overwrite=False,
+    chunksize=100000,
+    compression="zstd",
+):
+    """Convert downloaded HMDA LAR files to source-specific parquet files.
+
+    Raw source columns are retained, while documented measures and numeric
+    codes are converted to stable nullable numeric dtypes. Identifiers and
+    geographic codes remain strings. Conversion is chunked and each chunk is
+    written as a parquet row group.
+
+    Parameters
+    ----------
+    years : int or iterable of int, optional
+        Year or years to convert. By default, convert every configured year.
+    source : {"auto", "ffiec_three_year", "ffiec_snapshot", "cfpb", "nara"}
+        Source release to convert. ``"auto"`` uses the download precedence.
+    data_dir : str or path-like, optional
+        Root containing the ``raw`` and ``parquet`` HMDA directories.
+    overwrite : bool, optional
+        Replace valid parquet files that already exist.
+    chunksize : int, optional
+        Number of source rows per parquet row group.
+    compression : str, optional
+        Parquet compression codec. Defaults to ``"zstd"``.
+
+    Returns
+    -------
+    list of pathlib.Path
+        Parquet paths in requested order.
+    """
+    try:
+        import pyarrow as pa
+        import pyarrow.parquet as pq
+    except ImportError as exc:  # pragma: no cover - depends on optional install
+        raise ImportError(
+            "HMDA parquet conversion requires pyarrow; install py_tools[datasets]."
+        ) from exc
+
+    if not isinstance(chunksize, (int, np.integer)) or chunksize <= 0:
+        raise ValueError("chunksize must be a positive integer")
+
+    requested = _normalize_lar_years(years, source=source)
+    outputs = []
+    for year in requested:
+        resolved_source = _resolve_lar_source(year, source)
+        raw_path = _lar_file_path(year, data_dir=data_dir, source=resolved_source)
+        output_path = _lar_parquet_path(year, data_dir=data_dir, source=resolved_source)
+        outputs.append(output_path)
+
+        if output_path.exists() and _valid_parquet(output_path) and not overwrite:
+            continue
+        if not raw_path.exists():
+            raise FileNotFoundError(
+                f"Raw HMDA {year} ({resolved_source}) file not found at "
+                f"{raw_path}. Run download_lar first."
+            )
+        year_config = _LAR_SOURCE_CONFIG[resolved_source][year]
+        if not _validate_lar_file(raw_path, year_config["format"]):
+            raise ValueError(
+                f"Raw HMDA {year} ({resolved_source}) file is not valid "
+                f"{year_config['format']} data: {raw_path}."
+            )
+
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        temporary = None
+        writer = None
+        try:
+            with tempfile.NamedTemporaryFile(
+                prefix=f".{output_path.stem}.",
+                suffix=".parquet.part",
+                dir=output_path.parent,
+                delete=False,
+            ) as temp_file:
+                temporary = Path(temp_file.name)
+
+            for chunk_number, raw_chunk in enumerate(
+                _lar_chunk_reader(raw_path, year, resolved_source, int(chunksize))
+            ):
+                chunk = _coerce_lar_chunk(raw_chunk, year, resolved_source)
+                table = pa.Table.from_pandas(chunk, preserve_index=False)
+                if writer is None:
+                    cohort = (
+                        _nara_layout(year)[2] if resolved_source == "nara" else "csv"
+                    )
+                    metadata = dict(table.schema.metadata or {})
+                    metadata.update(
+                        {
+                            b"hmda.source": resolved_source.encode(),
+                            b"hmda.year": str(year).encode(),
+                            b"hmda.raw_filename": raw_path.name.encode(),
+                            b"hmda.schema_cohort": cohort.encode(),
+                        }
+                    )
+                    table = table.replace_schema_metadata(metadata)
+                    writer = pq.ParquetWriter(
+                        temporary,
+                        table.schema,
+                        compression=compression,
+                        use_dictionary=True,
+                    )
+                elif table.schema.remove_metadata() != writer.schema.remove_metadata():
+                    raise ValueError(
+                        f"Schema changed in HMDA {year} ({resolved_source}) "
+                        f"at chunk {chunk_number}."
+                    )
+                writer.write_table(table)
+
+            if writer is None:
+                raise ValueError(
+                    f"Raw HMDA {year} ({resolved_source}) file contains no records."
+                )
+            writer.close()
+            writer = None
+            if not _valid_parquet(temporary):
+                raise RuntimeError("converted output does not contain valid parquet")
+            os.replace(temporary, output_path)
+            temporary = None
+        except Exception as exc:
+            if writer is not None:
+                writer.close()
+            if temporary is not None:
+                temporary.unlink(missing_ok=True)
+            raise RuntimeError(
+                f"Failed to convert HMDA {year} ({resolved_source}) from "
+                f"{raw_path}: {exc}"
+            ) from exc
+
+    return outputs
+
+
+def load_lar(
+    year,
+    source="auto",
+    data_dir=default_dir,
+    columns=None,
+    filters=None,
+    convert_if_missing=False,
+):
+    """Load one source-specific annual HMDA parquet file.
+
+    Parameters
+    ----------
+    year : int
+        HMDA survey year to load.
+    source : {"auto", "ffiec_three_year", "ffiec_snapshot", "cfpb", "nara"}
+        Source release to load. ``"auto"`` uses the download precedence.
+    data_dir : str or path-like, optional
+        Root containing the ``raw`` and ``parquet`` HMDA directories.
+    columns : list of str, optional
+        Columns to read from parquet.
+    filters : list, optional
+        PyArrow-compatible parquet filters.
+    convert_if_missing : bool, optional
+        Convert the downloaded raw file with :func:`convert_lar` when the
+        parquet file is absent. Defaults to ``False``.
+
+    Returns
+    -------
+    pandas.DataFrame
+        Source-specific HMDA records.
+    """
+    year = int(year)
+    resolved_source = _resolve_lar_source(year, source)
+    parquet_path = _lar_parquet_path(year, data_dir, resolved_source)
+    if not parquet_path.exists() and convert_if_missing:
+        convert_lar(year, source=resolved_source, data_dir=data_dir)
+    if not parquet_path.exists():
+        raise FileNotFoundError(
+            f"HMDA {year} ({resolved_source}) parquet file not found at "
+            f"{parquet_path}. Run convert_lar first."
+        )
+    return pd.read_parquet(parquet_path, columns=columns, filters=filters)
+
+
+def load(data_dir=None, **kwargs):
+    """Load HMDA data from a source-specific annual parquet file.
+
+    This registry-compatible wrapper accepts ``year`` or the legacy spelling
+    ``yr`` and delegates to :func:`load_lar`.
 
     Parameters
     ----------
     data_dir : str, optional
-        Path to the directory containing the HDF store.  When provided it is
-        forwarded as the ``data_dir`` keyword argument to ``load_hmda``.
+        Root directory containing source-specific HMDA parquet files.
     **kwargs
-        Additional keyword arguments passed directly to ``load_hmda``.
-        Must include ``yr`` (int) – the HMDA survey year to load.
+        Additional keyword arguments passed directly to ``load_lar``.
 
     Returns
     -------
     pandas.DataFrame
         HMDA loan-application records for the requested year.
     """
+    if "year" in kwargs and "yr" in kwargs:
+        raise TypeError("Specify only one of year or yr")
+    if "yr" in kwargs:
+        kwargs["year"] = kwargs.pop("yr")
     if data_dir is not None:
         kwargs.setdefault("data_dir", data_dir)
-    if "save_dir" not in kwargs or kwargs.get("save_dir") is None:
-        kwargs["save_dir"] = kwargs.get("data_dir", default_dir)
-    return load_hmda(**kwargs)
+    return load_lar(**kwargs)
 
 
 def cat(num):
@@ -500,6 +1179,11 @@ def store(
     -------
     None
     """
+    warnings.warn(
+        "hmda.store() is deprecated; use convert_lar() for parquet output.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     store_file = save_dir + "hmda.hd5"
     key = "hmda_{}".format(yr)
     store = pd.HDFStore(store_file)
@@ -767,6 +1451,11 @@ def load_hmda(yr, data_dir=default_dir, save_dir=default_dir, query=None, column
         HMDA loan-application records for the requested year, filtered
         according to ``query`` and ``columns``.
     """
+    warnings.warn(
+        "hmda.load_hmda() is deprecated; use load_lar() for parquet data.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     store_file = save_dir + "hmda.hd5"
     key = "hmda_{}".format(yr)
     store = pd.HDFStore(store_file)
