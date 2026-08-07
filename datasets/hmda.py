@@ -1,3 +1,4 @@
+import argparse
 import os
 import sys
 import tempfile
@@ -304,8 +305,10 @@ _IDENTIFIER_COLUMNS = {
 }
 _GEOGRAPHY_COLUMNS = {
     "census_tract",
+    "census_tract_number",
     "county_code",
     "derived_msa_md",
+    "msamd",
     "msa_md",
     "msa_of_property",
     "msa_of_report",
@@ -320,6 +323,8 @@ _INTEGER_COLUMNS = {
     "app_income",
     "app_race",
     "app_sex",
+    "applicant_ethnicity",
+    "applicant_sex",
     "applicant_credit_score_type",
     "applicant_ethnicity_observed",
     "applicant_sex_observed",
@@ -337,6 +342,8 @@ _INTEGER_COLUMNS = {
     "co_app_income",
     "co_app_race",
     "co_app_sex",
+    "co_applicant_ethnicity",
+    "co_applicant_sex",
     "co_applicant_credit_score_type",
     "co_applicant_ethnicity_observed",
     "co_applicant_sex_observed",
@@ -357,6 +364,7 @@ _INTEGER_COLUMNS = {
     "home_improvement_loan_amount_000s",
     "home_improvement_loan_count",
     "home_improvement_validity_flag",
+    "hud_median_family_income",
     "initially_payable_to_institution",
     "interest_only_payment",
     "lien_status",
@@ -379,17 +387,24 @@ _INTEGER_COLUMNS = {
     "nonoccupant_validity_flag",
     "occupancy",
     "occupancy_type",
+    "owner_occupancy",
     "open_end_line_of_credit",
     "other_nonamortizing_features",
     "preapprovals",
     "preapproval",
     "prop_type",
+    "property_type",
     "purchaser_type",
     "record_quality_flag",
     "reverse_mortgage",
     "submission_of_application",
     "total_units",
+    "application_date_indicator",
+    "number_of_1_to_4_family_units",
+    "number_of_owner_occupied_units",
+    "population",
     "tract_median_age_of_housing_units",
+    "tract_one_to_four_family_units",
     "tract_one_to_four_family_homes",
     "tract_owner_occupied_units",
     "tract_population",
@@ -398,17 +413,17 @@ _FLOAT_COLUMNS = {
     "applicant_income_000s",
     "income",
     "loan_to_value_ratio",
+    "minority_population",
     "minority_population_percent",
-    "population",
     "rate_spread",
     "tract_minority_population_percent",
+    "tract_to_msamd_income",
     "tract_to_msa_income_percentage",
 }
 _MIXED_VALUE_COLUMNS = {
     "combined_loan_to_value_ratio",
     "debt_to_income_ratio",
     "discount_points",
-    "income",
     "interest_rate",
     "intro_rate_period",
     "lender_credits",
@@ -423,8 +438,10 @@ _MIXED_VALUE_COLUMNS = {
     "total_units",
 }
 _INTEGER_PREFIXES = (
+    "app_race_",
     "applicant_ethnicity_",
     "applicant_race_",
+    "co_app_race_",
     "co_applicant_ethnicity_",
     "co_applicant_race_",
 )
@@ -493,6 +510,12 @@ def _lar_file_path(year, data_dir=default_dir, source="auto"):
     )
 
 
+def _is_zip_metadata(member):
+    """Return whether a ZIP member is macOS filesystem metadata."""
+    parts = Path(member.filename).parts
+    return "__MACOSX" in parts or Path(member.filename).name.startswith("._")
+
+
 def _validate_lar_zip(path, require_csv=False):
     """Return whether a ZIP has a suitable nonempty data member."""
     if not zipfile.is_zipfile(path):
@@ -501,6 +524,7 @@ def _validate_lar_zip(path, require_csv=False):
         with zipfile.ZipFile(path) as archive:
             return any(
                 not member.is_dir()
+                and not _is_zip_metadata(member)
                 and member.file_size > 0
                 and (not require_csv or Path(member.filename).suffix.lower() == ".csv")
                 for member in archive.infolist()
@@ -700,10 +724,16 @@ def _column_kind(column):
 
 
 def _null_numeric_tokens(series):
-    """Replace documented empty/null tokens before numeric conversion."""
+    """Normalize numeric whitespace/grouping and documented null tokens."""
     values = series.astype("string").str.strip()
     is_null = values.str.upper().isin({token.upper() for token in _NULL_TOKENS})
-    return values.mask(is_null)
+    values = values.mask(is_null)
+    values = values.str.replace(r"\s+", "", regex=True)
+    comma_grouped = values.str.fullmatch(r"[+-]?\d{1,3}(?:,\d{3})+(?:\.\d+)?", na=False)
+    values.loc[comma_grouped] = values.loc[comma_grouped].str.replace(
+        ",", "", regex=False
+    )
+    return values
 
 
 def _coerce_lar_chunk(frame, year, source):
@@ -745,7 +775,11 @@ def _nara_layout(year):
 
 def _zip_data_member(archive, source):
     """Return the single data member from an HMDA source ZIP."""
-    members = [member for member in archive.infolist() if not member.is_dir()]
+    members = [
+        member
+        for member in archive.infolist()
+        if not member.is_dir() and not _is_zip_metadata(member)
+    ]
     if source in {"cfpb", "ffiec_snapshot", "ffiec_three_year"}:
         candidates = [
             member
@@ -753,7 +787,7 @@ def _zip_data_member(archive, source):
             if member.file_size > 0 and Path(member.filename).suffix.lower() == ".csv"
         ]
     else:
-        data_suffixes = {"", ".dat", ".data", ".txt"}
+        data_suffixes = {"", ".dat", ".data", ".lars", ".txt"}
         candidates = [
             member
             for member in members
@@ -1465,3 +1499,80 @@ def load_hmda(yr, data_dir=default_dir, save_dir=default_dir, query=None, column
     store.close()
 
     return df
+
+
+def _build_cli_parser():
+    """Build the command-line parser for HMDA download and conversion."""
+    parser = argparse.ArgumentParser(
+        prog="py-tools-hmda",
+        description="Download and convert annual HMDA LAR data.",
+    )
+    subparsers = parser.add_subparsers(dest="command", required=True)
+
+    download_parser = subparsers.add_parser(
+        "download", help="Download raw annual LAR files."
+    )
+    download_parser.add_argument(
+        "years",
+        metavar="YEAR",
+        type=int,
+        nargs="*",
+        help="Years to download; omit to download all years for the source.",
+    )
+    download_parser.add_argument(
+        "--source", choices=("auto", *LAR_SOURCES), default="auto"
+    )
+    download_parser.add_argument("--data-dir", default=default_dir)
+    download_parser.add_argument("--overwrite", action="store_true")
+    download_parser.add_argument(
+        "--progress", action="store_true", help="Show download progress."
+    )
+
+    convert_parser = subparsers.add_parser(
+        "convert", help="Convert downloaded LAR files to parquet."
+    )
+    convert_parser.add_argument(
+        "years",
+        metavar="YEAR",
+        type=int,
+        nargs="*",
+        help="Years to convert; omit to convert all years for the source.",
+    )
+    convert_parser.add_argument(
+        "--source", choices=("auto", *LAR_SOURCES), default="auto"
+    )
+    convert_parser.add_argument("--data-dir", default=default_dir)
+    convert_parser.add_argument("--overwrite", action="store_true")
+    convert_parser.add_argument("--chunksize", type=int, default=100000)
+    convert_parser.add_argument("--compression", default="zstd")
+    return parser
+
+
+def main(argv=None):
+    """Run the HMDA command-line interface."""
+    args = _build_cli_parser().parse_args(argv)
+    years = args.years or None
+    if args.command == "download":
+        paths = download_lar(
+            years=years,
+            source=args.source,
+            data_dir=args.data_dir,
+            overwrite=args.overwrite,
+            progress=args.progress,
+        )
+    else:
+        paths = convert_lar(
+            years=years,
+            source=args.source,
+            data_dir=args.data_dir,
+            overwrite=args.overwrite,
+            chunksize=args.chunksize,
+            compression=args.compression,
+        )
+    for path in paths:
+        print(path)
+    return 0
+
+
+if __name__ == "__main__":  # pragma: no cover - exercised through module CLI
+    raise SystemExit(main())

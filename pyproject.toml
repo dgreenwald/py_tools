@@ -24,6 +24,9 @@ dependencies = [
 [project.urls]
 Repository = "https://github.com/dgreenwald/py_tools"
 
+[project.scripts]
+py-tools-hmda = "py_tools.datasets.hmda:main"
+
 [project.optional-dependencies]
 ml = [
     "scikit-learn>=1.1",

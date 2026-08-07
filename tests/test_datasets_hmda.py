@@ -349,6 +349,50 @@ def test_convert_csv_to_source_specific_parquet(tmp_path):
     assert metadata[b"hmda.schema_cohort"] == b"csv"
 
 
+def test_convert_ignores_macos_zip_metadata(tmp_path):
+    path = hmda._lar_file_path(2022, tmp_path, source="ffiec_three_year")
+    path.parent.mkdir(parents=True)
+    path.write_bytes(
+        _archive_bytes(
+            {
+                "2022_public_lar_three_year_csv.csv": (
+                    b"activity_year,action_taken\n2022,1\n"
+                ),
+                "__MACOSX/._2022_public_lar_three_year_csv.csv": b"metadata",
+            }
+        )
+    )
+
+    [output] = hmda.convert_lar(2022, source="ffiec_three_year", data_dir=tmp_path)
+
+    assert pd.read_parquet(output).to_dict("records") == [
+        {"activity_year": 2022, "action_taken": 1}
+    ]
+
+
+def test_convert_accepts_nara_lars_archive_member(tmp_path):
+    values = {index: "1" for index in range(len(hmda._NARA_1990_2003_WIDTHS))}
+    values[1] = "0000123456"
+    grouped_amount = values.copy()
+    grouped_amount[6] = "1 250"
+    grouped_amount[16] = "2 05"
+    records = "\r\n".join(
+        [
+            _fixed_width_record(hmda._NARA_1990_2003_WIDTHS, values),
+            _fixed_width_record(hmda._NARA_1990_2003_WIDTHS, grouped_amount),
+        ]
+    ).encode("ascii")
+    _install_raw_zip(tmp_path, 2003, "nara", "HMS.U2003.LARS", records)
+
+    [output] = hmda.convert_lar(2003, source="nara", data_dir=tmp_path)
+
+    frame = pd.read_parquet(output)
+    assert len(frame) == 2
+    assert frame["respondent_id"].tolist() == ["0000123456", "0000123456"]
+    assert frame["loan_amt"].tolist() == [1, 1250]
+    assert frame["app_income"].tolist() == [1, 205]
+
+
 @pytest.mark.parametrize(
     "year,widths,names,cohort",
     [
@@ -387,6 +431,20 @@ def test_convert_nara_fixed_width_cohorts(tmp_path, year, widths, names, cohort)
     assert len(frame) == 2
     assert frame["respondent_id"].iloc[0] == "00001234"
     assert frame["state_code"].iloc[0] == "1"
+    if year == 2004:
+        for column in [
+            "app_race_1",
+            "app_race_2",
+            "app_race_3",
+            "app_race_4",
+            "app_race_5",
+            "co_app_race_1",
+            "co_app_race_2",
+            "co_app_race_3",
+            "co_app_race_4",
+            "co_app_race_5",
+        ]:
+            assert frame[column].dtype == pd.Int64Dtype()
     import pyarrow.parquet as pq
 
     assert pq.ParquetFile(output).schema_arrow.metadata[b"hmda.schema_cohort"] == (
@@ -396,9 +454,15 @@ def test_convert_nara_fixed_width_cohorts(tmp_path, year, widths, names, cohort)
 
 def test_convert_uses_documented_numeric_types_for_cfpb(tmp_path):
     csv = (
-        b"as_of_year,respondent_id,state_code,loan_amount_000s,"
-        b"applicant_income_000s,action_taken\n"
-        b"2016,0000123456,06,250,75.5,1\n"
+        b"as_of_year,respondent_id,state_code,msamd,census_tract_number,"
+        b"loan_amount_000s,applicant_income_000s,action_taken,property_type,"
+        b"owner_occupancy,applicant_ethnicity,co_applicant_ethnicity,"
+        b"applicant_sex,co_applicant_sex,population,"
+        b"minority_population,hud_median_family_income,tract_to_msamd_income,"
+        b"number_of_owner_occupied_units,number_of_1_to_4_family_units,"
+        b"application_date_indicator\n"
+        b"2016,0000123456,06,12345,0012.34,250,75.5,1,2,1,2,5,1,2,3177,"
+        b"28.77,54000,61.65,160,773,0\n"
     )
     _install_raw_zip(tmp_path, 2016, "cfpb", "hmda_2016.csv", csv)
 
@@ -408,8 +472,53 @@ def test_convert_uses_documented_numeric_types_for_cfpb(tmp_path):
     assert frame["as_of_year"].dtype == pd.Int64Dtype()
     assert frame["loan_amount_000s"].dtype == pd.Int64Dtype()
     assert frame["applicant_income_000s"].dtype == pd.Float64Dtype()
+    for column in [
+        "property_type",
+        "owner_occupancy",
+        "applicant_ethnicity",
+        "co_applicant_ethnicity",
+        "applicant_sex",
+        "co_applicant_sex",
+        "population",
+        "hud_median_family_income",
+        "number_of_owner_occupied_units",
+        "number_of_1_to_4_family_units",
+        "application_date_indicator",
+    ]:
+        assert frame[column].dtype == pd.Int64Dtype()
+    assert frame["minority_population"].dtype == pd.Float64Dtype()
+    assert frame["tract_to_msamd_income"].dtype == pd.Float64Dtype()
     assert frame["respondent_id"].iloc[0] == "0000123456"
     assert frame["state_code"].iloc[0] == "06"
+    assert frame["msamd"].iloc[0] == "12345"
+    assert frame["census_tract_number"].iloc[0] == "0012.34"
+
+
+def test_convert_uses_numeric_types_for_2017_ffiec_fields(tmp_path):
+    csv = (
+        b"activity_year,applicant_ethnicity,co_applicant_ethnicity,income,"
+        b"tract_one_to_four_family_units\n"
+        b"2017,1,5,75.5,1200\n"
+        b"2017,2,2,NA,800\n"
+    )
+    _install_raw_zip(
+        tmp_path,
+        2017,
+        "ffiec_three_year",
+        "2017_public_lar_three_year_csv.csv",
+        csv,
+    )
+
+    [output] = hmda.convert_lar(
+        2017, source="ffiec_three_year", data_dir=tmp_path, chunksize=1
+    )
+    frame = pd.read_parquet(output)
+
+    assert frame["applicant_ethnicity"].dtype == pd.Int64Dtype()
+    assert frame["co_applicant_ethnicity"].dtype == pd.Int64Dtype()
+    assert frame["income"].dtype == pd.Float64Dtype()
+    assert frame["tract_one_to_four_family_units"].dtype == pd.Int64Dtype()
+    assert frame["income"].tolist() == [75.5, pd.NA]
 
 
 def test_load_lar_projects_and_filters_parquet(tmp_path):
@@ -501,3 +610,82 @@ def test_conversion_failure_preserves_existing_parquet(tmp_path):
 def test_convert_requires_downloaded_raw_file(tmp_path):
     with pytest.raises(FileNotFoundError, match="download_lar"):
         hmda.convert_lar(2023, data_dir=tmp_path)
+
+
+def test_download_cli_dispatches_options_and_prints_paths(
+    tmp_path, monkeypatch, capsys
+):
+    calls = []
+
+    def fake_download(**kwargs):
+        calls.append(kwargs)
+        return [tmp_path / "first.zip", tmp_path / "second.zip"]
+
+    monkeypatch.setattr(hmda, "download_lar", fake_download)
+
+    result = hmda.main(
+        [
+            "download",
+            "2013",
+            "2014",
+            "--source",
+            "nara",
+            "--data-dir",
+            str(tmp_path),
+            "--overwrite",
+            "--progress",
+        ]
+    )
+
+    assert result == 0
+    assert calls == [
+        {
+            "years": [2013, 2014],
+            "source": "nara",
+            "data_dir": str(tmp_path),
+            "overwrite": True,
+            "progress": True,
+        }
+    ]
+    assert capsys.readouterr().out.splitlines() == [
+        str(tmp_path / "first.zip"),
+        str(tmp_path / "second.zip"),
+    ]
+
+
+def test_convert_cli_uses_all_source_years_when_omitted(tmp_path, monkeypatch, capsys):
+    calls = []
+    output = tmp_path / "parquet" / "nara" / "2014" / "lar.parquet"
+
+    def fake_convert(**kwargs):
+        calls.append(kwargs)
+        return [output]
+
+    monkeypatch.setattr(hmda, "convert_lar", fake_convert)
+
+    result = hmda.main(
+        [
+            "convert",
+            "--source",
+            "nara",
+            "--data-dir",
+            str(tmp_path),
+            "--chunksize",
+            "25000",
+            "--compression",
+            "snappy",
+        ]
+    )
+
+    assert result == 0
+    assert calls == [
+        {
+            "years": None,
+            "source": "nara",
+            "data_dir": str(tmp_path),
+            "overwrite": False,
+            "chunksize": 25000,
+            "compression": "snappy",
+        }
+    ]
+    assert capsys.readouterr().out == f"{output}\n"
