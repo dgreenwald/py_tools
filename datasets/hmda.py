@@ -96,6 +96,7 @@ _NATIONAL_ARCHIVES_LAR_CONFIG.update(
 )
 NATIONAL_ARCHIVES_LAR_YEARS = tuple(range(2014, 1980, -1))
 LAR_SOURCES = ("ffiec_three_year", "ffiec_snapshot", "cfpb", "nara")
+LAR_BULK_SOURCES = ("auto", "all", *LAR_SOURCES)
 _LAR_SOURCE_CONFIG = {
     "ffiec_three_year": _THREE_YEAR_LAR_CONFIG,
     "ffiec_snapshot": _SNAPSHOT_LAR_CONFIG,
@@ -501,6 +502,27 @@ def _resolve_lar_source(year, source="auto"):
     return source
 
 
+def _lar_source_year_pairs(years=None, source="auto"):
+    """Return ordered ``(year, source)`` pairs for a bulk operation."""
+    if source not in LAR_BULK_SOURCES:
+        supported = ", ".join(LAR_BULK_SOURCES)
+        raise ValueError(
+            f"Unsupported HMDA LAR source {source!r}. "
+            f"Supported sources are: {supported}."
+        )
+    if source != "all":
+        requested = _normalize_lar_years(years, source=source)
+        return [(year, _resolve_lar_source(year, source)) for year in requested]
+
+    requested = _normalize_lar_years(years, source="auto")
+    return [
+        (year, candidate)
+        for year in requested
+        for candidate in LAR_SOURCES
+        if year in _LAR_SOURCE_CONFIG[candidate]
+    ]
+
+
 def _lar_file_path(year, data_dir=default_dir, source="auto"):
     """Return the canonical local path for an annual LAR source file."""
     resolved_source = _resolve_lar_source(year, source)
@@ -621,11 +643,12 @@ def download_lar(
     ----------
     years : int or iterable of int, optional
         Year or years to download. By default, download every configured year.
-    source : {"auto", "ffiec_three_year", "ffiec_snapshot", "cfpb", "nara"}, optional
+    source : {"auto", "all", "ffiec_three_year", "ffiec_snapshot", "cfpb", "nara"}, optional
         Data release to download. ``"auto"`` prefers FFIEC three-year files
         for 2017--2022, FFIEC snapshots for 2023 onward, CFPB files for
         2007--2016, and National Archives files for earlier years. With an
         explicit source and no ``years``, download every year from that source.
+        ``"all"`` downloads every available source for each requested year.
     data_dir : str or path-like, optional
         Root directory for HMDA data files.
     overwrite : bool, optional
@@ -636,7 +659,7 @@ def download_lar(
     Returns
     -------
     list of pathlib.Path
-        Local source paths in requested order. Duplicate years appear once.
+        Local source paths in requested year and source order.
 
     Raises
     ------
@@ -645,11 +668,10 @@ def download_lar(
     RuntimeError
         If a download fails or has the wrong file format.
     """
-    requested = _normalize_lar_years(years, source=source)
+    requested = _lar_source_year_pairs(years, source=source)
     paths = []
 
-    for year in requested:
-        resolved_source = _resolve_lar_source(year, source)
+    for year, resolved_source in requested:
         destination = _lar_file_path(year, data_dir=data_dir, source=resolved_source)
         year_config = _LAR_SOURCE_CONFIG[resolved_source][year]
         paths.append(destination)
@@ -895,8 +917,9 @@ def convert_lar(
     ----------
     years : int or iterable of int, optional
         Year or years to convert. By default, convert every configured year.
-    source : {"auto", "ffiec_three_year", "ffiec_snapshot", "cfpb", "nara"}
+    source : {"auto", "all", "ffiec_three_year", "ffiec_snapshot", "cfpb", "nara"}
         Source release to convert. ``"auto"`` uses the download precedence.
+        ``"all"`` converts every available source for each requested year.
     data_dir : str or path-like, optional
         Root containing the ``raw`` and ``parquet`` HMDA directories.
     overwrite : bool, optional
@@ -909,7 +932,7 @@ def convert_lar(
     Returns
     -------
     list of pathlib.Path
-        Parquet paths in requested order.
+        Parquet paths in requested year and source order.
     """
     try:
         import pyarrow as pa
@@ -922,10 +945,9 @@ def convert_lar(
     if not isinstance(chunksize, (int, np.integer)) or chunksize <= 0:
         raise ValueError("chunksize must be a positive integer")
 
-    requested = _normalize_lar_years(years, source=source)
+    requested = _lar_source_year_pairs(years, source=source)
     outputs = []
-    for year in requested:
-        resolved_source = _resolve_lar_source(year, source)
+    for year, resolved_source in requested:
         raw_path = _lar_file_path(year, data_dir=data_dir, source=resolved_source)
         output_path = _lar_parquet_path(year, data_dir=data_dir, source=resolved_source)
         outputs.append(output_path)
@@ -1519,9 +1541,7 @@ def _build_cli_parser():
         nargs="*",
         help="Years to download; omit to download all years for the source.",
     )
-    download_parser.add_argument(
-        "--source", choices=("auto", *LAR_SOURCES), default="auto"
-    )
+    download_parser.add_argument("--source", choices=LAR_BULK_SOURCES, default="auto")
     download_parser.add_argument("--data-dir", default=default_dir)
     download_parser.add_argument("--overwrite", action="store_true")
     download_parser.add_argument(
@@ -1538,9 +1558,7 @@ def _build_cli_parser():
         nargs="*",
         help="Years to convert; omit to convert all years for the source.",
     )
-    convert_parser.add_argument(
-        "--source", choices=("auto", *LAR_SOURCES), default="auto"
-    )
+    convert_parser.add_argument("--source", choices=LAR_BULK_SOURCES, default="auto")
     convert_parser.add_argument("--data-dir", default=default_dir)
     convert_parser.add_argument("--overwrite", action="store_true")
     convert_parser.add_argument("--chunksize", type=int, default=100000)

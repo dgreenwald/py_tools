@@ -245,6 +245,36 @@ def test_explicit_overlapping_sources_have_separate_paths(tmp_path):
     assert paths["nara"].parts[-3] == "nara"
 
 
+def test_all_source_pairs_preserve_year_and_source_order():
+    assert hmda._lar_source_year_pairs([2014, 2017, 2014], source="all") == [
+        (2014, "cfpb"),
+        (2014, "nara"),
+        (2017, "ffiec_three_year"),
+        (2017, "ffiec_snapshot"),
+        (2017, "cfpb"),
+    ]
+
+    pairs = hmda._lar_source_year_pairs(source="all")
+    assert len(pairs) == sum(len(config) for config in hmda._LAR_SOURCE_CONFIG.values())
+    assert pairs[0] == (2025, "ffiec_snapshot")
+    assert pairs[-1] == (1981, "nara")
+
+
+def test_download_all_sources_for_overlapping_years(tmp_path, monkeypatch):
+    payload = _archive_bytes({"hmda_lar.csv": b"year\n2017\n"})
+    monkeypatch.setattr(hmda.urllib.request, "urlopen", lambda url: io.BytesIO(payload))
+
+    paths = hmda.download_lar([2014, 2017], source="all", data_dir=tmp_path)
+
+    assert paths == [
+        hmda._lar_file_path(2014, tmp_path, source="cfpb"),
+        hmda._lar_file_path(2014, tmp_path, source="nara"),
+        hmda._lar_file_path(2017, tmp_path, source="ffiec_three_year"),
+        hmda._lar_file_path(2017, tmp_path, source="ffiec_snapshot"),
+        hmda._lar_file_path(2017, tmp_path, source="cfpb"),
+    ]
+
+
 def test_explicit_source_defaults_and_validation(tmp_path, monkeypatch):
     payload = _archive_bytes({"hmda_lar.csv": b"year\n2022\n"})
     monkeypatch.setattr(hmda.urllib.request, "urlopen", lambda url: io.BytesIO(payload))
@@ -587,6 +617,17 @@ def test_conversion_keeps_overlapping_sources_separate(tmp_path):
     assert pd.read_parquet(snapshot)["lei"].tolist() == ["NEW"]
 
 
+def test_convert_all_sources_for_requested_year(tmp_path):
+    expected = []
+    for source in ("ffiec_three_year", "ffiec_snapshot", "cfpb"):
+        path = hmda._lar_parquet_path(2017, tmp_path, source=source)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        pd.DataFrame({"source": [source]}).to_parquet(path)
+        expected.append(path)
+
+    assert hmda.convert_lar(2017, source="all", data_dir=tmp_path) == expected
+
+
 def test_conversion_failure_preserves_existing_parquet(tmp_path):
     good = b"activity_year,action_taken\n2023,1\n"
     raw_path = _install_raw_zip(
@@ -689,3 +730,16 @@ def test_convert_cli_uses_all_source_years_when_omitted(tmp_path, monkeypatch, c
         }
     ]
     assert capsys.readouterr().out == f"{output}\n"
+
+
+def test_cli_accepts_all_sources(monkeypatch):
+    calls = []
+    monkeypatch.setattr(
+        hmda,
+        "download_lar",
+        lambda **kwargs: calls.append(kwargs) or [],
+    )
+
+    assert hmda.main(["download", "2017", "--source", "all"]) == 0
+    assert calls[0]["years"] == [2017]
+    assert calls[0]["source"] == "all"
