@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.2] - 2026-08-07
+
+### Added
+
+- Add dataframe normalization and validation utilities under `py_tools.data`.
+- Add HMDA LAR download, conversion, loading, and command-line workflows.
+- Add tests for the HMDA and Zillow dataset managers.
+
+### Changed
+
+- Expand HMDA source selection and integer-column handling.
+- Update the Zillow data manager's vintage, geography, caching, and raw-file
+  handling.
+
 ## [0.2.1] - 2026-08-04
 
 ### Added
