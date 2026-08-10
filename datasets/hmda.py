@@ -447,6 +447,53 @@ _INTEGER_PREFIXES = (
     "co_applicant_race_",
 )
 _NULL_TOKENS = {"", "NA", "N/A", "NULL", "null"}
+
+_CURRENT_CANONICAL_SCHEMA_VERSION = 1
+_SUPPORTED_CANONICAL_SCHEMA_VERSIONS = (1,)
+_CANONICAL_V1_ALIASES = {
+    "asof_date": "activity_year",
+    "as_of_year": "activity_year",
+    "loan_purp": "loan_purpose",
+    "occupancy": "occupancy_type",
+    "owner_occupancy": "occupancy_type",
+    "loan_amt": "loan_amount_000s",
+    "prop_msa": "msa_md",
+    "msamd": "msa_md",
+    "msa_of_property": "msa_md",
+    "census_tract_number": "census_tract",
+    "app_income": "applicant_income_000s",
+    "prop_type": "property_type",
+    "preapprovals": "preapproval",
+    "app_ethnicity": "applicant_ethnicity",
+    "co_app_ethnicity": "co_applicant_ethnicity",
+    "app_race": "applicant_race_1",
+    "co_app_race": "co_applicant_race_1",
+    "app_sex": "applicant_sex",
+    "co_app_sex": "co_applicant_sex",
+    "seq_num": "sequence_number",
+    **{f"app_race_{number}": f"applicant_race_{number}" for number in range(1, 6)},
+    **{
+        f"co_app_race_{number}": f"co_applicant_race_{number}" for number in range(1, 6)
+    },
+}
+_CANONICAL_V1_ADDITIONAL_COLUMNS = {
+    "applicant_age",
+    "applicant_age_above_62",
+    "co_applicant_age",
+    "co_applicant_age_above_62",
+    "conforming_loan_limit",
+    "derived_dwelling_category",
+    "derived_ethnicity",
+    "derived_loan_product_type",
+    "derived_race",
+    "derived_sex",
+    *{f"applicant_ethnicity_{number}" for number in range(1, 6)},
+    *{f"applicant_race_{number}" for number in range(1, 6)},
+    *{f"co_applicant_ethnicity_{number}" for number in range(1, 6)},
+    *{f"co_applicant_race_{number}" for number in range(1, 6)},
+}
+
+
 def _normalize_lar_years(years, source="auto"):
     """Return source-supported LAR years in caller-specified order."""
     if source == "auto":
@@ -741,6 +788,168 @@ def _column_kind(column):
     if name in _FLOAT_COLUMNS:
         return "float"
     return "string"
+
+
+def _canonical_v1_name(column):
+    """Return the canonical-v1 name for a documented source column."""
+    name = _normalized_column_name(column)
+    return _CANONICAL_V1_ALIASES.get(name, name)
+
+
+_NARA_AGGREGATE_ONLY_COLUMNS = set(_NARA_PRE_1990_NAMES) - (
+    set(_NARA_1990_2003_NAMES) | set(_NARA_2004_2014_NAMES)
+)
+_CANONICAL_V1_SOURCE_COLUMNS = (
+    _IDENTIFIER_COLUMNS
+    | _GEOGRAPHY_COLUMNS
+    | _INTEGER_COLUMNS
+    | _FLOAT_COLUMNS
+    | _MIXED_VALUE_COLUMNS
+    | set(_NARA_1990_2003_NAMES)
+    | set(_NARA_2004_2014_NAMES)
+) - _NARA_AGGREGATE_ONLY_COLUMNS
+CANONICAL_LAR_COLUMNS = tuple(
+    sorted(
+        {_canonical_v1_name(column) for column in _CANONICAL_V1_SOURCE_COLUMNS}
+        | _CANONICAL_V1_ADDITIONAL_COLUMNS
+    )
+)
+_CANONICAL_LAR_COLUMN_SET = frozenset(CANONICAL_LAR_COLUMNS)
+
+
+def _resolve_lar_schema(schema, schema_version):
+    """Validate schema arguments and return the resolved canonical version."""
+    if schema == "native":
+        if schema_version is not None:
+            raise ValueError("schema_version is only valid with schema='canonical'")
+        return None
+    if schema != "canonical":
+        raise ValueError("schema must be 'native' or 'canonical'")
+    if schema_version is None:
+        return _CURRENT_CANONICAL_SCHEMA_VERSION
+    if isinstance(schema_version, (bool, np.bool_)) or not isinstance(
+        schema_version, (int, np.integer)
+    ):
+        raise ValueError("schema_version must be an integer")
+    schema_version = int(schema_version)
+    if schema_version not in _SUPPORTED_CANONICAL_SCHEMA_VERSIONS:
+        supported = ", ".join(map(str, _SUPPORTED_CANONICAL_SCHEMA_VERSIONS))
+        raise ValueError(
+            f"Unsupported canonical HMDA schema version {schema_version}. "
+            f"Supported versions are: {supported}."
+        )
+    return schema_version
+
+
+def _source_schema_cohort(year, source):
+    """Return the source schema cohort used for provenance."""
+    if source == "nara":
+        return f"nara_{_nara_layout(year)[2].replace('-', '_')}"
+    if source == "cfpb":
+        return "cfpb_2007_2017"
+    if year == 2017:
+        return f"{source}_2017"
+    return f"{source}_2018_plus"
+
+
+def _canonical_dtype(column):
+    """Return the pandas nullable dtype for a canonical-v1 column."""
+    kind = _column_kind(column)
+    return {"integer": "Int64", "float": "Float64", "string": "string"}[kind]
+
+
+def _canonical_source_mapping(native_columns):
+    """Return canonical-to-native mappings for columns in one parquet file."""
+    mapping = {}
+    for native_column in native_columns:
+        normalized = _normalized_column_name(native_column)
+        if normalized not in (
+            _CANONICAL_V1_SOURCE_COLUMNS | _CANONICAL_V1_ADDITIONAL_COLUMNS
+        ):
+            continue
+        canonical = _canonical_v1_name(normalized)
+        if canonical in mapping:
+            raise ValueError(
+                f"Multiple native HMDA columns map to canonical column {canonical!r}: "
+                f"{mapping[canonical]!r} and {native_column!r}."
+            )
+        mapping[canonical] = native_column
+    return mapping
+
+
+def _canonical_columns(columns):
+    """Validate and return the requested canonical columns in output order."""
+    if columns is None:
+        return list(CANONICAL_LAR_COLUMNS)
+    if isinstance(columns, str):
+        raise ValueError("columns must be an iterable of canonical column names")
+    requested = list(columns)
+    unknown = [
+        column for column in requested if column not in _CANONICAL_LAR_COLUMN_SET
+    ]
+    if unknown:
+        raise ValueError(f"Unknown canonical HMDA column(s): {unknown}")
+    if len(requested) != len(set(requested)):
+        raise ValueError("Canonical HMDA columns must not contain duplicates")
+    return requested
+
+
+def _translate_canonical_filters(filters, mapping):
+    """Translate canonical filter fields to their native parquet names."""
+    if filters is None:
+        return None
+
+    def translate(expression):
+        if isinstance(expression, tuple) and len(expression) == 3:
+            column, operator, value = expression
+            if column not in _CANONICAL_LAR_COLUMN_SET:
+                raise ValueError(f"Unknown canonical HMDA filter column: {column!r}")
+            if column not in mapping:
+                raise ValueError(
+                    f"Canonical HMDA filter column {column!r} is unavailable "
+                    "for the requested year and source."
+                )
+            return (mapping[column], operator, value)
+        if isinstance(expression, list):
+            return [translate(item) for item in expression]
+        raise ValueError("filters must contain three-item filter tuples")
+
+    return translate(filters)
+
+
+def _load_canonical_lar(parquet_path, year, source, columns, filters, schema_version):
+    """Load source parquet and return the canonical HMDA schema."""
+    import pyarrow.parquet as pq
+
+    native_columns = pq.ParquetFile(parquet_path).schema_arrow.names
+    mapping = _canonical_source_mapping(native_columns)
+    requested = _canonical_columns(columns)
+    translated_filters = _translate_canonical_filters(filters, mapping)
+    projected_native = [mapping[column] for column in requested if column in mapping]
+    frame = pd.read_parquet(
+        parquet_path,
+        columns=projected_native,
+        filters=translated_filters,
+    )
+    frame.rename(
+        columns={native: canonical for canonical, native in mapping.items()},
+        inplace=True,
+    )
+    for column in requested:
+        dtype = _canonical_dtype(column)
+        if column in frame:
+            frame[column] = frame[column].astype(dtype)
+        else:
+            frame[column] = pd.Series(pd.NA, index=frame.index, dtype=dtype)
+    frame = frame.loc[:, requested]
+    frame.attrs["hmda"] = {
+        "year": year,
+        "source": source,
+        "source_schema": _source_schema_cohort(year, source),
+        "schema": "canonical",
+        "schema_version": schema_version,
+    }
+    return frame
 
 
 def _null_numeric_tokens(series):
@@ -1048,6 +1257,8 @@ def load_lar(
     columns=None,
     filters=None,
     convert_if_missing=False,
+    schema="native",
+    schema_version=None,
 ):
     """Load one source-specific annual HMDA parquet file.
 
@@ -1066,6 +1277,13 @@ def load_lar(
     convert_if_missing : bool, optional
         Convert the downloaded raw file with :func:`convert_lar` when the
         parquet file is absent. Defaults to ``False``.
+    schema : {"native", "canonical"}, optional
+        Column schema to return. ``"native"`` preserves source columns;
+        ``"canonical"`` returns the unified loan-level schema. Defaults to
+        ``"native"``.
+    schema_version : int, optional
+        Canonical schema version. ``None`` selects the current version. This
+        argument is only valid with ``schema="canonical"``.
 
     Returns
     -------
@@ -1073,6 +1291,12 @@ def load_lar(
         Source-specific HMDA records.
     """
     year = int(year)
+    resolved_schema_version = _resolve_lar_schema(schema, schema_version)
+    if schema == "canonical" and year < 1990:
+        raise ValueError(
+            "Canonical HMDA loan-level data begin in 1990; NARA 1981-1989 "
+            "files contain aggregate disclosure records. Use schema='native'."
+        )
     resolved_source = _resolve_lar_source(year, source)
     parquet_path = _lar_parquet_path(year, data_dir, resolved_source)
     if not parquet_path.exists() and convert_if_missing:
@@ -1082,7 +1306,16 @@ def load_lar(
             f"HMDA {year} ({resolved_source}) parquet file not found at "
             f"{parquet_path}. Run convert_lar first."
         )
-    return pd.read_parquet(parquet_path, columns=columns, filters=filters)
+    if schema == "native":
+        return pd.read_parquet(parquet_path, columns=columns, filters=filters)
+    return _load_canonical_lar(
+        parquet_path,
+        year,
+        resolved_source,
+        columns,
+        filters,
+        resolved_schema_version,
+    )
 
 
 def load(data_dir=None, **kwargs):

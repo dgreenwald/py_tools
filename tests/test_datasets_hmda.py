@@ -23,6 +23,13 @@ class _ResponseWithLength(io.BytesIO):
         self.headers = {"Content-Length": str(len(payload))}
 
 
+def _install_parquet(tmp_path, year, source, frame):
+    path = hmda._lar_parquet_path(year, tmp_path, source=source)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    frame.to_parquet(path, index=False)
+    return path
+
+
 @pytest.mark.parametrize("year", range(2017, 2026))
 def test_snapshot_lar_urls_and_paths(year, tmp_path):
     config = hmda._LAR_SOURCE_CONFIG["ffiec_snapshot"][year]
@@ -492,9 +499,7 @@ def test_convert_nulls_legacy_nara_nonnumeric_numeric_artifacts(tmp_path):
     values[14] = "N"
     values[15] = "/"
     values[16] = "23.7"
-    record = _fixed_width_record(hmda._NARA_1990_2003_WIDTHS, values).encode(
-        "latin-1"
-    )
+    record = _fixed_width_record(hmda._NARA_1990_2003_WIDTHS, values).encode("latin-1")
     _install_raw_zip(tmp_path, 1990, "nara", "lar_1990.dat", record)
 
     [output] = hmda.convert_lar(1990, source="nara", data_dir=tmp_path)
@@ -599,6 +604,125 @@ def test_load_lar_projects_and_filters_parquet(tmp_path):
 
     assert frame.to_dict("records") == [{"lei": "A", "action_taken": 1}]
     assert registry_frame["lei"].tolist() == ["A", "B"]
+
+
+def test_load_lar_canonical_translates_columns_filters_and_provenance(tmp_path):
+    native = pd.DataFrame(
+        {
+            "asof_date": pd.Series([2014, 2014], dtype="Int64"),
+            "loan_amt": pd.Series([250, 300], dtype="Int64"),
+            "app_income": pd.Series([75, 90], dtype="Int64"),
+            "action_taken": pd.Series([1, 3], dtype="Int64"),
+            "source_only": ["drop", "drop"],
+        }
+    )
+    _install_parquet(tmp_path, 2014, "nara", native)
+
+    frame = hmda.load_lar(
+        2014,
+        source="nara",
+        data_dir=tmp_path,
+        schema="canonical",
+        columns=[
+            "activity_year",
+            "loan_amount_000s",
+            "applicant_income_000s",
+            "lei",
+        ],
+        filters=[("action_taken", "==", 1)],
+    )
+
+    assert frame.columns.tolist() == [
+        "activity_year",
+        "loan_amount_000s",
+        "applicant_income_000s",
+        "lei",
+    ]
+    assert frame["activity_year"].tolist() == [2014]
+    assert frame["loan_amount_000s"].tolist() == [250]
+    assert frame["applicant_income_000s"].dtype == pd.Float64Dtype()
+    assert frame["applicant_income_000s"].tolist() == [75.0]
+    assert frame["lei"].dtype == pd.StringDtype()
+    assert frame["lei"].isna().all()
+    assert frame.attrs["hmda"] == {
+        "year": 2014,
+        "source": "nara",
+        "source_schema": "nara_2004_2014",
+        "schema": "canonical",
+        "schema_version": 1,
+    }
+
+
+def test_canonical_frames_share_union_and_dtypes_across_sources(tmp_path):
+    _install_parquet(
+        tmp_path,
+        2014,
+        "nara",
+        pd.DataFrame(
+            {
+                "asof_date": pd.Series([2014], dtype="Int64"),
+                "loan_amt": pd.Series([250], dtype="Int64"),
+            }
+        ),
+    )
+    _install_parquet(
+        tmp_path,
+        2016,
+        "cfpb",
+        pd.DataFrame(
+            {
+                "as_of_year": pd.Series([2016], dtype="Int64"),
+                "loan_amount_000s": pd.Series([300], dtype="Int64"),
+            }
+        ),
+    )
+
+    nara = hmda.load_lar(2014, source="nara", data_dir=tmp_path, schema="canonical")
+    cfpb = hmda.load(
+        yr=2016,
+        source="cfpb",
+        data_dir=tmp_path,
+        schema="canonical",
+        schema_version=1,
+    )
+
+    assert nara.columns.tolist() == list(hmda.CANONICAL_LAR_COLUMNS)
+    assert cfpb.columns.tolist() == list(hmda.CANONICAL_LAR_COLUMNS)
+    assert nara.dtypes.to_dict() == cfpb.dtypes.to_dict()
+    combined = pd.concat([nara, cfpb], ignore_index=True)
+    assert combined["activity_year"].tolist() == [2014, 2016]
+    assert combined["loan_amount_000s"].tolist() == [250, 300]
+
+
+@pytest.mark.parametrize(
+    "kwargs,match",
+    [
+        ({"schema": "unknown"}, "schema must be"),
+        ({"schema_version": 1}, "only valid"),
+        ({"schema": "canonical", "schema_version": True}, "must be an integer"),
+        ({"schema": "canonical", "schema_version": 2}, "Unsupported"),
+        ({"schema": "canonical", "columns": ["not_a_column"]}, "Unknown"),
+        (
+            {"schema": "canonical", "filters": [("lei", "==", "X")]},
+            "unavailable",
+        ),
+    ],
+)
+def test_load_lar_validates_canonical_schema_options(tmp_path, kwargs, match):
+    _install_parquet(
+        tmp_path,
+        2014,
+        "nara",
+        pd.DataFrame({"asof_date": pd.Series([2014], dtype="Int64")}),
+    )
+
+    with pytest.raises(ValueError, match=match):
+        hmda.load_lar(2014, source="nara", data_dir=tmp_path, **kwargs)
+
+
+def test_load_lar_rejects_pre_1990_canonical_aggregate_data(tmp_path):
+    with pytest.raises(ValueError, match="begin in 1990"):
+        hmda.load_lar(1989, source="nara", data_dir=tmp_path, schema="canonical")
 
 
 def test_load_lar_converts_downloaded_raw_file_if_missing(tmp_path):
