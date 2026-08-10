@@ -95,7 +95,7 @@ _NATIONAL_ARCHIVES_LAR_CONFIG.update(
     }
 )
 NATIONAL_ARCHIVES_LAR_YEARS = tuple(range(2014, 1980, -1))
-LAR_SOURCES = ("ffiec_three_year", "ffiec_snapshot", "cfpb", "nara")
+LAR_SOURCES = ("ffiec_three_year", "ffiec_snapshot", "nara", "cfpb")
 LAR_BULK_SOURCES = ("auto", "all", *LAR_SOURCES)
 _LAR_SOURCE_CONFIG = {
     "ffiec_three_year": _THREE_YEAR_LAR_CONFIG,
@@ -105,8 +105,8 @@ _LAR_SOURCE_CONFIG = {
 }
 LAR_YEARS = tuple(range(2025, 1980, -1))
 _AUTO_LAR_SOURCE = {
-    **{year: "nara" for year in range(1981, 2007)},
-    **{year: "cfpb" for year in range(2007, 2017)},
+    **{year: "nara" for year in range(1981, 2015)},
+    **{year: "cfpb" for year in range(2015, 2017)},
     **{year: "ffiec_three_year" for year in range(2017, 2023)},
     **{year: "ffiec_snapshot" for year in range(2023, 2026)},
 }
@@ -643,8 +643,8 @@ def download_lar(
         Year or years to download. By default, download every configured year.
     source : {"auto", "all", "ffiec_three_year", "ffiec_snapshot", "cfpb", "nara"}, optional
         Data release to download. ``"auto"`` prefers FFIEC three-year files
-        for 2017--2022, FFIEC snapshots for 2023 onward, CFPB files for
-        2007--2016, and National Archives files for earlier years. With an
+        for 2017--2022, FFIEC snapshots for 2023 onward, National Archives
+        files through 2014, and CFPB files for 2015--2016. With an
         explicit source and no ``years``, download every year from that source.
         ``"all"`` downloads every available source for each requested year.
     data_dir : str or path-like, optional

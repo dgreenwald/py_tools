@@ -221,7 +221,9 @@ def test_failed_overwrite_preserves_existing_archive(tmp_path, monkeypatch):
     [
         (1981, "nara"),
         (2006, "nara"),
-        (2007, "cfpb"),
+        (2007, "nara"),
+        (2014, "nara"),
+        (2015, "cfpb"),
         (2016, "cfpb"),
         (2017, "ffiec_three_year"),
         (2022, "ffiec_three_year"),
@@ -247,8 +249,8 @@ def test_explicit_overlapping_sources_have_separate_paths(tmp_path):
 
 def test_all_source_pairs_preserve_year_and_source_order():
     assert hmda._lar_source_year_pairs([2014, 2017, 2014], source="all") == [
-        (2014, "cfpb"),
         (2014, "nara"),
+        (2014, "cfpb"),
         (2017, "ffiec_three_year"),
         (2017, "ffiec_snapshot"),
         (2017, "cfpb"),
@@ -267,8 +269,8 @@ def test_download_all_sources_for_overlapping_years(tmp_path, monkeypatch):
     paths = hmda.download_lar([2014, 2017], source="all", data_dir=tmp_path)
 
     assert paths == [
-        hmda._lar_file_path(2014, tmp_path, source="cfpb"),
         hmda._lar_file_path(2014, tmp_path, source="nara"),
+        hmda._lar_file_path(2014, tmp_path, source="cfpb"),
         hmda._lar_file_path(2017, tmp_path, source="ffiec_three_year"),
         hmda._lar_file_path(2017, tmp_path, source="ffiec_snapshot"),
         hmda._lar_file_path(2017, tmp_path, source="cfpb"),
