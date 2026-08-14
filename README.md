@@ -39,6 +39,35 @@ Or create a `.env` file in the repository root (or a parent directory):
 PY_TOOLS_DATA_DIR=/path/to/data
 ```
 
+## Slurm jobs
+
+`py_tools.cluster` renders typed single-job and array definitions and can submit the resulting
+scripts with `sbatch --parsable`:
+
+```python
+from py_tools.cluster import (
+    SLURM_ARRAY_TASK_ID,
+    SlurmArray,
+    SlurmJob,
+    SlurmResources,
+    submit_slurm,
+    write_slurm_script,
+)
+
+job = SlurmJob(
+    name="analysis",
+    command=("python", "worker.py", "--index", SLURM_ARRAY_TASK_ID),
+    workdir="/cluster/project",
+    log_dir="/cluster/project/output/slurm",
+    resources=SlurmResources(time="04:00:00", memory="16G", account="research"),
+    activate="/cluster/venv/bin/activate",
+    array=SlurmArray(task_count=20, max_concurrent=4),
+)
+script = write_slurm_script(job, "/cluster/project/output/slurm/jobs.slurm")
+submission = submit_slurm(script)
+print(submission.job_id)
+```
+
 `py_tools.datasets` will load `.env` automatically when `python-dotenv` is installed
 (included in the `datasets` extra).
 
