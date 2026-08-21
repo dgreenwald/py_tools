@@ -1,3 +1,12 @@
+import os
+import shutil
+import stat
+import tempfile
+import urllib.request
+import uuid
+import zipfile
+from pathlib import Path, PurePosixPath
+
 import pandas as pd
 from . import fred
 from py_tools import time_series as ts
@@ -8,6 +17,272 @@ default_dir = config.base_dir() + "fof/"
 # data_dir = '/home/dan/Dropbox/data/fof/'
 DATASET_NAME = "fof"
 DESCRIPTION = "Federal Reserve Financial Accounts (FoF) dataset loader."
+FOF_CSV_URL = (
+    "https://www.federalreserve.gov/releases/z1/current/z1_csv_files.zip"
+)
+FOF_TABLE_MAPPING_URL = (
+    "https://www.federalreserve.gov/releases/z1/current/"
+    "z1_table_mapping.csv"
+)
+FOF_REQUEST_HEADERS = {
+    "User-Agent": "py_tools/0.2 (+https://github.com/dgreenwald/py_tools)",
+    "Accept": "application/zip, application/octet-stream, text/csv, */*",
+}
+DISCONTINUED_2026_TABLES = {
+    "f2",
+    "f3",
+    "f4",
+    "f4c",
+    "f4f",
+    "f4g",
+    "f5",
+    "l4s",
+}
+
+
+def _download_file(url, destination):
+    """Stream a URL to a local path."""
+    request = urllib.request.Request(url, headers=FOF_REQUEST_HEADERS)
+    with Path(destination).open("wb") as output:
+        with urllib.request.urlopen(request) as response:
+            while True:
+                chunk = response.read(1024 * 1024)
+                if not chunk:
+                    break
+                output.write(chunk)
+
+
+def _validated_archive_members(archive):
+    """Validate a Z.1 archive and return its regular-file members."""
+    members = []
+    stems = {"csv": set(), "data_dictionary": set()}
+
+    for info in archive.infolist():
+        member = PurePosixPath(info.filename)
+        parts = member.parts
+        if member.is_absolute() or ".." in parts:
+            raise RuntimeError(f"Unsafe path in Z.1 archive: {info.filename!r}")
+        if not parts or parts[0] not in stems:
+            raise RuntimeError(
+                f"Unexpected top-level path in Z.1 archive: {info.filename!r}"
+            )
+        if info.is_dir():
+            if len(parts) != 1:
+                raise RuntimeError(
+                    f"Unexpected directory in Z.1 archive: {info.filename!r}"
+                )
+            continue
+        if len(parts) != 2:
+            raise RuntimeError(
+                f"Unexpected nested path in Z.1 archive: {info.filename!r}"
+            )
+        mode = info.external_attr >> 16
+        if stat.S_ISLNK(mode):
+            raise RuntimeError(f"Symlink in Z.1 archive: {info.filename!r}")
+
+        expected_suffix = ".csv" if parts[0] == "csv" else ".txt"
+        if member.suffix.lower() != expected_suffix:
+            raise RuntimeError(
+                f"Unexpected file type in Z.1 archive: {info.filename!r}"
+            )
+        stems[parts[0]].add(member.stem)
+        members.append(info)
+
+    if not stems["csv"] or not stems["data_dictionary"]:
+        raise RuntimeError(
+            "Z.1 archive must contain nonempty csv and data_dictionary directories"
+        )
+    if stems["csv"] != stems["data_dictionary"]:
+        raise RuntimeError(
+            "Z.1 archive CSV files and data dictionaries do not correspond"
+        )
+    return members
+
+
+def _archive_vintage(members):
+    """Infer a YYMM vintage from the newest regular-file timestamp."""
+    year, month = max(info.date_time[:2] for info in members)
+    return f"{year % 100:02d}{month:02d}"
+
+
+def _validate_vintage(vintage):
+    """Return a validated YYMM vintage string."""
+    vintage = str(vintage)
+    if len(vintage) != 4 or not vintage.isdigit():
+        raise ValueError("vintage must be a four-digit YYMM string")
+    month = int(vintage[2:])
+    if month < 1 or month > 12:
+        raise ValueError("vintage month must be between 01 and 12")
+    return vintage
+
+
+def _validate_table_mapping(path):
+    """Validate the Fed's old-to-new Z.1 table crosswalk."""
+    try:
+        columns = set(pd.read_csv(path, nrows=1).columns)
+    except Exception as exc:
+        raise RuntimeError("Z.1 table mapping is not a readable CSV") from exc
+    if not {"new", "old"}.issubset(columns):
+        raise RuntimeError("Z.1 table mapping must contain new and old columns")
+
+
+def _install_staging_directory(staging, destination, overwrite):
+    """Atomically install a completed vintage, rolling back replacement."""
+    if not destination.exists():
+        os.replace(staging, destination)
+        return
+    if not overwrite:
+        raise FileExistsError(destination)
+
+    backup = destination.with_name(
+        f".{destination.name}.{uuid.uuid4().hex}.backup"
+    )
+    os.replace(destination, backup)
+    try:
+        os.replace(staging, destination)
+    except Exception:
+        os.replace(backup, destination)
+        raise
+    shutil.rmtree(backup)
+
+
+def download_current(vintage=None, data_dir=default_dir, overwrite=False):
+    """Download and install the current Federal Reserve Z.1 CSV release.
+
+    Parameters
+    ----------
+    vintage : str or None, optional
+        Four-digit ``YYMM`` destination vintage. If omitted, infer the
+        vintage from the newest file timestamp in the downloaded archive.
+    data_dir : str or path-like, optional
+        Root FoF data directory containing ``all_csv``.
+    overwrite : bool, optional
+        Atomically replace an installed vintage when ``True``.
+
+    Returns
+    -------
+    pathlib.Path
+        Installed ``all_csv/YYMM`` directory.
+
+    Raises
+    ------
+    ValueError
+        If an explicit vintage is not a valid ``YYMM`` string.
+    RuntimeError
+        If download, validation, extraction, or installation fails.
+    """
+    if vintage is not None:
+        vintage = _validate_vintage(vintage)
+
+    all_csv_dir = Path(data_dir) / "all_csv"
+    all_csv_dir.mkdir(parents=True, exist_ok=True)
+    if vintage is not None:
+        destination = all_csv_dir / vintage
+        if destination.exists() and not overwrite:
+            return destination
+
+    archive_path = None
+    staging = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            prefix=".z1_csv_files.",
+            suffix=".zip.part",
+            dir=all_csv_dir,
+            delete=False,
+        ) as temporary:
+            archive_path = Path(temporary.name)
+        _download_file(FOF_CSV_URL, archive_path)
+
+        if not zipfile.is_zipfile(archive_path):
+            raise RuntimeError("downloaded content is not a valid ZIP archive")
+        with zipfile.ZipFile(archive_path) as archive:
+            members = _validated_archive_members(archive)
+            if vintage is None:
+                vintage = _archive_vintage(members)
+            destination = all_csv_dir / vintage
+            if destination.exists() and not overwrite:
+                return destination
+
+            staging = Path(
+                tempfile.mkdtemp(prefix=f".{vintage}.", dir=all_csv_dir)
+            )
+            for info in members:
+                target = staging.joinpath(*PurePosixPath(info.filename).parts)
+                target.parent.mkdir(parents=True, exist_ok=True)
+                with archive.open(info) as source, target.open("wb") as output:
+                    shutil.copyfileobj(source, output)
+
+        mapping_path = staging / "z1_table_mapping.csv"
+        _download_file(FOF_TABLE_MAPPING_URL, mapping_path)
+        _validate_table_mapping(mapping_path)
+        _install_staging_directory(staging, destination, overwrite)
+        staging = None
+        return destination
+    except (ValueError, RuntimeError):
+        raise
+    except Exception as exc:
+        raise RuntimeError(
+            f"Failed to install current Z.1 data from {FOF_CSV_URL}: {exc}"
+        ) from exc
+    finally:
+        if archive_path is not None:
+            archive_path.unlink(missing_ok=True)
+        if staging is not None:
+            shutil.rmtree(staging, ignore_errors=True)
+
+
+def _resolve_table_stem(table, vintage_dir):
+    """Resolve a legacy table name to the installed archive's file stem."""
+    table = str(table)
+    csv_dir = vintage_dir / "csv"
+    for stem in dict.fromkeys((table, table.replace(".", "_"))):
+        if (csv_dir / f"{stem}.csv").exists():
+            return stem
+
+    mapping_path = vintage_dir / "z1_table_mapping.csv"
+    if mapping_path.exists():
+        mapping = pd.read_csv(mapping_path, dtype=str)
+        if {"new", "old"}.issubset(mapping.columns):
+            compact_old = (
+                mapping["old"].str.replace(".", "", regex=False).str.lower()
+            )
+            requested = table.replace(".", "").replace("_", "").lower()
+            matches = mapping.loc[compact_old == requested, "new"].dropna()
+            if len(matches) == 1:
+                stem = matches.iloc[0].replace(".", "_")
+                if (csv_dir / f"{stem}.csv").exists():
+                    return stem
+
+    attempted = csv_dir / f"{table}.csv"
+    compact_table = table.replace(".", "").replace("_", "").lower()
+    if (
+        compact_table in DISCONTINUED_2026_TABLES
+        and mapping_path.exists()
+    ):
+        raise FileNotFoundError(
+            f"FoF table {table!r} was discontinued in the June 2026 Z.1 "
+            "redesign and is not included in the current release ZIP. Its "
+            "series remain available separately through FRED."
+        )
+    raise FileNotFoundError(
+        f"FoF table {table!r} was not found at {attempted}. "
+        "Install the requested vintage with fof.download_current(...)."
+    )
+
+
+def _quarterly_vintage_index(vintage_dir):
+    """Read a representative quarterly index from an installed vintage."""
+    for path in sorted((vintage_dir / "csv").glob("*.csv")):
+        try:
+            dates = pd.read_csv(path, usecols=["date"])["date"].astype(str)
+        except (OSError, ValueError, KeyError):
+            continue
+        quarterly = dates.str.fullmatch(r"\d{4}:Q[1-4]")
+        if quarterly.all() and len(dates):
+            year = dates.str[:4].astype(int)
+            quarter = dates.str[-1].astype(int)
+            return pd.DatetimeIndex(ts.date_from_qtr(year, quarter), name="date")
+    raise ValueError(f"No quarterly date index was found in {vintage_dir}")
 
 
 def load(
@@ -192,6 +467,8 @@ def load(
 
     df_list = []
     vars_loaded = []
+    missing_codes = {}
+    vintage_dir = Path(data_dir) / "all_csv" / vintage
 
     for table in unique_tables:
         these_codes = [
@@ -202,18 +479,32 @@ def load(
 
         these_cols = ["date"] + these_codes
 
-        df_tab = load_table(
-            table,
-            data_dir=data_dir,
-            usecols=these_cols,
-            vintage=vintage,
-            update_names=update_names,
-        )
+        try:
+            df_tab = load_table(
+                table,
+                data_dir=data_dir,
+                usecols=these_cols,
+                vintage=vintage,
+                update_names=update_names,
+            )
+        except FileNotFoundError:
+            if not (vintage_dir / "csv").is_dir():
+                raise
+            missing_codes.update(
+                (code, code_index[code]) for code in these_codes
+            )
+            continue
         df_tab.rename(columns=code_index, inplace=True)
 
         for key, this_table, this_code in var_index_backup:
             if (this_table == table) and (key not in df_tab):
                 df_tab = df_tab.rename(columns={this_code + ".Q": key})
+
+        missing_codes.update(
+            (code, code_index[code])
+            for code in these_codes
+            if code_index[code] not in df_tab
+        )
 
         if named_only:
             drop_cols = [
@@ -232,7 +523,15 @@ def load(
         df_list.append(df_tab[new_vars].copy())
         vars_loaded += new_vars
 
-    df = pd.concat(df_list, axis=1)
+    if df_list:
+        df = pd.concat(df_list, axis=1)
+    else:
+        df = pd.DataFrame(index=_quarterly_vintage_index(vintage_dir))
+
+    for name in missing_codes.values():
+        if name not in df:
+            df[name] = float("nan")
+
     # df = df.apply(pd.to_numeric, errors='coerce')
     return df
 
@@ -287,7 +586,9 @@ def load_table(
         print("Change to keyword vintage")
         vintage = fof_vintage
 
-    infile = data_dir + "all_csv/{0}/csv/{1}.csv".format(vintage, table)
+    vintage_dir = Path(data_dir) / "all_csv" / vintage
+    table_stem = _resolve_table_stem(table, vintage_dir)
+    infile = vintage_dir / "csv" / f"{table_stem}.csv"
     df = pd.read_csv(infile)
 
     if table[0] == "s":
@@ -326,9 +627,7 @@ def load_table(
             ),
         ]
 
-        infile_names = data_dir + "all_csv/{0}/data_dictionary/{1}.txt".format(
-            vintage, table
-        )
+        infile_names = vintage_dir / "data_dictionary" / f"{table_stem}.txt"
         df_names = pd.read_csv(
             infile_names,
             sep="\t",
