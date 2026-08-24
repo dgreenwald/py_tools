@@ -119,7 +119,8 @@ class ConfigRegistry:
         Returns
         -------
         dict
-            Fully resolved configuration with inheritance applied
+            Independent deep copy of the fully resolved configuration with
+            inheritance applied
 
         Raises
         ------
@@ -131,7 +132,7 @@ class ConfigRegistry:
         # Check cache (only if no extra context)
         cache_key = (config_id, tuple(sorted(extra_context.items())))
         if not extra_context and cache_key in self._cache:
-            return self._cache[cache_key]
+            return copy.deepcopy(self._cache[cache_key])
 
         # Validate config exists
         if config_id not in self.configs:
@@ -152,7 +153,7 @@ class ConfigRegistry:
         if not extra_context:
             self._cache[cache_key] = resolved
 
-        return resolved
+        return copy.deepcopy(resolved)
 
     def _resolve_inheritance(
         self, config_id: Union[str, int], visited: set
