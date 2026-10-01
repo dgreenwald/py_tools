@@ -39,6 +39,27 @@ Or create a `.env` file in the repository root (or a parent directory):
 PY_TOOLS_DATA_DIR=/path/to/data
 ```
 
+## HMDA conversion
+
+Convert downloaded years concurrently with an explicit worker count:
+
+```bash
+py-tools-hmda convert 2021 2022 2023 --workers 3
+```
+
+The default is one worker. Each process converts one year/source file, retaining
+the existing chunked reads and atomic output replacement. A single file remains
+serial. Memory use grows approximately with `--workers` at a fixed `--chunksize`,
+and disk bandwidth can limit speedup. Start with two workers and increase as RAM
+and storage allow. Valid existing outputs are skipped unless `--overwrite` is set.
+
+The Python API accepts `convert_lar(..., workers=3)`. Scripts using multiple
+workers must call it inside an `if __name__ == "__main__":` guard because worker
+processes use the spawn start method. On failure, new work stops and active
+conversions finish before the error is raised; completed outputs remain available
+for a subsequent run. Returned paths and CLI output retain requested year/source
+order.
+
 ## Slurm jobs
 
 `py_tools.cluster` renders typed single-job and array definitions and can submit the resulting

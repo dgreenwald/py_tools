@@ -1,10 +1,12 @@
 import argparse
+import multiprocessing
 import os
 import sys
 import tempfile
 import urllib.request
 import warnings
 import zipfile
+from concurrent.futures import FIRST_COMPLETED, ProcessPoolExecutor, wait
 from contextlib import contextmanager
 from pathlib import Path
 
@@ -1115,6 +1117,89 @@ def _valid_parquet(path):
         return False
 
 
+def _convert_lar_file(year, resolved_source, raw_path, output_path, chunksize, compression):
+    """Convert one source file, publishing its output only after validation."""
+    import pyarrow as pa
+    import pyarrow.parquet as pq
+
+    if not raw_path.exists():
+        raise FileNotFoundError(
+            f"Raw HMDA {year} ({resolved_source}) file not found at "
+            f"{raw_path}. Run download_lar first."
+        )
+    year_config = _LAR_SOURCE_CONFIG[resolved_source][year]
+    if not _validate_lar_file(raw_path, year_config["format"]):
+        raise ValueError(
+            f"Raw HMDA {year} ({resolved_source}) file is not valid "
+            f"{year_config['format']} data: {raw_path}."
+        )
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = None
+    writer = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            prefix=f".{output_path.stem}.",
+            suffix=".parquet.part",
+            dir=output_path.parent,
+            delete=False,
+        ) as temp_file:
+            temporary = Path(temp_file.name)
+
+        for chunk_number, raw_chunk in enumerate(
+            _lar_chunk_reader(raw_path, year, resolved_source, int(chunksize))
+        ):
+            chunk = _coerce_lar_chunk(raw_chunk, year, resolved_source)
+            table = pa.Table.from_pandas(chunk, preserve_index=False)
+            if writer is None:
+                cohort = (
+                    _nara_layout(year)[2] if resolved_source == "nara" else "csv"
+                )
+                metadata = dict(table.schema.metadata or {})
+                metadata.update(
+                    {
+                        b"hmda.source": resolved_source.encode(),
+                        b"hmda.year": str(year).encode(),
+                        b"hmda.raw_filename": raw_path.name.encode(),
+                        b"hmda.schema_cohort": cohort.encode(),
+                    }
+                )
+                table = table.replace_schema_metadata(metadata)
+                writer = pq.ParquetWriter(
+                    temporary,
+                    table.schema,
+                    compression=compression,
+                    use_dictionary=True,
+                )
+            elif table.schema.remove_metadata() != writer.schema.remove_metadata():
+                raise ValueError(
+                    f"Schema changed in HMDA {year} ({resolved_source}) "
+                    f"at chunk {chunk_number}."
+                )
+            writer.write_table(table)
+
+        if writer is None:
+            raise ValueError(
+                f"Raw HMDA {year} ({resolved_source}) file contains no records."
+            )
+        writer.close()
+        writer = None
+        if not _valid_parquet(temporary):
+            raise RuntimeError("converted output does not contain valid parquet")
+        os.replace(temporary, output_path)
+        temporary = None
+    except Exception as exc:
+        if writer is not None:
+            writer.close()
+        if temporary is not None:
+            temporary.unlink(missing_ok=True)
+        raise RuntimeError(
+            f"Failed to convert HMDA {year} ({resolved_source}) from "
+            f"{raw_path}: {exc}"
+        ) from exc
+    return output_path
+
+
 def convert_lar(
     years=None,
     source="auto",
@@ -1122,6 +1207,7 @@ def convert_lar(
     overwrite=False,
     chunksize=100000,
     compression="zstd",
+    workers=1,
 ):
     """Convert downloaded HMDA LAR files to source-specific parquet files.
 
@@ -1145,15 +1231,24 @@ def convert_lar(
         Number of source rows per parquet row group.
     compression : str, optional
         Parquet compression codec. Defaults to ``"zstd"``.
+    workers : int, optional
+        Maximum number of file conversion processes. Defaults to one (serial).
+        Memory use grows with workers and chunksize. Python scripts using
+        multiple workers must guard their entry point with ``if __name__ ==
+        "__main__":`` because workers use the spawn start method.
 
     Returns
     -------
     list of pathlib.Path
         Parquet paths in requested year and source order.
+
+    Notes
+    -----
+    On failure, no further files are scheduled and running conversions finish
+    before the error is raised. Successfully written files are retained.
     """
     try:
-        import pyarrow as pa
-        import pyarrow.parquet as pq
+        import pyarrow  # noqa: F401
     except ImportError as exc:  # pragma: no cover - depends on optional install
         raise ImportError(
             "HMDA parquet conversion requires pyarrow; install py_tools[datasets]."
@@ -1162,90 +1257,52 @@ def convert_lar(
     if not isinstance(chunksize, (int, np.integer)) or chunksize <= 0:
         raise ValueError("chunksize must be a positive integer")
 
+    if (
+        isinstance(workers, (bool, np.bool_))
+        or not isinstance(workers, (int, np.integer))
+        or workers <= 0
+    ):
+        raise ValueError("workers must be a positive integer")
+
     requested = _lar_source_year_pairs(years, source=source)
     outputs = []
+    jobs = []
     for year, resolved_source in requested:
         raw_path = _lar_file_path(year, data_dir=data_dir, source=resolved_source)
         output_path = _lar_parquet_path(year, data_dir=data_dir, source=resolved_source)
         outputs.append(output_path)
-
         if output_path.exists() and _valid_parquet(output_path) and not overwrite:
             continue
-        if not raw_path.exists():
-            raise FileNotFoundError(
-                f"Raw HMDA {year} ({resolved_source}) file not found at "
-                f"{raw_path}. Run download_lar first."
-            )
-        year_config = _LAR_SOURCE_CONFIG[resolved_source][year]
-        if not _validate_lar_file(raw_path, year_config["format"]):
-            raise ValueError(
-                f"Raw HMDA {year} ({resolved_source}) file is not valid "
-                f"{year_config['format']} data: {raw_path}."
-            )
+        jobs.append(
+            (year, resolved_source, raw_path, output_path, int(chunksize), compression)
+        )
 
-        output_path.parent.mkdir(parents=True, exist_ok=True)
-        temporary = None
-        writer = None
-        try:
-            with tempfile.NamedTemporaryFile(
-                prefix=f".{output_path.stem}.",
-                suffix=".parquet.part",
-                dir=output_path.parent,
-                delete=False,
-            ) as temp_file:
-                temporary = Path(temp_file.name)
-
-            for chunk_number, raw_chunk in enumerate(
-                _lar_chunk_reader(raw_path, year, resolved_source, int(chunksize))
-            ):
-                chunk = _coerce_lar_chunk(raw_chunk, year, resolved_source)
-                table = pa.Table.from_pandas(chunk, preserve_index=False)
-                if writer is None:
-                    cohort = (
-                        _nara_layout(year)[2] if resolved_source == "nara" else "csv"
-                    )
-                    metadata = dict(table.schema.metadata or {})
-                    metadata.update(
-                        {
-                            b"hmda.source": resolved_source.encode(),
-                            b"hmda.year": str(year).encode(),
-                            b"hmda.raw_filename": raw_path.name.encode(),
-                            b"hmda.schema_cohort": cohort.encode(),
-                        }
-                    )
-                    table = table.replace_schema_metadata(metadata)
-                    writer = pq.ParquetWriter(
-                        temporary,
-                        table.schema,
-                        compression=compression,
-                        use_dictionary=True,
-                    )
-                elif table.schema.remove_metadata() != writer.schema.remove_metadata():
-                    raise ValueError(
-                        f"Schema changed in HMDA {year} ({resolved_source}) "
-                        f"at chunk {chunk_number}."
-                    )
-                writer.write_table(table)
-
-            if writer is None:
-                raise ValueError(
-                    f"Raw HMDA {year} ({resolved_source}) file contains no records."
-                )
-            writer.close()
-            writer = None
-            if not _valid_parquet(temporary):
-                raise RuntimeError("converted output does not contain valid parquet")
-            os.replace(temporary, output_path)
-            temporary = None
-        except Exception as exc:
-            if writer is not None:
-                writer.close()
-            if temporary is not None:
-                temporary.unlink(missing_ok=True)
-            raise RuntimeError(
-                f"Failed to convert HMDA {year} ({resolved_source}) from "
-                f"{raw_path}: {exc}"
-            ) from exc
+    if workers == 1 or len(jobs) <= 1:
+        for job in jobs:
+            _convert_lar_file(*job)
+    else:
+        worker_count = min(int(workers), len(jobs))
+        remaining = iter(jobs)
+        pending = set()
+        with ProcessPoolExecutor(
+            max_workers=worker_count,
+            mp_context=multiprocessing.get_context("spawn"),
+        ) as executor:
+            try:
+                for _ in range(worker_count):
+                    pending.add(executor.submit(_convert_lar_file, *next(remaining)))
+                while pending:
+                    completed, pending = wait(pending, return_when=FIRST_COMPLETED)
+                    # Check the entire completed batch before scheduling more work.
+                    for future in completed:
+                        future.result()
+                    for _ in completed:
+                        job = next(remaining, None)
+                        if job is not None:
+                            pending.add(executor.submit(_convert_lar_file, *job))
+            finally:
+                for future in pending:
+                    future.cancel()
 
     return outputs
 
@@ -1764,6 +1821,17 @@ def load_hmda(yr, data_dir=default_dir, save_dir=default_dir, query=None, column
     return df
 
 
+def _positive_worker_count(value):
+    """Parse a positive CLI worker count."""
+    try:
+        workers = int(value)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError("workers must be a positive integer") from exc
+    if workers <= 0:
+        raise argparse.ArgumentTypeError("workers must be a positive integer")
+    return workers
+
+
 def _build_cli_parser():
     """Build the command-line parser for HMDA download and conversion."""
     parser = argparse.ArgumentParser(
@@ -1804,6 +1872,10 @@ def _build_cli_parser():
     convert_parser.add_argument("--overwrite", action="store_true")
     convert_parser.add_argument("--chunksize", type=int, default=100000)
     convert_parser.add_argument("--compression", default="zstd")
+    convert_parser.add_argument(
+        "--workers", type=_positive_worker_count, default=1,
+        help="Number of file conversion processes (default: 1); increases memory use.",
+    )
     return parser
 
 
@@ -1827,6 +1899,7 @@ def main(argv=None):
             overwrite=args.overwrite,
             chunksize=args.chunksize,
             compression=args.compression,
+            workers=args.workers,
         )
     for path in paths:
         print(path)

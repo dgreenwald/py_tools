@@ -2,7 +2,9 @@
 
 import io
 import zipfile
+from concurrent.futures import Future
 
+import numpy as np
 import pandas as pd
 import pytest
 
@@ -807,6 +809,193 @@ def test_convert_requires_downloaded_raw_file(tmp_path):
         hmda.convert_lar(2023, data_dir=tmp_path)
 
 
+@pytest.mark.parametrize("workers", [0, -1, True, False, np.bool_(True), 1.5, "2", None])
+def test_convert_rejects_invalid_workers(tmp_path, workers):
+    with pytest.raises(ValueError, match="workers must be a positive integer"):
+        hmda.convert_lar([], data_dir=tmp_path, workers=workers)
+
+
+def test_parallel_conversion_matches_serial(tmp_path):
+    import pyarrow.parquet as pq
+
+    years = [2023, 1990, 2022, 2023]
+    expected = []
+    for root in (tmp_path / "serial", tmp_path / "parallel"):
+        for year in (2023, 2022):
+            source = hmda._resolve_lar_source(year)
+            _install_raw_zip(
+                root, year, source, "lar.csv",
+                (f"activity_year,lei,action_taken,loan_amount\n"
+                 f"{year},001,1,250000\n{year},002,,300000\n").encode(),
+            )
+        widths = hmda._NARA_1990_2003_WIDTHS
+        records = [
+            _fixed_width_record(widths, {0: "90", 1: respondent})
+            for respondent in ("00001234", "00005678")
+        ]
+        _install_raw_zip(root, 1990, "nara", "lar.dat", "\n".join(records).encode())
+        expected.append([
+            hmda._lar_parquet_path(year, root) for year in (2023, 1990, 2022)
+        ])
+
+    serial = hmda.convert_lar(years, data_dir=tmp_path / "serial", chunksize=1)
+    parallel = hmda.convert_lar(
+        years, data_dir=tmp_path / "parallel", chunksize=1, workers=np.int64(2)
+    )
+    assert [serial, parallel] == expected
+    for left, right in zip(serial, parallel):
+        pd.testing.assert_frame_equal(pd.read_parquet(left), pd.read_parquet(right))
+        left_file, right_file = pq.ParquetFile(left), pq.ParquetFile(right)
+        assert left_file.schema_arrow.equals(right_file.schema_arrow, check_metadata=True)
+        assert left_file.num_row_groups == right_file.num_row_groups == 2
+
+
+def test_parallel_all_sources_skips_existing_without_raw(tmp_path):
+    sources = ("ffiec_three_year", "ffiec_snapshot", "cfpb")
+    existing = _install_parquet(
+        tmp_path, 2017, sources[0], pd.DataFrame({"activity_year": [2017]})
+    )
+    original = existing.read_bytes()
+    for source in sources[1:]:
+        _install_raw_zip(
+            tmp_path, 2017, source, "lar.csv", b"activity_year,action_taken\n2017,1\n"
+        )
+    paths = hmda.convert_lar(2017, source="all", data_dir=tmp_path, workers=8)
+    assert paths == [hmda._lar_parquet_path(2017, tmp_path, source=s) for s in sources]
+    assert existing.read_bytes() == original
+    assert all(hmda._valid_parquet(path) for path in paths)
+
+
+@pytest.mark.parametrize("years", [[], [2023], [2024], [2023, 2024], [2024, 2025]])
+def test_convert_avoids_pool_for_at_most_one_pending_file(tmp_path, monkeypatch, years):
+    def unexpected_pool(**kwargs):
+        pytest.fail("No process pool needed")
+
+    monkeypatch.setattr(hmda, "ProcessPoolExecutor", unexpected_pool)
+    _install_raw_zip(
+        tmp_path, 2023, "ffiec_snapshot", "lar.csv", b"activity_year\n2023\n"
+    )
+    _install_parquet(tmp_path, 2024, "ffiec_snapshot", pd.DataFrame({"year": [2024]}))
+    _install_parquet(tmp_path, 2025, "ffiec_snapshot", pd.DataFrame({"year": [2025]}))
+    paths = hmda.convert_lar(years, data_dir=tmp_path, workers=4)
+    assert len(paths) == len(years)
+
+
+def test_parallel_overwrite_replaces_existing_outputs(tmp_path):
+    for year in (2023, 2024):
+        _install_parquet(
+            tmp_path, year, "ffiec_snapshot", pd.DataFrame({"old": [1]})
+        )
+        _install_raw_zip(
+            tmp_path, year, "ffiec_snapshot", "lar.csv",
+            f"activity_year\n{year}\n".encode(),
+        )
+    outputs = hmda.convert_lar(
+        [2023, 2024], data_dir=tmp_path, workers=2, overwrite=True
+    )
+    for year, path in zip((2023, 2024), outputs):
+        assert pd.read_parquet(path)["activity_year"].tolist() == [year]
+    assert not list(tmp_path.rglob("*.part"))
+
+
+def test_parallel_failure_preserves_output_and_cleans_temporary(tmp_path):
+    output = _install_parquet(
+        tmp_path, 2023, "ffiec_snapshot", pd.DataFrame({"activity_year": [2023]})
+    )
+    original = output.read_bytes()
+    _install_raw_zip(
+        tmp_path, 2023, "ffiec_snapshot", "lar.csv",
+        b"activity_year,action_taken\n2023,1\n2023,bad\n",
+    )
+    _install_raw_zip(
+        tmp_path, 2024, "ffiec_snapshot", "lar.csv", b"activity_year\n2024\n"
+    )
+    with pytest.raises(RuntimeError, match=r"2023.*ffiec_snapshot.*action_taken"):
+        hmda.convert_lar(
+            [2023, 2024], data_dir=tmp_path, workers=2, chunksize=1, overwrite=True
+        )
+    assert output.read_bytes() == original
+    assert not list(tmp_path.rglob("*.part"))
+    # The valid sibling may have completed or been cancelled before starting.
+    sibling = hmda._lar_parquet_path(2024, tmp_path)
+    if sibling.exists():
+        assert hmda._valid_parquet(sibling)
+
+
+@pytest.mark.parametrize("fail", [False, True])
+def test_parallel_scheduler_bounds_work_and_observes_completion(tmp_path, monkeypatch, fail):
+    submitted = []
+    active = set()
+    cancelled = []
+
+    class TrackedFuture(Future):
+        def cancel(self):
+            cancelled.append(self.year)
+            return super().cancel()
+
+    class Executor:
+        def __init__(self, max_workers, mp_context):
+            assert max_workers == 2
+            assert mp_context.get_start_method() == "spawn"
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            pass
+
+        def submit(self, fn, *job):
+            assert fn is hmda._convert_lar_file
+            future = TrackedFuture()
+            future.year = job[0]
+            submitted.append(future.year)
+            active.add(future)
+            assert len(active) <= 2
+            return future
+
+    def complete_latest(pending, return_when):
+        assert return_when == hmda.FIRST_COMPLETED
+        assert pending == active
+        # The first submitted file finishes last, exercising completion order.
+        future = max(pending, key=lambda f: f.year)
+        active.remove(future)
+        if fail:
+            future.set_exception(RuntimeError("conversion failed"))
+        else:
+            future.set_result(None)
+        return {future}, pending - {future}
+
+    monkeypatch.setattr(hmda, "ProcessPoolExecutor", Executor)
+    monkeypatch.setattr(hmda, "wait", complete_latest)
+    if fail:
+        with pytest.raises(RuntimeError, match="conversion failed"):
+            hmda.convert_lar([2022, 2023, 2024], data_dir=tmp_path, workers=2)
+        assert submitted == [2022, 2023]
+        assert cancelled == [2022]
+    else:
+        paths = hmda.convert_lar([2022, 2023, 2024], data_dir=tmp_path, workers=2)
+        assert submitted == [2022, 2023, 2024]
+        assert paths == [hmda._lar_parquet_path(y, tmp_path) for y in submitted]
+        assert not cancelled
+
+
+@pytest.mark.parametrize("value", ["0", "-1", "1.5", "bad"])
+def test_convert_cli_rejects_invalid_workers(value):
+    with pytest.raises(SystemExit) as exc:
+        hmda.main(["convert", "--workers", value])
+    assert exc.value.code == 2
+
+
+def test_convert_cli_forwards_workers(monkeypatch, capsys, tmp_path):
+    paths = [tmp_path / "2024.parquet", tmp_path / "2023.parquet"]
+    calls = []
+    monkeypatch.setattr(hmda, "convert_lar", lambda **kw: calls.append(kw) or paths)
+    assert hmda.main(["convert", "2024", "2023", "--workers", "2"]) == 0
+    assert calls[0]["workers"] == 2
+    assert calls[0]["years"] == [2024, 2023]
+    assert capsys.readouterr().out.splitlines() == [str(path) for path in paths]
+
+
 def test_download_cli_dispatches_options_and_prints_paths(
     tmp_path, monkeypatch, capsys
 ):
@@ -881,6 +1070,7 @@ def test_convert_cli_uses_all_source_years_when_omitted(tmp_path, monkeypatch, c
             "overwrite": False,
             "chunksize": 25000,
             "compression": "snappy",
+            "workers": 1,
         }
     ]
     assert capsys.readouterr().out == f"{output}\n"
