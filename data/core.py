@@ -1179,6 +1179,10 @@ class MVOLSResults:
         HC1 standard errors for each parameter.
     HC1_tstat : numpy.ndarray of shape (k, nz)
         HC1 t-statistics for each parameter.
+    cov_HAC : numpy.ndarray or None
+        Bartlett HAC parameter covariance when requested.
+    HAC_se, HAC_tstat : numpy.ndarray or None
+        Bartlett HAC standard errors and t-statistics when requested.
     llf : float
         Log-likelihood of the fitted model.
     aic : float
@@ -1193,6 +1197,7 @@ class MVOLSResults:
     nobs, params, fittedvalues, resid, cov_e : see Parameters
     cov_HC0, HC0_se, HC0_tstat : see Parameters
     cov_HC1, HC1_se, HC1_tstat : see Parameters
+    cov_HAC, HAC_se, HAC_tstat : see Parameters; ``None`` when not requested
     llf, aic, bic, hqc : see Parameters
     """
 
@@ -1213,6 +1218,9 @@ class MVOLSResults:
         aic,
         bic,
         hqc,
+        cov_HAC=None,
+        HAC_se=None,
+        HAC_tstat=None,
     ):
         """Initialise a MVOLSResults container.
 
@@ -1240,6 +1248,10 @@ class MVOLSResults:
             HC1 standard errors of shape (k, nz).
         HC1_tstat : numpy.ndarray
             HC1 t-statistics of shape (k, nz).
+        cov_HAC : numpy.ndarray or None
+            Bartlett HAC parameter covariance of shape (k*nz, k*nz).
+        HAC_se, HAC_tstat : numpy.ndarray or None
+            Bartlett HAC standard errors and t-statistics, shape (k, nz).
         llf : float
             Log-likelihood.
         aic : float
@@ -1268,6 +1280,9 @@ class MVOLSResults:
         self.aic = aic
         self.bic = bic
         self.hqc = hqc
+        self.cov_HAC = cov_HAC
+        self.HAC_se = HAC_se
+        self.HAC_tstat = HAC_tstat
 
 
 def mv_ols(df, lhs, rhs, match="inner", ix=None, nw_lags=0):
@@ -1291,7 +1306,8 @@ def mv_ols(df, lhs, rhs, match="inner", ix=None, nw_lags=0):
     ix : array-like of bool or None, optional
         Custom inclusion index (used when ``match='custom'``).
     nw_lags : int, optional
-        Newey-West HAC lag order. Currently not implemented; must be ``0``.
+        Maximum included lag for Bartlett HAC. ``nw_lags=0`` retains the
+        existing HC0 and HC1 covariance estimates without computing HAC.
 
     Returns
     -------
@@ -1299,16 +1315,12 @@ def mv_ols(df, lhs, rhs, match="inner", ix=None, nw_lags=0):
         Object whose ``results`` attribute is an :class:`MVOLSResults`
         instance, together with the sample index and design matrices.
 
-    Raises
-    ------
-    NotImplementedError
-        If ``nw_lags > 0`` (not yet implemented).
     """
     if "const" in rhs and "const" not in df:
         df["const"] = 1.0
 
-    if nw_lags > 0:
-        raise NotImplementedError("mv_ols with nw_lags > 0 is not implemented.")
+    if not isinstance(nw_lags, (int, np.integer)) or nw_lags < 0:
+        raise ValueError("nw_lags must be a nonnegative integer")
 
     X = df[rhs].values
     z = df[lhs].values
@@ -1339,6 +1351,17 @@ def mv_ols(df, lhs, rhs, match="inner", ix=None, nw_lags=0):
     HC1_se = standard_errors(cov_HC1, T).reshape(params.shape)
     HC1_tstat = params / HC1_se
 
+    cov_HAC = HAC_se = HAC_tstat = None
+    if nw_lags > 0:
+        from py_tools.econometrics.hac import long_run_cov
+
+        moments = (Xs[:, :, None] * resid[:, None, :]).reshape(T, k * nz)
+        S = long_run_cov(moments, nw_lags, kernel="bartlett")
+        bread = np.kron(np.linalg.inv(Xs.T @ Xs / T), np.eye(nz))
+        cov_HAC = bread @ S @ bread.T / T
+        HAC_se = np.sqrt(np.diag(cov_HAC)).reshape(params.shape)
+        HAC_tstat = params / HAC_se
+
     # Compute likelihood
     n_free = np.prod(params.shape)
 
@@ -1364,6 +1387,9 @@ def mv_ols(df, lhs, rhs, match="inner", ix=None, nw_lags=0):
         aic,
         bic,
         hqc,
+        cov_HAC,
+        HAC_se,
+        HAC_tstat,
     )
 
     return FullResults(results, ix, Xs, zs)

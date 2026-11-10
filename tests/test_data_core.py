@@ -30,7 +30,29 @@ from py_tools.data.core import (
     weight_regression_params,
     collapse,
     safe_sum,
+    mv_ols,
 )
+
+
+def test_mv_ols_hac_matches_statsmodels_equation_by_equation():
+    rng = np.random.default_rng(10)
+    n = 120
+    x = rng.normal(size=n)
+    innovations = rng.normal(size=(n, 2))
+    errors = np.zeros_like(innovations)
+    for t in range(1, n):
+        errors[t] = 0.6 * errors[t - 1] + innovations[t]
+    df = pd.DataFrame({"x": x, "y1": 1 + 2 * x + errors[:, 0],
+                       "y2": -1 + x + errors[:, 1]})
+    fit = mv_ols(df.copy(), ["y1", "y2"], ["const", "x"], nw_lags=17).results
+    assert fit.cov_HAC.shape == (4, 4)
+    for j, name in enumerate(("y1", "y2")):
+        reference = sm.OLS(df[name], sm.add_constant(df["x"])).fit().get_robustcov_results(
+            "HAC", maxlags=17, use_correction=False
+        )
+        np.testing.assert_allclose(fit.HAC_se[:, j], reference.bse, atol=1e-12)
+        np.testing.assert_allclose(fit.HAC_tstat[:, j], reference.tvalues, atol=1e-12)
+    assert mv_ols(df.copy(), ["y1", "y2"], ["const", "x"]).results.cov_HAC is None
 
 
 def make_regression_df(seed=123, n=240):

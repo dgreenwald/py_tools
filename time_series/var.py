@@ -118,6 +118,51 @@ def companion_form(A, use_const=True):
     return A_comp
 
 
+def simulate_var(A, resid, T, n_sims, init, rng, method="iid_resample"):
+    """Simulate a constant-inclusive VAR(p) by resampling residual rows.
+
+    ``A`` has shape (n_variables, n_variables*p + 1), with lag-one
+    coefficients first and the constant last. ``init`` contains p initial
+    observations in chronological order. The result has shape
+    (n_sims, T, n_variables) and excludes the initial observations.
+    """
+    A = np.asarray(A, dtype=float)
+    resid = np.asarray(resid, dtype=float)
+    init = np.asarray(init, dtype=float)
+    if method != "iid_resample":
+        raise ValueError("unknown simulation method")
+    if A.ndim != 2 or A.shape[0] == 0:
+        raise ValueError("A must be a nonempty 2-D array")
+    ny, nx = A.shape
+    if (nx - 1) % ny or nx <= 1:
+        raise ValueError("A must contain VAR lag blocks and a final constant")
+    p = (nx - 1) // ny
+    if p < 1 or init.shape != (p, ny):
+        raise ValueError("init must have shape (number of lags, number of variables)")
+    if resid.ndim != 2 or resid.shape[1] != ny or len(resid) == 0:
+        raise ValueError("resid must have shape (observations, number of variables)")
+    if not all(np.isfinite(x).all() for x in (A, resid, init)):
+        raise ValueError("A, resid, and init must be finite")
+    if not isinstance(T, (int, np.integer)) or T < 1:
+        raise ValueError("T must be a positive integer")
+    if not isinstance(n_sims, (int, np.integer)) or n_sims < 1:
+        raise ValueError("n_sims must be a positive integer")
+    if not isinstance(rng, np.random.Generator):
+        raise TypeError("rng must be a numpy.random.Generator")
+
+    state = np.empty((n_sims, nx))
+    state[:, :-1] = init[::-1].reshape(-1)
+    state[:, -1] = 1.0
+    transition = companion_form(A)
+    draws = rng.integers(len(resid), size=(n_sims, T))
+    simulations = np.empty((n_sims, T, ny))
+    for t in range(T):
+        state = state @ transition.T
+        state[:, :ny] += resid[draws[:, t]]
+        simulations[:, t] = state[:, :ny]
+    return simulations
+
+
 def compute_irfs(A, B, Nt_irf):
     """Compute impulse response functions for a VAR.
 

@@ -55,3 +55,25 @@ def test_var_class_fit_irf_and_bootstrap_smoke():
 
     model.bootstrap_irfs(np.eye(2), Nt_irf=6)
     assert model.irfs_boot.shape == (2, 2, 6, 8)
+
+
+def test_simulate_var_respects_lag_order_constant_and_seed():
+    A = np.array([[0.5, 0.25, 1.0]])
+    resid = np.zeros((3, 1))
+    init = np.array([[2.0], [4.0]])  # oldest, newest
+    actual = tsv.simulate_var(A, resid, T=3, n_sims=2, init=init,
+                              rng=np.random.default_rng(7))
+    expected = np.array([3.5, 3.75, 3.75])
+    assert actual.shape == (2, 3, 1)
+    np.testing.assert_allclose(actual[:, :, 0], np.tile(expected, (2, 1)))
+
+
+def test_simulate_var_draws_residual_rows_jointly():
+    A = np.zeros((2, 3))
+    resid = np.array([[1.0, 10.0], [2.0, 20.0]])
+    actual = tsv.simulate_var(A, resid, T=8, n_sims=4,
+                              init=np.zeros((1, 2)), rng=np.random.default_rng(11))
+    np.testing.assert_allclose(actual[:, :, 1], 10 * actual[:, :, 0])
+    duplicate = tsv.simulate_var(A, resid, T=8, n_sims=4,
+                                 init=np.zeros((1, 2)), rng=np.random.default_rng(11))
+    np.testing.assert_array_equal(actual, duplicate)

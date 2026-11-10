@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+from pathlib import Path
 
 from . import config
 
@@ -9,17 +10,20 @@ DATASET_NAME = "fama_bliss"
 DESCRIPTION = "Fama-Bliss bond yield dataset loader."
 
 
-def load(data_dir=default_dir):
+def load(data_dir=default_dir, filename="fbdata.csv"):
     """Load Fama-Bliss bond price data and compute log prices and yields.
 
-    Reads ``fbdata.csv`` from *data_dir*, pivots by maturity term (1–5 years),
+    Reads *filename* from *data_dir*, selects the five DISCBOND maturities,
+    pivots by maturity term (1–5 years),
     resamples to monthly frequency, and computes log prices and continuously
     compounded yields for each maturity.
 
     Parameters
     ----------
     data_dir : str, optional
-        Directory containing the ``fbdata.csv`` file.
+        Directory containing the input file.
+    filename : str, optional
+        CSV filename, default ``fbdata.csv``.
 
     Returns
     -------
@@ -29,8 +33,11 @@ def load(data_dir=default_dir):
         by date.
     """
 
-    infile = data_dir + "fbdata.csv"
+    infile = Path(data_dir) / filename
     df = pd.read_csv(infile)
+    df = df.loc[
+        df["TIDXFAM"].eq("DISCBOND") & df["TTERMTYPE"].isin(range(5001, 5006))
+    ].copy()
 
     df = df.rename(
         columns={
@@ -43,9 +50,7 @@ def load(data_dir=default_dir):
     df["price"] *= 0.01
 
     df["date"] = pd.to_datetime(df["date"])
-    df["term"] = df["term"] - 5000
-    df["term"] = df["term"].astype(str)
-    df["term"].replace({str(val): "P" + str(val) for val in range(1, 6)}, inplace=True)
+    df["term"] = "P" + (df["term"] - 5000).astype(str)
 
     df_stack = df.pivot(index="date", columns="term", values="price")
     df_stack = df_stack.resample("MS").mean()
