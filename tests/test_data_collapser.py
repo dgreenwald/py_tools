@@ -93,6 +93,11 @@ class TestCollapseFunction:
         assert np.isclose(result.loc["a", "x"], 4.0)
         assert np.isclose(result.loc["b", "x"], 16.0)
 
+    def test_default_variables_exclude_weight(self):
+        result = collapse(make_df(), by_list=["g"], weight_var="w")
+        assert result.columns.tolist() == ["x"]
+        assert np.isclose(result.loc["a", "x"], 2.0)
+
 
 # --- collapse_quantile ---
 

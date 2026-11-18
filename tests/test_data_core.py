@@ -488,6 +488,13 @@ class TestCollapse:
         result = collapse(df, method="sum", by=["g"], var_list=["x"], wvar="w")
         assert np.isclose(result.loc["a", "x"], 5.0)
 
+    def test_missing_value_excludes_its_weight(self):
+        df = pd.DataFrame({"g": ["a", "a"], "x": [1.0, np.nan], "w": [1.0, 2.0]})
+        with pytest.warns(DeprecationWarning, match="data.core.collapse"):
+            result = collapse(df, by=["g"], wvar="w")
+        assert np.isclose(result.loc["a", "x"], 1.0)
+        assert np.isclose(result.loc["a", "w"], 3.0)
+
 
 # --- absorb ---
 

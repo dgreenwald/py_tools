@@ -201,8 +201,8 @@ def collapse(
     by_list : list of str
         Columns to group by.
     var_list : list of str or None, optional
-        Columns to aggregate. Defaults to ``[]``, which causes
-        :class:`Collapser` to use all non-group columns automatically.
+        Columns to aggregate. Defaults to numeric non-group, non-weight
+        columns.
     weight_var : str or None, optional
         Column name of the weight variable.
     weight_suffix : bool, optional
@@ -471,7 +471,13 @@ class Collapser:
         self.by_list = by_list
 
         if not self.var_list:
-            self.var_list = [var for var in df.columns if var not in self.by_list]
+            self.var_list = [
+                var
+                for var in df.columns
+                if var not in self.by_list
+                and var != self.weight_var
+                and pd.api.types.is_numeric_dtype(df[var])
+            ]
 
         if self.weight_var is None:
             weight = np.ones((len(df), 1))

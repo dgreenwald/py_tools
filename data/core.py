@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 import pickle
+import warnings
 
 import statsmodels.api as sm
 import statsmodels.formula.api as smf
@@ -1725,7 +1726,7 @@ def sum_regression_params(positions, *args, **kwargs):
 
 
 def collapse(df, method="mean", var_list=None, by=None, wvar=None):
-    """Collapse a DataFrame to weighted means or sums within groups.
+    """Deprecated wrapper for weighted group aggregation.
 
     Parameters
     ----------
@@ -1746,7 +1747,8 @@ def collapse(df, method="mean", var_list=None, by=None, wvar=None):
     -------
     pandas.DataFrame
         Collapsed DataFrame indexed by *by* with aggregated *var_list*
-        columns and the weight sum column *wvar*.
+        columns and the weight sum column *wvar*. Missing values are excluded
+        from each variable's weight denominator.
 
     Raises
     ------
@@ -1754,6 +1756,13 @@ def collapse(df, method="mean", var_list=None, by=None, wvar=None):
         If *by* is empty, *method* is unsupported, *wvar* is ``None``, or
         *wvar* appears in *var_list*.
     """
+    warnings.warn(
+        "py_tools.data.core.collapse is deprecated; use "
+        "py_tools.data.collapser.collapse instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+
     if by is None:
         by = []
 
@@ -1770,18 +1779,16 @@ def collapse(df, method="mean", var_list=None, by=None, wvar=None):
 
     assert wvar not in var_list
 
-    keep_vars = list(set(var_list + by + [wvar]))
-    _df = df[keep_vars].copy()
+    from .collapser import collapse as collapse_with_collapser
 
-    for var in var_list:
-        if (var not in by) and (var != wvar):
-            _df[var] *= _df[wvar]
-
-    collapsed = _df.groupby(by)[var_list + [wvar]].sum()
-    if method == "mean":
-        for var in var_list:
-            collapsed[var] /= collapsed[wvar]
-
+    collapsed = collapse_with_collapser(
+        df,
+        by_list=by,
+        var_list=var_list,
+        weight_var=wvar,
+        as_sum=(method == "sum"),
+    )
+    collapsed[wvar] = df.groupby(by)[wvar].sum()
     return collapsed
 
 

@@ -24,7 +24,7 @@ pip install "dgreenwald-py-tools[datasets]"  # pandas-datareader, python-dotenv
 pip install "dgreenwald-py-tools[scraping]"  # requests, beautifulsoup4, lxml
 pip install "dgreenwald-py-tools[nlp]"       # nltk
 pip install "dgreenwald-py-tools[mpi]"       # mpi4py
-pip install "dgreenwald-py-tools[dev]"       # pytest, ruff
+pip install "dgreenwald-py-tools[dev]"       # pytest, ruff, pre-commit
 ```
 
 If you use dataset loaders, set:
@@ -130,8 +130,10 @@ df = datasets.load_dataset("fred", codes=["UNRATE"])
 
 ```bash
 pip install -e ".[dev]"
+pre-commit install       # run Ruff on staged Python files at commit time
 python -m pytest          # run tests
 ruff check .              # lint
+pre-commit run --all-files  # check the whole repository
 ```
 
 ## Contributing
