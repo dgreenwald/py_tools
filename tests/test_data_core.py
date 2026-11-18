@@ -31,6 +31,7 @@ from py_tools.data.core import (
     collapse,
     safe_sum,
     mv_ols,
+    out_of_sample_fitted_value,
 )
 
 
@@ -360,6 +361,83 @@ class TestRegressionCovariance:
 
         assert actual.cov_type == "HAC"
         assert np.all(np.isfinite(actual.bse))
+
+
+class TestOutOfSampleFittedValue:
+    def test_fits_only_within_inclusive_date_range(self):
+        dates = pd.date_range("2020-01-01", periods=6)
+        df = pd.DataFrame(
+            {"x": np.arange(6.0), "y": [100.0, 3.0, 5.0, 7.0, 9.0, np.nan]},
+            index=dates,
+        )
+
+        result = out_of_sample_fitted_value(
+            df, "y", "x", startdate=dates[1], enddate=dates[4], var_name="fit"
+        )
+
+        assert result.index.equals(df.index)
+        assert result.name == "fit"
+        np.testing.assert_allclose(result, 1.0 + 2.0 * df["x"], atol=1e-12)
+
+    def test_weighted_fit_predicts_without_prediction_weights(self):
+        dates = pd.date_range("2020-01-01", periods=5)
+        df = pd.DataFrame(
+            {"x": [0.0, 1.0, 2.0, 3.0, 4.0],
+             "y": [1.0, 3.0, 5.0, np.nan, np.nan],
+             "w": [1.0, 2.0, 3.0, np.nan, np.nan]},
+            index=dates,
+        )
+
+        result = out_of_sample_fitted_value(
+            df, "y", ["x"], enddate=dates[2], weight_var="w"
+        )
+
+        np.testing.assert_allclose(result, [1.0, 3.0, 5.0, 7.0, 9.0], atol=1e-12)
+
+    def test_categorical_fixed_effects_use_fitted_design(self):
+        dates = pd.date_range("2020-01-01", periods=7)
+        df = pd.DataFrame(
+            {"x": np.arange(7.0),
+             "g": ["a", "b", "a", "b", "a", "b", "a"]},
+            index=dates,
+        )
+        expected = 1.0 + 2.0 * df["x"] + 10.0 * (df["g"] == "b")
+        df["y"] = expected
+        df.loc[dates[5]:, "y"] = np.nan
+
+        result = out_of_sample_fitted_value(
+            df, "y", "x", enddate=dates[4], fes=["g"]
+        )
+
+        np.testing.assert_allclose(result, expected, atol=1e-12)
+
+    def test_missing_predictors_and_duplicate_index(self):
+        dates = pd.to_datetime(
+            ["2020-01-01", "2020-01-02", "2020-01-02", "2020-01-02", "2020-01-03"]
+        )
+        df = pd.DataFrame(
+            {"x": [0.0, 1.0, 2.0, np.nan, 4.0],
+             "y": [1.0, 3.0, 5.0, np.nan, np.nan]},
+            index=dates,
+        )
+
+        result = out_of_sample_fitted_value(df, "y", "x", enddate=dates[1])
+
+        assert result.index.equals(df.index)
+        np.testing.assert_allclose(
+            result.iloc[[0, 1, 2, 4]], [1.0, 3.0, 5.0, 9.0], atol=1e-12
+        )
+        assert np.isnan(result.iloc[3])
+
+    def test_empty_fit_range_raises(self):
+        df = pd.DataFrame({"x": [1.0], "y": [2.0]}, index=pd.to_datetime(["2020-01-01"]))
+        with pytest.raises(ValueError, match="No observations"):
+            out_of_sample_fitted_value(df, "y", "x", startdate="2021-01-01")
+
+    def test_absorbed_effects_rejected(self):
+        df = pd.DataFrame({"x": [1.0], "y": [2.0], "g": ["a"]})
+        with pytest.raises(NotImplementedError, match="absorb_vars"):
+            out_of_sample_fitted_value(df, "y", "x", absorb_vars=["g"])
 
 
 # --- least_sq ---

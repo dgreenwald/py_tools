@@ -1809,3 +1809,51 @@ def safe_sum(x):
         Sum of *x*, or ``NaN`` if any element is ``NaN``.
     """
     return x.sum(skipna=False)
+
+
+def out_of_sample_fitted_value(
+    df, lhs, rhs, startdate=None, enddate=None, var_name=None, **kwargs
+):
+    """Fit on the inclusive date range and predict wherever all RHS are present.
+
+    The returned series retains the full input index. Missing RHS values give
+    missing predictions; missing LHS values outside the fit range do not matter.
+    Additional regression options are passed to :func:`regression`. Trend and
+    absorbed fixed effects are not supported for out-of-sample prediction.
+    """
+    if kwargs.get("trend") is not None or kwargs.get("absorb_vars"):
+        raise NotImplementedError(
+            "Out-of-sample prediction does not support trend or absorb_vars"
+        )
+
+    if isinstance(rhs, str):
+        rhs = [rhs]
+    else:
+        rhs = list(rhs)
+
+    if startdate is None:
+        df_samp = df if enddate is None else df.loc[:enddate]
+    else:
+        df_samp = df.loc[startdate:] if enddate is None else df.loc[startdate:enddate]
+    if df_samp.empty:
+        raise ValueError("No observations in the fitting date range")
+
+    fr = regression(df_samp, lhs, rhs, **kwargs)
+    series = pd.Series(np.nan, index=df.index, name=var_name, dtype=float)
+    valid_rhs = df[rhs].notna().all(axis=1)
+    if valid_rhs.any():
+        try:
+            import patsy
+        except ImportError as exc:
+            raise ImportError("patsy is required for out-of-sample prediction") from exc
+
+        positions = np.flatnonzero(valid_rhs.to_numpy())
+        prediction_df = df.iloc[positions].copy()
+        prediction_df.index = positions
+        design_info = fr.results.model.data.orig_exog.design_info
+        design = patsy.build_design_matrices(
+            [design_info], prediction_df, return_type="dataframe"
+        )[0]
+        predictions = fr.results.predict(design, transform=False)
+        series.iloc[design.index.to_numpy()] = np.asarray(predictions)
+    return series
