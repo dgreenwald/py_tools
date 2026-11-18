@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 import pickle
+import re
 import warnings
 
 import statsmodels.api as sm
@@ -53,7 +54,14 @@ def lowercase(df):
 
 
 def absorb(
-    df, groups, value_var, weight_var=None, restore_mean=True, tol=1e-12, display=False
+    df,
+    groups,
+    value_var,
+    weight_var=None,
+    restore_mean=True,
+    tol=1e-12,
+    display=False,
+    max_iter=10000,
 ):
     """Remove the mean from a variable by group (alternating-projections FWL).
 
@@ -77,10 +85,15 @@ def absorb(
         If ``True`` (default), add back the (weighted) grand mean so that
         the output has the same mean as the input.
     tol : float, optional
-        Convergence tolerance on the root-mean-square of group means of the
-        residuals. Defaults to ``1e-12``.
+        Relative convergence tolerance: iteration stops once the summed
+        root-mean-square of the group means of the weighted residuals falls
+        below ``tol`` times the root-mean-square of the weighted variable.
+        Defaults to ``1e-12``.
     display : bool, optional
         If ``True``, print the RMSE at each iteration. Defaults to ``False``.
+    max_iter : int, optional
+        Maximum number of alternating-projection sweeps. A ``RuntimeWarning``
+        is issued if the tolerance is not reached. Defaults to ``10000``.
 
     Returns
     -------
@@ -141,9 +154,23 @@ def absorb(
     _df["_res_weight"] = _df["_x_weight"].copy()
 
     err = get_err()
+    scale = np.sqrt(np.nanmean(_df["_x_weight"].to_numpy() ** 2))
+    if not np.isfinite(scale) or scale == 0.0:
+        scale = 1.0
+    threshold = tol * scale
 
     count = 0
-    while err > tol:
+    while err > threshold:
+        if count >= max_iter:
+            warnings.warn(
+                "absorb did not converge for {0} after {1:d} iterations "
+                "(relative error {2:g}, tol {3:g})".format(
+                    value_var, count, err / scale, tol
+                ),
+                RuntimeWarning,
+                stacklevel=2,
+            )
+            break
         for ii, group in enumerate(groups):
             fe_var = fe_list[ii]
             _df["_res_weight"] += _df[fe_var + "_weight"]
@@ -595,6 +622,72 @@ def _formula_from_terms(lhs, rhs, fes=None, intercept=True, formula_extra=None):
     return formula
 
 
+def _formula_variables(df, formula):
+    """Return the columns of *df* referenced by a patsy formula fragment."""
+    tokens = re.findall(r"[A-Za-z_][A-Za-z0-9_.]*", formula)
+    tokens += re.findall(r"""Q\(\s*["']([^"']+)["']\s*\)""", formula)
+    return [tok for tok in dict.fromkeys(tokens) if tok in df.columns]
+
+
+def _resolve_cov_type(cov_type, absorbing):
+    """Pick the default covariance type and reject leverage-based ones under absorb."""
+    if cov_type is None:
+        return "HC1" if absorbing else "HC3"
+    if absorbing and cov_type.upper() in ("HC2", "HC3"):
+        raise ValueError(
+            "cov_type={0!r} is not supported with absorbed fixed effects: the "
+            "leverage of the absorbed effects is not available. Use 'HC1', "
+            "cluster, or Newey-West standard errors, or include the effects "
+            "as dummies via `fes`.".format(cov_type)
+        )
+    return cov_type
+
+
+def _fe_rank(df, groups):
+    """Rank of the absorbed fixed-effect dummies (including the constant).
+
+    Exact for one or two sets of effects (two-way redundancy is counted via
+    connected components). For three or more sets, each additional set is
+    assumed to add one redundancy only, so the rank is an upper bound and the
+    implied degrees of freedom are conservative.
+    """
+    ids = [df.groupby(group, sort=False).ngroup().to_numpy() for group in groups]
+    if not ids:
+        return 0
+
+    counts = [int(this_id.max()) + 1 for this_id in ids]
+    rank = counts[0]
+    if len(ids) >= 2:
+        from scipy.sparse import coo_matrix
+        from scipy.sparse.csgraph import connected_components
+
+        n0, n1 = counts[0], counts[1]
+        graph = coo_matrix(
+            (np.ones(len(ids[0])), (ids[0], ids[1] + n0)), shape=(n0 + n1, n0 + n1)
+        )
+        n_components, _ = connected_components(graph, directed=False)
+        rank = n0 + n1 - n_components
+    for count in counts[2:]:
+        rank += count - 1
+    return rank
+
+
+def _is_nested(df, group, cluster_groups):
+    """Return True if every level of *group* lies within a single cluster."""
+    ids = df.groupby(group, sort=False).ngroup().to_numpy()
+    n_clusters = pd.Series(np.asarray(cluster_groups)).groupby(ids).nunique()
+    return bool(n_clusters.max() <= 1)
+
+
+def _rescale_cov(results, factor):
+    """Scale the covariance attached to a statsmodels results object."""
+    results.cov_params_default = results.cov_params_default * factor
+    cache = getattr(results, "_cache", None)
+    if cache is not None:
+        cache.clear()
+    return results
+
+
 def _extend_list_with_item_or_list(var_list, items):
     for item in items:
         if isinstance(item, str):
@@ -645,7 +738,7 @@ def regression(
     cluster_var=None,
     cluster_groups=None,
     weight_var=None,
-    cov_type="HC3",
+    cov_type=None,
     **kwargs,
 ):
     """Run an OLS or WLS regression from a pandas DataFrame.
@@ -667,8 +760,10 @@ def regression(
         formula. Defaults to ``[]``.
     absorb_vars : list or None, optional
         Group variables to absorb via :func:`absorb` before fitting. Supports
-        the same syntax as :func:`absorb`'s *groups* argument.
-        Defaults to ``[]``.
+        the same syntax as :func:`absorb`'s *groups* argument. Every column of
+        the design (including trends, ``fes`` dummies and ``formula_extra``
+        terms) is absorbed, and the residual degrees of freedom account for
+        the absorbed effects. Defaults to ``[]``.
     intercept : bool, optional
         If ``True`` (default), include a constant term.
     formula_extra : str or None, optional
@@ -684,9 +779,11 @@ def regression(
         Pre-computed cluster group labels (alternative to *cluster_var*).
     weight_var : str or None, optional
         Weight variable for WLS estimation.
-    cov_type : str, optional
+    cov_type : str or None, optional
         Robust covariance type to use when not using clustered or Newey-West
-        standard errors. Defaults to ``'HC3'``.
+        standard errors. Defaults to ``'HC3'``, or ``'HC1'`` when
+        *absorb_vars* is given (``'HC2'``/``'HC3'`` are rejected with absorbed
+        effects).
     **kwargs
         Additional keyword arguments forwarded to :func:`formula_regression`
         or :func:`wls_formula`.
@@ -711,6 +808,8 @@ def regression(
         var_list += [weight_var]
     if cluster_var is not None:
         var_list += [cluster_var]
+    if formula_extra is not None:
+        var_list += _formula_variables(df, formula_extra)
     var_list = _extend_list_with_item_or_list(var_list, absorb_vars)
     this_list = _select_existing_vars(df, var_list)
 
@@ -721,16 +820,6 @@ def regression(
         ix = ix_samp.copy()
 
     ix_both = np.logical_and(ix, ix_samp)
-
-    if absorb_vars:
-        for var in [lhs] + rhs:
-            _df.loc[ix_both, var] = absorb(
-                _df.loc[ix_both, :],
-                absorb_vars,
-                var,
-                weight_var=weight_var,
-                restore_mean=True,
-            )
 
     Xs = _df.loc[ix_both, rhs].values
     zs = _df.loc[ix_both, lhs].values
@@ -757,6 +846,21 @@ def regression(
         Xs = np.hstack((np.ones((Xs.shape[0], 1)), Xs))
 
     these_groups = _slice_cluster_groups(_df, cluster_var, cluster_groups, ix_both)
+
+    if absorb_vars:
+        fr = wls_formula(
+            _df,
+            formula,
+            weight_var=weight_var,
+            ix=ix_both,
+            cluster_groups=these_groups,
+            cov_type=cov_type,
+            absorb_vars=absorb_vars,
+            **kwargs,
+        )
+        return FullResults(
+            fr.results, ix=ix, Xs=fr.results.model.exog, zs=fr.results.model.endog
+        )
 
     if weight_var is None:
         fr = formula_regression(
@@ -805,6 +909,13 @@ def _apply_absorb_to_design(df, y, X, weights, absorb_vars, weight_var=None):
     X = X.copy()
     absorb_df = df.loc[y.index, :].copy()
 
+    # Restoring the grand mean is only equivalent to the dummy regression when
+    # the design carries a constant to absorb it.
+    has_const = any(
+        np.allclose(X[col], X[col].iloc[0]) and X[col].iloc[0] != 0.0
+        for col in X.columns
+    )
+
     if weight_var is None:
         absorb_weight_var = "_absorb_weight"
         absorb_df[absorb_weight_var] = weights
@@ -819,7 +930,7 @@ def _apply_absorb_to_design(df, y, X, weights, absorb_vars, weight_var=None):
             absorb_vars,
             absorb_var,
             weight_var=absorb_weight_var,
-            restore_mean=True,
+            restore_mean=has_const,
         )
 
     for ii, col in enumerate(X.columns):
@@ -833,7 +944,7 @@ def _apply_absorb_to_design(df, y, X, weights, absorb_vars, weight_var=None):
             absorb_vars,
             absorb_var,
             weight_var=absorb_weight_var,
-            restore_mean=True,
+            restore_mean=has_const,
         )
 
     return y, X
@@ -847,7 +958,7 @@ def wls_formula(
     ix=None,
     nw_lags=0,
     cluster_groups=None,
-    cov_type="HC3",
+    cov_type=None,
     absorb_vars=None,
     display=False,
 ):
@@ -873,13 +984,18 @@ def wls_formula(
         (*cov_type* errors).
     cluster_groups : array-like or None, optional
         Cluster group labels for cluster-robust standard errors.
-    cov_type : str, optional
+    cov_type : str or None, optional
         Robust covariance type to use when *cluster_groups* is ``None`` and
-        ``nw_lags == 0``. Defaults to ``'HC3'``.
+        ``nw_lags == 0``. Defaults to ``'HC3'``, or ``'HC1'`` when
+        *absorb_vars* is given (``'HC2'``/``'HC3'`` are rejected with absorbed
+        effects).
     absorb_vars : list or None, optional
         Group variables to absorb via :func:`absorb` before fitting. Supports
-        the same syntax as :func:`absorb`'s *groups* argument. Defaults to
-        ``[]``.
+        the same syntax as :func:`absorb`'s *groups* argument. Rows with
+        missing group values are dropped. The residual degrees of freedom
+        are reduced by the rank of the absorbed effects. For clustered
+        standard errors, effects nested within clusters are not counted
+        (the reghdfe convention). Defaults to ``[]``.
     display : bool, optional
         If ``True``, print the regression summary. Defaults to ``False``.
 
@@ -892,8 +1008,13 @@ def wls_formula(
     if absorb_vars is None:
         absorb_vars = []
 
+    cov_type = _resolve_cov_type(cov_type, bool(absorb_vars))
+
     if ix is None:
         ix = np.ones(len(df), dtype=bool)
+    if absorb_vars:
+        group_vars = _extend_list_with_item_or_list([], absorb_vars)
+        ix = np.logical_and(ix, df[group_vars].notna().all(axis=1).to_numpy())
 
     try:
         import patsy
@@ -907,11 +1028,34 @@ def wls_formula(
     weights = _prepare_formula_weights(df, ix, y.index, weight_var, weights)
     y, X = _apply_absorb_to_design(df, y, X, weights, absorb_vars, weight_var)
 
-    results = sm.WLS(y, X, weights=weights).fit()
+    model = sm.WLS(y, X, weights=weights)
+    if absorb_vars:
+        sample = df.loc[y.index, :]
+        has_const = int(model.k_constant > 0)
+        fe_dof = _fe_rank(sample, absorb_vars) - has_const
+        model.df_resid -= fe_dof
+        model.df_model += fe_dof
+
+    results = model.fit()
 
     results = _update_fit_cov(
         results, nw_lags=nw_lags, cluster_groups=cluster_groups, cov_type=cov_type
     )
+
+    if absorb_vars and cluster_groups is not None:
+        # statsmodels' small-sample factor (N-1)/(N-K) only sees the columns of
+        # the absorbed design; add the effects that are not nested in clusters.
+        nonnested = [
+            group
+            for group in absorb_vars
+            if not _is_nested(sample, group, cluster_groups)
+        ]
+        k_extra = _fe_rank(sample, nonnested) - has_const if nonnested else 0
+        if k_extra > 0:
+            n_obs, k_cols = X.shape
+            results = _rescale_cov(
+                results, (n_obs - k_cols) / (n_obs - k_cols - k_extra)
+            )
 
     if display:
         print(results.summary())
@@ -1037,6 +1181,8 @@ def formula_regression(
         Object containing statsmodels results, the sample index, and ``None``
         for design matrix and outcome (formula-based fit).
     """
+    cov_type = _resolve_cov_type(cov_type, False)
+
     if ix is None:
         model = smf.ols(formula=formula, data=df)
     else:
@@ -1222,6 +1368,7 @@ class MVOLSResults:
         cov_HAC=None,
         HAC_se=None,
         HAC_tstat=None,
+        nobs_used=None,
     ):
         """Initialise a MVOLSResults container.
 
@@ -1284,6 +1431,26 @@ class MVOLSResults:
         self.cov_HAC = cov_HAC
         self.HAC_se = HAC_se
         self.HAC_tstat = HAC_tstat
+        self.nobs_used = nobs_used
+
+    def cov_params(self, cov_type="HC0"):
+        """Finite-sample covariance of ``params.ravel()`` (C order).
+
+        The stored ``cov_*`` attributes are asymptotic covariances of
+        ``sqrt(T)`` times the estimates; this divides by the number of
+        observations used in estimation.
+
+        Parameters
+        ----------
+        cov_type : {'HC0', 'HC1', 'HAC'}, optional
+            Which stored covariance to use (``'HC0'`` is the homoskedastic
+            estimator, ``'HC1'`` the heteroskedasticity-robust one). Defaults
+            to ``'HC0'``.
+        """
+        cov = getattr(self, "cov_" + cov_type)
+        if cov is None:
+            raise ValueError("cov_{0} was not computed".format(cov_type))
+        return cov / self.nobs_used
 
 
 def mv_ols(df, lhs, rhs, match="inner", ix=None, nw_lags=0):
@@ -1391,6 +1558,7 @@ def mv_ols(df, lhs, rhs, match="inner", ix=None, nw_lags=0):
         cov_HAC,
         HAC_se,
         HAC_tstat,
+        nobs_used=T,
     )
 
     return FullResults(results, ix, Xs, zs)
@@ -1564,33 +1732,42 @@ def read_pickle(path):
         return pickle.load(f)
 
 
-def demean_separate(df, var_list, group_list, **kwargs):
-    """Demean variables sequentially by each group variable.
+def demean_separate(df, var_list, group_list, prefix=None, **kwargs):
+    """Remove fixed effects for several group dimensions jointly.
 
-    Applies :func:`demean2` once per group in *group_list*, passing the
-    result of each call as input to the next. This corresponds to iterative
-    within-group demeaning.
+    Projects each variable off the dummies for every group in *group_list*
+    simultaneously (via :func:`absorb`), which is exact for unbalanced as
+    well as balanced panels. A single sequential pass of group demeaning is
+    only correct for balanced data.
 
     Parameters
     ----------
     df : pandas.DataFrame
-        Input DataFrame (modified by each call to :func:`demean2`).
+        Input DataFrame (not modified in place).
     var_list : list of str
         Variables to demean.
     group_list : list
-        Sequence of group-by variable(s) passed one at a time to
-        :func:`demean2`.
+        Group dimensions; each element is a column name or a list of names
+        (interacted effects), as in :func:`absorb`.
+    prefix : str or None, optional
+        If ``None`` (default), demeaned values overwrite the original columns.
+        Otherwise they are written to ``'<prefix>_<var>'``.
     **kwargs
-        Additional keyword arguments forwarded to :func:`demean2`.
+        Additional keyword arguments forwarded to :func:`absorb`
+        (e.g. ``weight_var``, ``tol``).
 
     Returns
     -------
     pandas.DataFrame
-        DataFrame with variables demeaned by each group in succession.
+        Copy of *df* with demeaned columns. Rows with missing group values
+        get ``NaN``.
     """
+    kwargs.setdefault("restore_mean", False)
+    full_prefix = "" if prefix is None else prefix + "_"
 
-    for group in group_list:
-        df = demean2(group, var_list, df, **kwargs)
+    df = df.copy()
+    for var in var_list:
+        df[full_prefix + var] = absorb(df, group_list, var, **kwargs).to_numpy()
 
     return df
 
@@ -1654,9 +1831,12 @@ def weight_regression_params(weights, params=None, cov=None, results=None):
     cov : array-like of shape (k, k) or None, optional
         Covariance matrix of the coefficients. Required if *results* is
         ``None``.
-    results : statsmodels results object or None, optional
-        Alternative input: if provided, ``params`` and ``cov_HC0`` are
-        extracted from this object.
+    results : statsmodels or MVOLSResults object, optional
+        Alternative input: if provided, ``params`` and ``cov_params()`` are
+        taken from this object, so the covariance actually attached to the
+        fit (robust, clustered, HAC, ...) is used. For :class:`MVOLSResults`
+        the parameters are ``params.ravel()`` (C order) and the homoskedastic
+        covariance is used.
 
     Returns
     -------
@@ -1674,8 +1854,8 @@ def weight_regression_params(weights, params=None, cov=None, results=None):
     assert ((params is not None) and (cov is not None)) or (results is not None)
 
     if results is not None:
-        params = results.params
-        cov = results.cov_HC0
+        params = np.asarray(results.params).ravel()
+        cov = np.asarray(results.cov_params())
 
     x = np.dot(params, weights)
     se = np.sqrt(np.dot(weights, np.dot(cov, weights)))
@@ -1705,7 +1885,7 @@ def sum_regression_params(positions, *args, **kwargs):
     """
 
     if "results" in kwargs and kwargs["results"] is not None:
-        n_params = len(kwargs["results"].params)
+        n_params = np.size(kwargs["results"].params)
     elif "params" in kwargs and kwargs["params"] is not None:
         n_params = len(kwargs["params"])
     elif "cov" in kwargs and kwargs["cov"] is not None:

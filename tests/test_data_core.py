@@ -28,6 +28,8 @@ from py_tools.data.core import (
     demean,
     demean2,
     weight_regression_params,
+    sum_regression_params,
+    demean_separate,
     collapse,
     safe_sum,
     mv_ols,
@@ -599,3 +601,163 @@ class TestSafeSum:
 
     def test_nan_propagates(self):
         assert np.isnan(safe_sum(pd.Series([1.0, np.nan, 3.0])))
+
+
+# --- absorbed fixed effects vs. explicit dummies ---
+
+
+def make_panel_df(seed=7, n=400):
+    rng = np.random.default_rng(seed)
+    df = pd.DataFrame(
+        {
+            "g": rng.integers(0, 30, size=n),
+            "h": rng.integers(0, 8, size=n),
+            "z": rng.normal(size=n),
+            "w": rng.uniform(0.5, 2.0, size=n),
+        }
+    )
+    df["x"] = rng.normal(size=n) + 0.1 * df["g"]
+    df["c"] = df["g"] // 5  # cluster that nests g
+    df["k"] = rng.integers(0, 15, size=n)  # cluster crossing g
+    df["y"] = df["x"] + 0.5 * df["z"] + 0.3 * df["g"] + 0.2 * df["h"]
+    df["y"] += rng.normal(size=n)
+    return df
+
+
+def _coef(fr, name="x"):
+    res = fr.results
+    i = res.model.exog_names.index(name)
+    return res.params[i], res.bse[i], res.df_resid
+
+
+def _assert_same_coef(actual, expected, name="x"):
+    a, e = _coef(actual, name), _coef(expected, name)
+    assert np.allclose(a, e, atol=1e-8), (a, e)
+
+
+class TestAbsorbedRegression:
+    @pytest.mark.parametrize("groups", [["g"], ["g", "h"], [["g", "h"]]])
+    @pytest.mark.parametrize("cov_type", ["HC1", "HC0"])
+    def test_absorb_matches_dummies(self, groups, cov_type):
+        df = make_panel_df()
+        flat = [g for item in groups for g in ([item] if isinstance(item, str) else item)]
+        extra = "C(g):C(h)" if isinstance(groups[0], list) else None
+        dummies = regression(
+            df, "y", ["x", "z"], fes=None if extra else flat,
+            formula_extra=extra, cov_type=cov_type,
+        )
+        absorbed = regression(
+            df, "y", ["x", "z"], absorb_vars=groups, cov_type=cov_type
+        )
+        _assert_same_coef(absorbed, dummies)
+
+    def test_weighted_absorb_matches_dummies(self):
+        df = make_panel_df()
+        dummies = regression(df, "y", ["x"], fes=["g", "h"], weight_var="w", cov_type="HC1")
+        absorbed = regression(df, "y", ["x"], absorb_vars=["g", "h"], weight_var="w")
+        _assert_same_coef(absorbed, dummies)
+
+    def test_trend_is_absorbed(self):
+        df = make_panel_df()
+        dummies = regression(df, "y", ["x"], fes=["g"], trend="linear", cov_type="HC1")
+        absorbed = regression(df, "y", ["x"], absorb_vars=["g"], trend="linear")
+        _assert_same_coef(absorbed, dummies)
+
+    def test_fes_dummies_are_absorbed(self):
+        df = make_panel_df()
+        dummies = regression(df, "y", ["x"], fes=["g", "h"], cov_type="HC1")
+        absorbed = regression(df, "y", ["x"], fes=["h"], absorb_vars=["g"])
+        _assert_same_coef(absorbed, dummies)
+
+    def test_no_intercept_absorb_matches_dummies(self):
+        df = make_panel_df()
+        dummies = regression(df, "y", ["x"], fes=["g"], cov_type="HC1")
+        absorbed = regression(df, "y", ["x"], absorb_vars=["g"], intercept=False)
+        _assert_same_coef(absorbed, dummies)
+
+    def test_cluster_not_nested_matches_dummies(self):
+        df = make_panel_df()
+        dummies = regression(df, "y", ["x"], fes=["g"], cluster_var="k")
+        absorbed = regression(df, "y", ["x"], absorb_vars=["g"], cluster_var="k")
+        assert np.allclose(_coef(absorbed)[:2], _coef(dummies)[:2], atol=1e-8)
+
+    def test_cluster_nested_effects_not_counted(self):
+        df = make_panel_df()
+        absorbed = regression(df, "y", ["x"], absorb_vars=["g"], cluster_var="c")
+        # Nested effects are excluded from K: same as clustering the
+        # within-transformed data directly.
+        d = df.copy()
+        for v in ["y", "x"]:
+            d[v] = absorb(df, ["g"], v)
+        direct = regression(d, "y", ["x"], cluster_var="c")
+        assert np.allclose(_coef(absorbed)[:2], _coef(direct)[:2], atol=1e-8)
+
+    @pytest.mark.parametrize("cov_type", ["HC2", "HC3"])
+    def test_leverage_cov_types_rejected(self, cov_type):
+        df = make_panel_df()
+        with pytest.raises(ValueError, match="absorbed"):
+            regression(df, "y", ["x"], absorb_vars=["g"], cov_type=cov_type)
+
+    def test_default_cov_type(self):
+        df = make_panel_df()
+        assert regression(df, "y", ["x"]).results.cov_type == "HC3"
+        assert regression(df, "y", ["x"], absorb_vars=["g"]).results.cov_type == "HC1"
+
+    def test_formula_extra_new_variable(self):
+        df = make_panel_df()
+        actual = regression(df, "y", ["x"], formula_extra="z + np.log(w)")
+        expected = formula_regression(df, "y ~ x + z + np.log(w)")
+        assert np.allclose(actual.results.params, expected.results.params)
+
+    def test_formula_extra_missing_values_with_cluster(self):
+        df = make_panel_df()
+        df.loc[[1, 4, 9], "z"] = np.nan
+        actual = regression(df, "y", ["x"], formula_extra="z", cluster_var="k")
+        assert actual.results.nobs == len(df) - 3
+
+
+class TestDemeanSeparate:
+    def test_matches_dummy_residuals_unbalanced(self):
+        df = make_panel_df()
+        actual = demean_separate(df, ["x"], ["g", "h"])
+        expected = sm.OLS(
+            df["x"], patsy.dmatrix("C(g) + C(h)", df, return_type="dataframe")
+        ).fit().resid
+        assert np.allclose(actual["x"], expected, atol=1e-8)
+
+    def test_prefix_keeps_original(self):
+        df = make_panel_df()
+        actual = demean_separate(df, ["x"], ["g"], prefix="dm")
+        assert np.allclose(actual["x"], df["x"])
+        assert np.allclose(actual.groupby("g")["dm_x"].mean(), 0.0, atol=1e-10)
+
+
+class TestWeightRegParamsResults:
+    def test_uses_attached_robust_cov(self):
+        df = make_regression_df()
+        res = regression(df, "y", ["x", "z"], cov_type="HC1").results
+        w = np.array([0.0, 1.0, 1.0])
+        x, se = weight_regression_params(w, results=res)
+        assert np.isclose(x, res.params[1] + res.params[2])
+        assert np.isclose(se, np.sqrt(w @ res.cov_params() @ w), atol=1e-12)
+
+    def test_mv_ols_scaled_by_sample_size(self):
+        df = make_regression_df()
+        df.loc[[0, 1], "y"] = np.nan
+        res = mv_ols(df.copy(), ["y", "z"], ["const", "x"]).results
+        x, se = sum_regression_params([2], results=res)  # params[1, 0]: x in y-eq
+        assert np.isclose(x, res.params[1, 0])
+        assert np.isclose(se, res.HC0_se[1, 0], atol=1e-12)
+
+
+class TestAbsorbConvergence:
+    def test_large_scale_converges(self):
+        df = make_panel_df()
+        df["big"] = 1e8 * df["x"]
+        out = absorb(df, ["g", "h"], "big", restore_mean=False)
+        assert np.allclose(out / 1e8, absorb(df, ["g", "h"], "x", restore_mean=False))
+
+    def test_max_iter_warns(self):
+        df = make_panel_df()
+        with pytest.warns(RuntimeWarning, match="did not converge"):
+            absorb(df, ["g", "h"], "x", max_iter=1)
